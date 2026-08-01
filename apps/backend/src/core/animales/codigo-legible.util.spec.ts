@@ -4,7 +4,7 @@ import {
   validarCodigoLegible,
   validarMicrochipISO,
   resolverIdentificadorExterno,
-} from './codigo-legible.util.ts';
+} from './codigo-legible.util';
 
 let ok = 0, fail = 0;
 function check(nombre: string, cond: boolean) {
