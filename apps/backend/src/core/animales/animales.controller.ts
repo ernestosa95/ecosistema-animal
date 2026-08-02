@@ -3,11 +3,13 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
 import { AnimalesService } from './animales.service';
 import { CreateAnimalDto } from './dto/create-animal.dto';
+import { UpdateAnimalDto } from './dto/update-animal.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../common/guards/tenant.guard';
 import { CurrentOrg } from '../../common/decorators/current-context.decorator';
@@ -35,5 +37,14 @@ export class AnimalesController {
   @Get(':id')
   obtener(@CurrentOrg() organizacionId: string, @Param('id') id: string) {
     return this.animales.obtener(organizacionId, id);
+  }
+
+  @Patch(':id')
+  actualizar(
+    @CurrentOrg() organizacionId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateAnimalDto,
+  ) {
+    return this.animales.actualizar(organizacionId, id, dto);
   }
 }

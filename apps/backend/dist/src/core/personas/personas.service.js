@@ -64,6 +64,35 @@ let PersonasService = class PersonasService {
             throw new common_1.NotFoundException('Persona no encontrada');
         return persona;
     }
+    async actualizar(organizacionId, id, dto) {
+        const actual = await this.obtener(organizacionId, id);
+        if (dto.dni && dto.dni !== actual.dni) {
+            const [existe] = await this.db
+                .select({ id: schema_1.personas.id })
+                .from(schema_1.personas)
+                .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.personas.organizacionId, organizacionId), (0, drizzle_orm_1.eq)(schema_1.personas.dni, dto.dni)))
+                .limit(1);
+            if (existe && existe.id !== id) {
+                throw new common_1.ConflictException('Ya existe otra persona con ese DNI en la organización');
+            }
+        }
+        const [persona] = await this.db
+            .update(schema_1.personas)
+            .set({
+            ...(dto.dni !== undefined && { dni: dto.dni }),
+            ...(dto.nombre !== undefined && { nombre: dto.nombre }),
+            ...(dto.apellido !== undefined && { apellido: dto.apellido }),
+            ...(dto.sexo !== undefined && { sexo: dto.sexo }),
+            ...(dto.fechaNacimiento !== undefined && { fechaNacimiento: dto.fechaNacimiento }),
+            ...(dto.celular !== undefined && { celular: dto.celular }),
+            ...(dto.telefono !== undefined && { telefono: dto.telefono }),
+            ...(dto.email !== undefined && { email: dto.email }),
+            updatedAt: new Date(),
+        })
+            .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.personas.id, id), (0, drizzle_orm_1.eq)(schema_1.personas.organizacionId, organizacionId)))
+            .returning();
+        return persona;
+    }
     async listarAnimales(organizacionId, personaId) {
         await this.obtener(organizacionId, personaId);
         return this.db

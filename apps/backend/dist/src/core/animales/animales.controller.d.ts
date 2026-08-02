@@ -1,5 +1,6 @@
 import { AnimalesService } from './animales.service';
 import { CreateAnimalDto } from './dto/create-animal.dto';
+import { UpdateAnimalDto } from './dto/update-animal.dto';
 export declare class AnimalesController {
     private readonly animales;
     constructor(animales: AnimalesService);
@@ -602,5 +603,23 @@ export declare class AnimalesController {
         fotoUrl: string | null;
         estado: "activo" | "inactivo" | "fallecido";
         datosEspecificos: unknown;
+    }>;
+    actualizar(organizacionId: string, id: string, dto: UpdateAnimalDto): Promise<{
+        id: string;
+        organizacionId: string;
+        personaId: string | null;
+        especieId: string;
+        codigoLegible: string | null;
+        microchip: string | null;
+        nombre: string;
+        sexo: "macho" | "hembra" | "indefinido" | null;
+        fechaNacimiento: string | null;
+        fechaNacEstimada: boolean;
+        fotoUrl: string | null;
+        estado: "activo" | "inactivo" | "fallecido";
+        datosEspecificos: unknown;
+        createdAt: Date;
+        updatedAt: Date;
+        deletedAt: Date | null;
     }>;
 }

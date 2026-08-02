@@ -1,5 +1,6 @@
 import { DrizzleDB } from '../../database/drizzle.provider';
 import { CreatePersonaDto } from './dto/create-persona.dto';
+import { UpdatePersonaDto } from './dto/update-persona.dto';
 export declare class PersonasService {
     private readonly db;
     constructor(db: DrizzleDB);
@@ -9,10 +10,10 @@ export declare class PersonasService {
         createdAt: Date;
         updatedAt: Date;
         deletedAt: Date | null;
+        organizacionId: string;
         email: string | null;
         apellido: string;
         usuarioId: string | null;
-        organizacionId: string;
         dni: string | null;
         sexo: "masculino" | "femenino" | "otro" | null;
         fechaNacimiento: string | null;
@@ -264,10 +265,10 @@ export declare class PersonasService {
         createdAt: Date;
         updatedAt: Date;
         deletedAt: Date | null;
+        organizacionId: string;
         email: string | null;
         apellido: string;
         usuarioId: string | null;
-        organizacionId: string;
         dni: string | null;
         sexo: "masculino" | "femenino" | "otro" | null;
         fechaNacimiento: string | null;
@@ -519,15 +520,31 @@ export declare class PersonasService {
         createdAt: Date;
         updatedAt: Date;
         deletedAt: Date | null;
+        organizacionId: string;
         email: string | null;
         apellido: string;
         usuarioId: string | null;
-        organizacionId: string;
         dni: string | null;
         sexo: "masculino" | "femenino" | "otro" | null;
         fechaNacimiento: string | null;
         celular: string | null;
         telefono: string | null;
+    }>;
+    actualizar(organizacionId: string, id: string, dto: UpdatePersonaDto): Promise<{
+        id: string;
+        organizacionId: string;
+        usuarioId: string | null;
+        dni: string | null;
+        nombre: string;
+        apellido: string;
+        sexo: "masculino" | "femenino" | "otro" | null;
+        fechaNacimiento: string | null;
+        celular: string | null;
+        telefono: string | null;
+        email: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        deletedAt: Date | null;
     }>;
     listarAnimales(organizacionId: string, personaId: string): Promise<{
         id: string;

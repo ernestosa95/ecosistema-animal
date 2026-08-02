@@ -3,11 +3,13 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
 import { PersonasService } from './personas.service';
 import { CreatePersonaDto } from './dto/create-persona.dto';
+import { UpdatePersonaDto } from './dto/update-persona.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../common/guards/tenant.guard';
 import { CurrentOrg } from '../../common/decorators/current-context.decorator';
@@ -30,6 +32,15 @@ export class PersonasController {
   @Get(':id')
   obtener(@CurrentOrg() organizacionId: string, @Param('id') id: string) {
     return this.personas.obtener(organizacionId, id);
+  }
+
+  @Patch(':id')
+  actualizar(
+    @CurrentOrg() organizacionId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdatePersonaDto,
+  ) {
+    return this.personas.actualizar(organizacionId, id, dto);
   }
 
   @Get(':id/animales')

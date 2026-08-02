@@ -8,6 +8,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDB } from '../../database/drizzle.provider';
 import { animales, especies, personas } from '../../database/schema';
 import { CreateAnimalDto } from './dto/create-animal.dto';
+import { UpdateAnimalDto } from './dto/update-animal.dto';
 import {
   generarCodigoLegible,
   validarMicrochipISO,
@@ -98,6 +99,59 @@ export class AnimalesService {
       .where(and(eq(animales.id, id), eq(animales.organizacionId, organizacionId)))
       .limit(1);
     if (!animal) throw new NotFoundException('Paciente no encontrado');
+    return animal;
+  }
+
+  /** Actualiza los datos de un paciente de la organización activa. */
+  async actualizar(
+    organizacionId: string,
+    id: string,
+    dto: UpdateAnimalDto,
+  ) {
+    await this.obtener(organizacionId, id); // valida pertenencia (NotFound si no existe)
+
+    if (dto.especieId) {
+      const [especie] = await this.db
+        .select({ id: especies.id })
+        .from(especies)
+        .where(eq(especies.id, dto.especieId))
+        .limit(1);
+      if (!especie) throw new BadRequestException('La especie indicada no existe');
+    }
+    if (dto.microchip && !validarMicrochipISO(dto.microchip)) {
+      throw new BadRequestException('El microchip no cumple el formato ISO (15 dígitos)');
+    }
+    if (dto.personaId) {
+      const [dueno] = await this.db
+        .select({ id: personas.id })
+        .from(personas)
+        .where(
+          and(eq(personas.id, dto.personaId), eq(personas.organizacionId, organizacionId)),
+        )
+        .limit(1);
+      if (!dueno) {
+        throw new BadRequestException('El dueño indicado no existe en esta organización');
+      }
+    }
+
+    const [animal] = await this.db
+      .update(animales)
+      .set({
+        ...(dto.nombre !== undefined && { nombre: dto.nombre }),
+        ...(dto.especieId !== undefined && { especieId: dto.especieId }),
+        ...(dto.personaId !== undefined && { personaId: dto.personaId }),
+        ...(dto.sexo !== undefined && { sexo: dto.sexo }),
+        ...(dto.fechaNacimiento !== undefined && { fechaNacimiento: dto.fechaNacimiento }),
+        ...(dto.fechaNacEstimada !== undefined && { fechaNacEstimada: dto.fechaNacEstimada }),
+        ...(dto.fotoUrl !== undefined && { fotoUrl: dto.fotoUrl }),
+        ...(dto.microchip !== undefined && { microchip: dto.microchip }),
+        ...(dto.estado !== undefined && { estado: dto.estado }),
+        ...(dto.datosEspecificos !== undefined && { datosEspecificos: dto.datosEspecificos }),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(animales.id, id), eq(animales.organizacionId, organizacionId)))
+      .returning();
+
     return animal;
   }
 }

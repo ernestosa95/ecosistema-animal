@@ -16,6 +16,7 @@ exports.PersonasController = void 0;
 const common_1 = require("@nestjs/common");
 const personas_service_1 = require("./personas.service");
 const create_persona_dto_1 = require("./dto/create-persona.dto");
+const update_persona_dto_1 = require("./dto/update-persona.dto");
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 const tenant_guard_1 = require("../../common/guards/tenant.guard");
 const current_context_decorator_1 = require("../../common/decorators/current-context.decorator");
@@ -31,6 +32,9 @@ let PersonasController = class PersonasController {
     }
     obtener(organizacionId, id) {
         return this.personas.obtener(organizacionId, id);
+    }
+    actualizar(organizacionId, id, dto) {
+        return this.personas.actualizar(organizacionId, id, dto);
     }
     animales(organizacionId, id) {
         return this.personas.listarAnimales(organizacionId, id);
@@ -60,6 +64,15 @@ __decorate([
     __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", void 0)
 ], PersonasController.prototype, "obtener", null);
+__decorate([
+    (0, common_1.Patch)(':id'),
+    __param(0, (0, current_context_decorator_1.CurrentOrg)()),
+    __param(1, (0, common_1.Param)('id')),
+    __param(2, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, update_persona_dto_1.UpdatePersonaDto]),
+    __metadata("design:returntype", void 0)
+], PersonasController.prototype, "actualizar", null);
 __decorate([
     (0, common_1.Get)(':id/animales'),
     __param(0, (0, current_context_decorator_1.CurrentOrg)()),
