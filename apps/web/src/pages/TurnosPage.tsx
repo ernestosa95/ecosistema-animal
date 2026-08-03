@@ -16,6 +16,7 @@ const ESTADOS: Record<EstadoTurno, { label: string; color: string }> = {
   reprogramado: { label: 'Reprogramado', color: '#7C5CBF' },
   atendido:     { label: 'Atendido',     color: '#2E9E5B' },
   cancelado:    { label: 'Cancelado',    color: '#8A9A96' },
+  ausente:      { label: 'Ausente',      color: '#8A9A96' },
 };
 // Máquina de estados: qué acciones ofrece cada estado
 const ACCIONES: Record<EstadoTurno, Array<['confirmar' | 'atender' | 'reprogramar' | 'cancelar', string]>> = {
@@ -24,6 +25,7 @@ const ACCIONES: Record<EstadoTurno, Array<['confirmar' | 'atender' | 'reprograma
   reprogramado: [['confirmar', 'solid'], ['atender', ''], ['cancelar', 'danger']],
   atendido:     [],
   cancelado:    [],
+  ausente:      [],
 };
 const LABEL: Record<string, string> = { confirmar: 'Confirmar', atender: 'Atender', reprogramar: 'Reprogramar', cancelar: 'Cancelar' };
 
@@ -147,6 +149,7 @@ export default function TurnosPage({ onAtender }: Props) {
                 )}
                 {t.estado === 'atendido' && <div className="hu-terminal">✓ Consulta registrada</div>}
                 {t.estado === 'cancelado' && <div className="hu-terminal">Turno cancelado</div>}
+                {t.estado === 'ausente' && <div className="hu-terminal">El paciente no asistió</div>}
               </div>
             </div>
           );

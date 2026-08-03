@@ -8,7 +8,7 @@
 const BASE = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
 // Poné en true para ver el portal SIN backend (datos de ejemplo).
-export const USAR_MOCK = true;
+export const USAR_MOCK = false;
 
 // El token del dueño viaja en la URL: .../portal?token=xxxxx
 export function tokenDeUrl(): string {
