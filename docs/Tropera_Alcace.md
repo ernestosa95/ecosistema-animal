@@ -1,5 +1,7 @@
 ## Alcance del Desarrollo: Tropera (MVP)
 
+> **Estado (agosto 2026):** El módulo Tropera (schema `tropera` + módulos ganaderos) **todavía no está implementado**. El **tronco común (`core`) del que depende ya está construido y probado** (organizaciones, usuarios, membresías, personas, especies y animales), junto con la autenticación y el multi-tenant. Este documento describe el alcance objetivo del MVP de Tropera; el estado global del ecosistema vive en `Roadmap_Ecosistema.md` (ver Fase 1).
+
 ---
 
 ### 1. Resumen Ejecutivo
@@ -17,9 +19,7 @@ Como parte del ecosistema, Tropera comparte con las demás soluciones (ej. **HCE
 * **Sincronización Offline:**
 * Capacidad de operar y realizar registros sin conectividad a internet.
 * **Sincronización automática** en segundo plano una vez que el dispositivo detecta conexión a la red.
-* **Infraestructura compartida del ecosistema:** Tropera se apoya en el **backend propio** común (PostgreSQL self-hosted + API en NestJS, con autenticación y motor de sincronización propios), en reemplazo de un BaaS gestionado. Los datos de Tropera se organizan en el *schema* `tropera`, colgando del tronco común `core`. Ver `Roadmap_Ecosistema.md` para el detalle del stack.
-
-
+* **Infraestructura compartida del ecosistema:** Tropera se apoya en el **backend propio** común (PostgreSQL + API en NestJS con Drizzle, autenticación y —a futuro— motor de sincronización propios), en reemplazo de un BaaS gestionado. Los datos de Tropera se organizan en el *schema* `tropera`, colgando del tronco común `core`. Ver `Roadmap_Ecosistema.md` para el detalle del stack.
 
 ---
 
@@ -27,8 +27,8 @@ Como parte del ecosistema, Tropera comparte con las demás soluciones (ej. **HCE
 
 #### A. Gestión de Autenticación y Campos
 
-* **Gestión de Usuarios:** Registro e inicio de sesión de usuario único (proyectando a futuro un esquema de trabajo colaborativo multi-rol).
-* **Gestión de Campos:** Creación y administración de establecimientos agropecuarios.
+* **Gestión de Usuarios:** Registro e inicio de sesión (base ya implementada en el `core`, con esquema multi-rol por organización listo para el trabajo colaborativo).
+* **Gestión de Campos:** Creación y administración de establecimientos agropecuarios *(schema `tropera.establecimientos`)*.
 
 #### B. Identificación y Control de Hacienda
 
@@ -41,8 +41,6 @@ Como parte del ecosistema, Tropera comparte con las demás soluciones (ej. **HCE
 * Vaquillonas
 * Novillos *(y equivalentes básicos de la cría/recría)*
 
-
-
 #### C. Evolución y Movimientos de Stock
 
 * **Registro de Variaciones:** Aumento o disminución de existencias respaldado con **metadata asociada** (fecha, motivo, observaciones, etc.).
@@ -50,8 +48,6 @@ Como parte del ecosistema, Tropera comparte con las demás soluciones (ej. **HCE
 * Altas: Nacimientos, compras.
 * Bajas: Ventas, muertes.
 * Traslados: Movimientos internos entre potreros/lotes dentro del mismo campo o traslados hacia campos externos.
-
-
 
 #### D. Eventos Sanitarios y Reproductivos
 

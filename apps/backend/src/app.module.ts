@@ -7,6 +7,7 @@ import { EspeciesModule } from './core/especies/especies.module';
 import { PersonasModule } from './core/personas/personas.module';
 import { AnimalesModule } from './core/animales/animales.module';
 import { HceModule } from './hce/hce.module';
+import { PortalModule } from './portal/portal.module';
 
 /**
  * Módulo raíz. A medida que sumemos features se importan aquí:
@@ -24,6 +25,7 @@ import { HceModule } from './hce/hce.module';
     PersonasModule,
     AnimalesModule,
     HceModule,
+    PortalModule,
   ],
 })
 export class AppModule {}

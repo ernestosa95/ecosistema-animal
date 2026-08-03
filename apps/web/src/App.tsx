@@ -4,11 +4,13 @@ import { LoginPage } from './pages/LoginPage';
 import { PacientesPage } from './pages/PacientesPage';
 import { PacienteDetallePage } from './pages/PacienteDetallePage';
 import { PersonasPage } from './pages/PersonasPage';
+import TurnosPage from './pages/TurnosPage';
 import type { Animal } from './api/types';
 
 type Vista =
   | { nombre: 'pacientes' }
   | { nombre: 'detalle'; animal: Animal }
+  | { nombre: 'agenda' }
   | { nombre: 'duenos' };
 
 export default function App() {
@@ -20,7 +22,9 @@ export default function App() {
   }
 
   const seccion =
-    vista.nombre === 'duenos' ? 'duenos' : 'pacientes';
+    vista.nombre === 'duenos' ? 'duenos'
+      : vista.nombre === 'agenda' ? 'agenda'
+        : 'pacientes';
 
   return (
     <div className="app">
@@ -45,6 +49,12 @@ export default function App() {
           Pacientes
         </button>
         <button
+          className={seccion === 'agenda' ? 'nav-item activo' : 'nav-item'}
+          onClick={() => setVista({ nombre: 'agenda' })}
+        >
+          Agenda
+        </button>
+        <button
           className={seccion === 'duenos' ? 'nav-item activo' : 'nav-item'}
           onClick={() => setVista({ nombre: 'duenos' })}
         >
@@ -64,6 +74,14 @@ export default function App() {
             sesion={sesion}
             animal={vista.animal}
             onVolver={() => setVista({ nombre: 'pacientes' })}
+          />
+        )}
+        {vista.nombre === 'agenda' && (
+          <TurnosPage
+            onAtender={(_turno) => {
+              // Opcional a futuro: abrir "Nueva consulta" del paciente atendido.
+              // Ej: setVista({ nombre: 'detalle', animal: ... });
+            }}
           />
         )}
         {vista.nombre === 'duenos' && <PersonasPage sesion={sesion} />}

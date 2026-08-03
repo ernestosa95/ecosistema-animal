@@ -1,0 +1,56 @@
+# Dependencias
+node_modules/
+.pnpm-store/
+
+# Variables de entorno (secretos) — se versiona solo .env.example
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Builds
+dist/
+build/
+out/
+*.tsbuildinfo
+.vite/
+apps/web/dist/
+apps/backend/dist/
+
+# Base local PGlite (ajustá la ruta a la de tu init-local-db.mjs)
+.pglite/
+pgdata/
+*.pglite
+apps/backend/.pglite/
+apps/backend/pgdata/
+apps/backend/.data/
+
+# Drizzle (temporales; las migraciones SÍ se versionan)
+.drizzle/
+
+# Logs
+logs/
+*.log
+pnpm-debug.log*
+
+# Tests
+coverage/
+.nyc_output/
+
+# Móvil Expo (a futuro)
+.expo/
+apps/mobile/.expo/
+*.jks
+*.p8
+*.p12
+
+# Editor / SO
+.vscode/*
+!.vscode/settings.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Caché
+.cache/
+.eslintcache
