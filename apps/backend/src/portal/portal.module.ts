@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../core/auth/auth.module';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../common/guards/tenant.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
 import { PortalController } from './portal.controller';
 import { PortalService } from './portal.service';
 import { PortalTokenService } from './portal-token.service';
@@ -14,6 +15,6 @@ import { PortalGuard } from './portal.guard';
 @Module({
   imports: [AuthModule],
   controllers: [PortalController],
-  providers: [PortalService, PortalTokenService, PortalGuard, JwtAuthGuard, TenantGuard],
+  providers: [PortalService, PortalTokenService, PortalGuard, JwtAuthGuard, TenantGuard, RolesGuard],
 })
 export class PortalModule {}

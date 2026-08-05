@@ -15,6 +15,7 @@ export function PacientesPage({
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
+  const [busqueda, setBusqueda] = useState('');
 
   const especiesPorId = useMemo(
     () => Object.fromEntries(especies.map((e) => [e.id, e.nombre])),
@@ -24,6 +25,20 @@ export function PacientesPage({
     () => Object.fromEntries(personas.map((p) => [p.id, `${p.nombre} ${p.apellido}`])),
     [personas],
   );
+
+  const filtrados = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    if (!q) return animales;
+    return animales.filter((a) => {
+      const especie = (especiesPorId[a.especieId] ?? '').toLowerCase();
+      const dueno = (a.personaId ? personasPorId[a.personaId] ?? '' : '').toLowerCase();
+      return (
+        a.nombre.toLowerCase().includes(q) ||
+        especie.includes(q) ||
+        dueno.includes(q)
+      );
+    });
+  }, [animales, busqueda, especiesPorId, personasPorId]);
 
   async function cargar() {
     setCargando(true);
@@ -52,9 +67,9 @@ export function PacientesPage({
   return (
     <div>
       <div className="page-head">
-        <h1>Pacientes</h1>
+        <h1>Animales</h1>
         <button className="btn" onClick={() => setMostrarForm((v) => !v)}>
-          {mostrarForm ? 'Cerrar' : '+ Nuevo paciente'}
+          {mostrarForm ? 'Cerrar' : '+ Nuevo animal'}
         </button>
       </div>
 
@@ -71,10 +86,27 @@ export function PacientesPage({
       )}
 
       {error && <div className="alerta">{error}</div>}
+
+      {!cargando && animales.length > 0 && (
+        <input
+          placeholder="Buscar por nombre, tipo de animal o dueño…"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '10px 12px',
+            margin: '0 0 12px',
+            border: '1px solid #DCE6E3',
+            borderRadius: '10px',
+            fontSize: '14px',
+          }}
+        />
+      )}
+
       {cargando ? (
         <p className="muted">Cargando…</p>
       ) : animales.length === 0 ? (
-        <p className="muted">Todavía no hay pacientes. Creá el primero con “Nuevo paciente”.</p>
+        <p className="muted">Todavía no hay animales. Creá el primero con “Nuevo animal”.</p>
       ) : (
         <div className="card">
           <table className="tabla">
@@ -89,7 +121,13 @@ export function PacientesPage({
               </tr>
             </thead>
             <tbody>
-              {animales.map((a) => (
+              {filtrados.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="muted" style={{ textAlign: 'center', padding: '16px' }}>
+                    Sin resultados para “{busqueda}”.
+                  </td>
+                </tr>
+              ) : filtrados.map((a) => (
                 <tr key={a.id}>
                   <td>{a.nombre}</td>
                   <td>{especiesPorId[a.especieId] ?? '—'}</td>

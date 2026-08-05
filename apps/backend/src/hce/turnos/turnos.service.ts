@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDB } from '../../database/drizzle.provider';
-import { turnos, animales } from '../../database/schema';
+import { turnos, animales, especies, personas } from '../../database/schema';
 import { CreateTurnoDto } from './dto/create-turno.dto';
 import { UpdateEstadoTurnoDto } from './dto/update-estado-turno.dto';
 
@@ -76,14 +76,31 @@ export class TurnosService {
     return actualizado;
   }
 
-  /** Agenda: turnos de la organización en un rango, ordenados por fecha/hora. */
+  /**
+   * Agenda: turnos de la organización en un rango, ordenados por fecha/hora.
+   * Trae también el nombre del paciente, su especie y el dueño para la vista.
+   */
   agenda(organizacionId: string, desde?: string, hasta?: string) {
     const filtros = [eq(turnos.organizacionId, organizacionId)];
     if (desde) filtros.push(gte(turnos.fechaHora, new Date(desde)));
     if (hasta) filtros.push(lte(turnos.fechaHora, new Date(hasta)));
     return this.db
-      .select()
+      .select({
+        id: turnos.id,
+        animalId: turnos.animalId,
+        fechaHora: turnos.fechaHora,
+        estado: turnos.estado,
+        motivo: turnos.motivo,
+        canal: turnos.canal,
+        pacienteNombre: animales.nombre,
+        especie: especies.nombre,
+        duenoNombre: personas.nombre,
+        duenoApellido: personas.apellido,
+      })
       .from(turnos)
+      .leftJoin(animales, eq(turnos.animalId, animales.id))
+      .leftJoin(especies, eq(animales.especieId, especies.id))
+      .leftJoin(personas, eq(animales.personaId, personas.id))
       .where(and(...filtros))
       .orderBy(asc(turnos.fechaHora));
   }

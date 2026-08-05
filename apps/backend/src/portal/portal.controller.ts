@@ -12,6 +12,8 @@ import {
 import { and, eq, isNull } from 'drizzle-orm';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../common/guards/tenant.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentOrg } from '../common/decorators/current-context.decorator';
 import { DRIZZLE, DrizzleDB } from '../database/drizzle.provider';
 import { personas } from '../database/schema';
@@ -33,7 +35,8 @@ export class PortalController {
    * POST /portal/acceso/:personaId   (requiere sesión de staff + organización)
    */
   @Post('acceso/:personaId')
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles('propietario', 'admin', 'veterinario', 'recepcion')
   async generarAcceso(
     @Param('personaId') personaId: string,
     @CurrentOrg() organizacionId: string,

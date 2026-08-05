@@ -46,7 +46,7 @@ export default function App() {
           className={seccion === 'pacientes' ? 'nav-item activo' : 'nav-item'}
           onClick={() => setVista({ nombre: 'pacientes' })}
         >
-          Pacientes
+          Animales
         </button>
         <button
           className={seccion === 'agenda' ? 'nav-item activo' : 'nav-item'}

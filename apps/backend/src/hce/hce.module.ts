@@ -7,6 +7,7 @@ import { TurnosService } from './turnos/turnos.service';
 import { TurnosController } from './turnos/turnos.controller';
 import { AuthModule } from '../core/auth/auth.module';
 import { TenantGuard } from '../common/guards/tenant.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
 import { CarnetModule } from './carnet/carnet.module';
 
 /**
@@ -16,6 +17,6 @@ import { CarnetModule } from './carnet/carnet.module';
 @Module({
   imports: [AuthModule, CarnetModule],
   controllers: [ConsultasController, VacunacionesController, TurnosController],
-  providers: [ConsultasService, VacunacionesService, TurnosService, TenantGuard],
+  providers: [ConsultasService, VacunacionesService, TurnosService, TenantGuard, RolesGuard],
 })
 export class HceModule {}

@@ -13,14 +13,17 @@ import { CreateTurnoDto } from './dto/create-turno.dto';
 import { UpdateEstadoTurnoDto } from './dto/update-estado-turno.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../common/guards/tenant.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentOrg } from '../../common/decorators/current-context.decorator';
 
 @Controller('turnos')
-@UseGuards(JwtAuthGuard, TenantGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 export class TurnosController {
   constructor(private readonly turnos: TurnosService) {}
 
   @Post()
+  @Roles('propietario', 'admin', 'veterinario', 'recepcion')
   solicitar(@CurrentOrg() organizacionId: string, @Body() dto: CreateTurnoDto) {
     return this.turnos.solicitar(organizacionId, dto);
   }
@@ -48,6 +51,7 @@ export class TurnosController {
   }
 
   @Patch(':id/estado')
+  @Roles('propietario', 'admin', 'veterinario', 'recepcion')
   cambiarEstado(
     @CurrentOrg() organizacionId: string,
     @Param('id') id: string,

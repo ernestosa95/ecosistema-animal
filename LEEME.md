@@ -1,72 +1,102 @@
-# 🔐 Backend del Portal del Dueño
+# ✨ Pulido C — parte segura + snippets
 
-Módulo NestJS que le da backend real al portal que ya tenés en la web. Endpoints:
+Tu repo remoto quedó **atrás** respecto de lo que aplicaste localmente. Por eso este paquete
+trae dos cosas:
 
-- `GET  /portal/resumen`         → (dueño) sus mascotas con vacunas, turnos y consultas.
-- `POST /portal/turnos`          → (dueño) solicita un turno (`canal: portal`, `solicitado`).
-- `POST /portal/acceso/:personaId` → (staff) genera el enlace de acceso del dueño.
+1. **Archivos listos** (nuevos o de base estable, sin riesgo de pisarte nada).
+2. **Snippets** para los cambios que tocan tus páginas (los aplicás vos, sin importar el
+   estado exacto de tus archivos).
 
-Acceso por **magic-link**: un token JWT con `scope: 'portal'` que viaja en el header
-`X-Portal-Token`. No usa el login del staff. Reutiliza tu `JwtService` (mismo secreto),
-así que **no hay dependencias nuevas que instalar**.
+---
 
-## Instalar
+## 1. Archivos listos (descomprimir sobre la raíz del repo)
 
-1. Descomprimí sobre la raíz del repo (`ecosistema/`). Agrega la carpeta
-   `apps/backend/src/portal/` y sobrescribe `apps/backend/src/app.module.ts`
-   (solo suma `PortalModule` a los imports).
-2. Reiniciá el backend:
-   ```bash
-   cd apps/backend
-   pnpm start:dev
-   ```
-   Debería compilar con `Found 0 errors` (ya lo verifiqué contra tu código).
+- `apps/backend/src/common/filters/db-error.filter.ts` — **404 en vez de 500** cuando se
+  pasa un id inválido. Es un filtro **global**: no hay que tocar ningún controller.
+- `apps/backend/src/main.ts` — registra ese filtro (una línea nueva). *(Si tu `main.ts`
+  tiene cambios propios, copiá solo el bloque del `DbErrorFilter`.)*
+- `apps/web/src/auth/permisos.ts` — helper `puede(rol, accion)` para ocultar botones.
+- `docs/Estructura_Proyecto.md` y `docs/Roadmap_Ecosistema.md` — **documentación actualizada**.
 
-## Probarlo de punta a punta
+Reiniciá el backend. Probá: `GET /animales/no-es-uuid/carnet.pdf` → ahora **404**, no 500.
 
-**1) Conseguí un token de staff y tu organización.** Lo más rápido: en el navegador,
-con sesión iniciada, abrí la consola (F12) y mirá el localStorage:
-```js
-JSON.parse(localStorage.getItem('ecosistema.sesion'))
-// → { token: '...', organizacionId: '...', rol: '...' }
-```
+---
 
-**2) Elegí un dueño (persona) que tenga mascotas cargadas.** Su `id` lo ves en la
-pestaña Dueños de la app, o con `GET /personas`.
+## 2. Snippets (aplicar en tus páginas)
 
-**3) Generá el enlace de acceso del dueño:**
-```bash
-curl -X POST http://localhost:3000/portal/acceso/PERSONA_ID \
-  -H "Authorization: Bearer TOKEN_DE_STAFF" \
-  -H "X-Organizacion-Id: ORG_ID"
-```
-Devuelve:
-```json
-{ "token": "eyJ...", "portalUrl": "http://localhost:5173/?token=eyJ..." }
-```
+### a) Ocultar botones por rol
 
-**4) Probá el endpoint del dueño directo (opcional):**
-```bash
-curl http://localhost:3000/portal/resumen -H "X-Portal-Token: eyJ..."
-```
-
-**5) Pasá el portal web a datos reales.** En `apps/web/src/api/portal.ts`:
+En cada página, agregá el import:
 ```ts
-export const USAR_MOCK = false;
+import { puede } from '../auth/permisos';
 ```
-Abrí el `portalUrl` del paso 3 → vas a ver las mascotas reales de ese dueño, y el botón
-"Solicitar turno" va a crear un turno de verdad (aparecerá en la Agenda como `solicitado`
-por canal `portal`).
 
-## Notas de diseño
+**Página de Animales** — envolvé el botón "+ Nuevo animal":
+```tsx
+{puede(sesion.rol, 'escribir_animales') && (
+  <button className="btn" onClick={() => setMostrarForm((v) => !v)}>
+    {mostrarForm ? 'Cerrar' : '+ Nuevo animal'}
+  </button>
+)}
+```
 
-- **Aislamiento:** el dueño solo ve/gestiona lo suyo. `GET /resumen` filtra por su
-  `personaId` + `organizacionId`; `POST /turnos` verifica que la mascota le pertenezca
-  antes de crear.
-- **Vigencia del token:** 30 días. Para producción conviene acortarla y regenerar el
-  enlace on-demand (magic-link por email). El endpoint de acceso ya te deja hacer eso.
-- **`PORTAL_BASE_URL`:** el `portalUrl` usa `http://localhost:5173` por defecto. En la VM
-  poné `PORTAL_BASE_URL=https://tudominio` en el `.env` del backend.
-- **Compatibilidad de datos:** el resumen ya viene con la forma exacta que espera el
-  `mapResumen()` del front (vacuna `producto`→`nombre`, turno `fechaHora` partido en
-  fecha/hora). No hay que tocar nada en la web salvo el `USAR_MOCK`.
+**Página de Dueños** — el botón "+ Nuevo dueño":
+```tsx
+{puede(sesion.rol, 'escribir_duenos') && ( /* …tu botón… */ )}
+```
+
+**Ficha del animal (PacienteDetallePage)** — el botón "+ Nueva consulta" (clínico):
+```tsx
+{puede(sesion.rol, 'clinico') && (
+  <button className="btn" onClick={() => setMostrarConsulta((v) => !v)}>
+    {mostrarConsulta ? 'Cerrar' : '+ Nueva consulta'}
+  </button>
+)}
+```
+
+### b) Botón "Descargar carnet" (ficha del animal)
+
+Dentro del componente `PacienteDetallePage`, agregá la función:
+```tsx
+async function descargarCarnet() {
+  const res = await fetch(`${API_BASE}/animales/${animal.id}/carnet.pdf`, {
+    headers: {
+      Authorization: `Bearer ${sesion.token}`,
+      'X-Organizacion-Id': sesion.organizacionId,
+    },
+  });
+  if (!res.ok) { alert('No se pudo generar el carnet'); return; }
+  window.open(URL.createObjectURL(await res.blob()));
+}
+```
+Y el botón, en la barra de acciones de la ficha (junto a "Editar"):
+```tsx
+<button className="btn-ghost" onClick={descargarCarnet}>Descargar carnet</button>
+```
+*(`API_BASE` = `import.meta.env.VITE_API_URL ?? 'http://localhost:3000'` si no lo tenés ya.)*
+
+### c) Rename PacientesPage → AnimalesPage (cosmético)
+```bash
+cd apps/web/src/pages
+git mv PacientesPage.tsx AnimalesPage.tsx    # o mv, si no está en git aún
+```
+Renombrá la función `PacientesPage` → `AnimalesPage` dentro del archivo, y actualizá el
+import en `App.tsx`.
+
+---
+
+## 3. Importante: sincronizá tu repo (evita esta divergencia)
+
+Tu remoto no tiene lo que fuiste aplicando local (admin, solicitudes, permisos, etc.).
+Cuando quieras, subí todo:
+```bash
+git add -A
+git commit -m "Huella completa + admin + auto-registro + ciclo de vida + pulido"
+git push
+```
+Con el remoto al día, puedo clonar tu estado real y hacer los próximos cambios (refresh
+tokens, Tropera, móvil) con precisión, sin snippets.
+
+## Falta de C (próximo)
+- **Refresh tokens** — es el único ítem de C que queda y toca auth; lo hacemos como paso
+  aparte y enfocado.

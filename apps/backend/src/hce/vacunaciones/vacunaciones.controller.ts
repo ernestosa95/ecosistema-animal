@@ -11,17 +11,20 @@ import { VacunacionesService } from './vacunaciones.service';
 import { CreateVacunacionDto } from './dto/create-vacunacion.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../common/guards/tenant.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import {
   CurrentOrg,
   CurrentUser,
 } from '../../common/decorators/current-context.decorator';
 
 @Controller('vacunaciones')
-@UseGuards(JwtAuthGuard, TenantGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 export class VacunacionesController {
   constructor(private readonly vacunaciones: VacunacionesService) {}
 
   @Post()
+  @Roles('propietario', 'admin', 'veterinario')
   registrar(
     @CurrentOrg() organizacionId: string,
     @CurrentUser() user: { sub: string },

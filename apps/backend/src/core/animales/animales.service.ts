@@ -2,9 +2,10 @@ import {
   Injectable,
   Inject,
   BadRequestException,
+  ConflictException,
   NotFoundException,
 } from '@nestjs/common';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDB } from '../../database/drizzle.provider';
 import { animales, especies, personas } from '../../database/schema';
 import { CreateAnimalDto } from './dto/create-animal.dto';
@@ -36,6 +37,18 @@ export class AnimalesService {
     // 2) Validar microchip si viene
     if (dto.microchip && !validarMicrochipISO(dto.microchip)) {
       throw new BadRequestException('El microchip no cumple el formato ISO (15 dígitos)');
+    }
+
+    // 2·bis) Microchip único: evita cargar dos veces el mismo animal.
+    if (dto.microchip) {
+      const [dup] = await this.db
+        .select({ id: animales.id })
+        .from(animales)
+        .where(and(eq(animales.microchip, dto.microchip), isNull(animales.deletedAt)))
+        .limit(1);
+      if (dup) {
+        throw new ConflictException('Ya existe un animal con ese microchip');
+      }
     }
 
     // 2b) Si se asocia un dueño, verificar que sea de la misma organización

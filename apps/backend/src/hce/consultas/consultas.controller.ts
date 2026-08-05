@@ -10,17 +10,20 @@ import { ConsultasService } from './consultas.service';
 import { CreateConsultaDto } from './dto/create-consulta.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../common/guards/tenant.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import {
   CurrentOrg,
   CurrentUser,
 } from '../../common/decorators/current-context.decorator';
 
 @Controller('consultas')
-@UseGuards(JwtAuthGuard, TenantGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 export class ConsultasController {
   constructor(private readonly consultas: ConsultasService) {}
 
   @Post()
+  @Roles('propietario', 'admin', 'veterinario')
   crear(
     @CurrentOrg() organizacionId: string,
     @CurrentUser() user: { sub: string },

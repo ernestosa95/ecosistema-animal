@@ -1,14 +1,23 @@
 import { useState } from 'react';
 import { api } from '../api/client';
+import { crearSolicitud } from '../api/solicitudes';
 import type { Sesion } from '../api/types';
 
 export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
   const [modo, setModo] = useState<'login' | 'registro'>('login');
+  const [enviada, setEnviada] = useState(false);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
+  const [telefono, setTelefono] = useState('');
+
+  const [tipo, setTipo] = useState<'crear' | 'unirse'>('crear');
   const [nombreOrganizacion, setNombreOrganizacion] = useState('');
+  const [tipoOrganizacion, setTipoOrganizacion] = useState('clinica');
+  const [organizacionSolicitada, setOrganizacionSolicitada] = useState('');
+
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
 
@@ -24,15 +33,44 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
     setError(null);
     setCargando(true);
     try {
-      if (modo === 'registro') {
-        await api.register({ email, password, nombre, apellido, nombreOrganizacion });
+      if (modo === 'login') {
+        await entrar();
+      } else {
+        await crearSolicitud({
+          tipo, nombre, apellido, email, password,
+          telefono: telefono || undefined,
+          ...(tipo === 'crear'
+            ? { nombreOrganizacion, tipoOrganizacion }
+            : { organizacionSolicitada }),
+        });
+        setEnviada(true);
       }
-      await entrar();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error inesperado');
     } finally {
       setCargando(false);
     }
+  }
+
+  if (enviada) {
+    return (
+      <div className="login-wrap">
+        <div className="card login-card">
+          <div className="brand brand-lg">
+            <span className="brand-dot" />
+            Ecosistema · Salud Animal
+          </div>
+          <h1>Solicitud enviada</h1>
+          <p>
+            Recibimos tu solicitud. Vas a poder ingresar cuando la aprobemos. Te avisaremos
+            al email que cargaste.
+          </p>
+          <button className="btn" onClick={() => { setEnviada(false); setModo('login'); }}>
+            Volver al inicio
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -42,7 +80,7 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
           <span className="brand-dot" />
           Ecosistema · Salud Animal
         </div>
-        <h1>{modo === 'login' ? 'Ingresar' : 'Crear cuenta'}</h1>
+        <h1>{modo === 'login' ? 'Ingresar' : 'Solicitar acceso'}</h1>
 
         {modo === 'registro' && (
           <>
@@ -55,13 +93,48 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
               <input value={apellido} onChange={(e) => setApellido(e.target.value)} required />
             </label>
             <label>
-              Nombre de la clínica / organización
-              <input
-                value={nombreOrganizacion}
-                onChange={(e) => setNombreOrganizacion(e.target.value)}
-                required
-              />
+              Teléfono (opcional)
+              <input value={telefono} onChange={(e) => setTelefono(e.target.value)} />
             </label>
+
+            <label>
+              ¿Qué querés hacer?
+              <select value={tipo} onChange={(e) => setTipo(e.target.value as 'crear' | 'unirse')}>
+                <option value="crear">Crear una veterinaria nueva</option>
+                <option value="unirse">Unirme a una veterinaria existente</option>
+              </select>
+            </label>
+
+            {tipo === 'crear' ? (
+              <>
+                <label>
+                  Nombre de la veterinaria
+                  <input
+                    value={nombreOrganizacion}
+                    onChange={(e) => setNombreOrganizacion(e.target.value)}
+                    required
+                  />
+                </label>
+                <label>
+                  Tipo
+                  <select value={tipoOrganizacion} onChange={(e) => setTipoOrganizacion(e.target.value)}>
+                    <option value="clinica">Clínica</option>
+                    <option value="establecimiento">Establecimiento</option>
+                    <option value="mixta">Mixta</option>
+                  </select>
+                </label>
+              </>
+            ) : (
+              <label>
+                Veterinaria a la que querés unirte
+                <input
+                  value={organizacionSolicitada}
+                  onChange={(e) => setOrganizacionSolicitada(e.target.value)}
+                  placeholder="Nombre de la veterinaria"
+                  required
+                />
+              </label>
+            )}
           </>
         )}
 
@@ -83,7 +156,7 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
         {error && <div className="alerta">{error}</div>}
 
         <button className="btn" type="submit" disabled={cargando}>
-          {cargando ? 'Procesando…' : modo === 'login' ? 'Ingresar' : 'Registrarme'}
+          {cargando ? 'Procesando…' : modo === 'login' ? 'Ingresar' : 'Enviar solicitud'}
         </button>
 
         <p className="switch">
@@ -96,7 +169,7 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
               setModo(modo === 'login' ? 'registro' : 'login');
             }}
           >
-            {modo === 'login' ? 'Crear una' : 'Ingresar'}
+            {modo === 'login' ? 'Solicitar acceso' : 'Ingresar'}
           </button>
         </p>
       </form>

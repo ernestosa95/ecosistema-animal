@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import type { Sesion, Persona, Animal } from '../api/types';
 
@@ -9,6 +9,16 @@ export function PersonasPage({ sesion }: { sesion: Sesion }) {
   const [mostrarNuevo, setMostrarNuevo] = useState(false);
   const [editando, setEditando] = useState<Persona | null>(null);
   const [expandida, setExpandida] = useState<string | null>(null);
+  const [busqueda, setBusqueda] = useState('');
+
+  const filtradas = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    if (!q) return personas;
+    return personas.filter((p) =>
+      `${p.nombre} ${p.apellido}`.toLowerCase().includes(q) ||
+      (p.dni ?? '').toLowerCase().includes(q),
+    );
+  }, [personas, busqueda]);
 
   async function cargar() {
     setCargando(true);
@@ -59,6 +69,23 @@ export function PersonasPage({ sesion }: { sesion: Sesion }) {
       )}
 
       {error && <div className="alerta">{error}</div>}
+
+      {!cargando && personas.length > 0 && (
+        <input
+          placeholder="Buscar por nombre o DNI…"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '10px 12px',
+            margin: '0 0 12px',
+            border: '1px solid #DCE6E3',
+            borderRadius: '10px',
+            fontSize: '14px',
+          }}
+        />
+      )}
+
       {cargando ? (
         <p className="muted">Cargando…</p>
       ) : personas.length === 0 ? (
@@ -75,7 +102,13 @@ export function PersonasPage({ sesion }: { sesion: Sesion }) {
               </tr>
             </thead>
             <tbody>
-              {personas.map((p) => (
+              {filtradas.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="muted" style={{ textAlign: 'center', padding: '16px' }}>
+                    Sin resultados para “{busqueda}”.
+                  </td>
+                </tr>
+              ) : filtradas.map((p) => (
                 <PersonaFila
                   key={p.id}
                   sesion={sesion}

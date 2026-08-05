@@ -41,6 +41,7 @@ export const organizaciones = core.table('organizaciones', {
   nombre: text('nombre').notNull(),
   tipo: tipoOrganizacion('tipo').notNull().default('clinica'),
   cuit: text('cuit'),
+  activo: boolean('activo').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
@@ -120,4 +121,23 @@ export const animales = core.table('animales', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
+});
+
+// --- Solicitudes de registro / acceso (auto-registro con aprobación) ---
+export const solicitudes = core.table('solicitudes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tipo: text('tipo').notNull(), // 'crear' | 'unirse'
+  estado: text('estado').notNull().default('pendiente'), // 'pendiente' | 'aprobada' | 'rechazada'
+  nombre: text('nombre').notNull(),
+  apellido: text('apellido').notNull(),
+  email: text('email').notNull(),
+  passwordHash: text('password_hash').notNull(),
+  telefono: text('telefono'),
+  nombreOrganizacion: text('nombre_organizacion'),
+  tipoOrganizacion: text('tipo_organizacion'),
+  organizacionSolicitada: text('organizacion_solicitada'),
+  motivoRechazo: text('motivo_rechazo'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  resolvedPor: uuid('resolved_por').references(() => usuarios.id),
 });

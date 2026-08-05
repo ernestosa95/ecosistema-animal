@@ -12,6 +12,8 @@ import { CreateAnimalDto } from './dto/create-animal.dto';
 import { UpdateAnimalDto } from './dto/update-animal.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../common/guards/tenant.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentOrg } from '../../common/decorators/current-context.decorator';
 
 /**
@@ -20,11 +22,12 @@ import { CurrentOrg } from '../../common/decorators/current-context.decorator';
  * X-Organizacion-Id y nunca del body, para evitar fugas entre tenants.
  */
 @Controller('animales')
-@UseGuards(JwtAuthGuard, TenantGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 export class AnimalesController {
   constructor(private readonly animales: AnimalesService) {}
 
   @Post()
+  @Roles('propietario', 'admin', 'veterinario', 'recepcion')
   crear(@CurrentOrg() organizacionId: string, @Body() dto: CreateAnimalDto) {
     return this.animales.crear(organizacionId, dto);
   }
@@ -40,6 +43,7 @@ export class AnimalesController {
   }
 
   @Patch(':id')
+  @Roles('propietario', 'admin', 'veterinario', 'recepcion')
   actualizar(
     @CurrentOrg() organizacionId: string,
     @Param('id') id: string,

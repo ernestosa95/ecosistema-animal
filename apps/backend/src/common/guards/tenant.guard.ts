@@ -5,9 +5,9 @@ import {
   Inject,
   ForbiddenException,
 } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDB } from '../../database/drizzle.provider';
-import { membresias } from '../../database/schema';
+import { membresias, organizaciones } from '../../database/schema';
 
 /**
  * Resuelve la organización activa (header X-Organizacion-Id) y verifica que el
@@ -39,6 +39,15 @@ export class TenantGuard implements CanActivate {
 
     if (!m) {
       throw new ForbiddenException('No pertenecés a esta organización');
+    }
+
+    const [org] = await this.db
+      .select({ activo: organizaciones.activo })
+      .from(organizaciones)
+      .where(and(eq(organizaciones.id, organizacionId), isNull(organizaciones.deletedAt)))
+      .limit(1);
+    if (!org || !org.activo) {
+      throw new ForbiddenException('La veterinaria está desactivada');
     }
 
     req.organizacionId = organizacionId;

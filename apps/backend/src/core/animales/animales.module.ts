@@ -3,6 +3,7 @@ import { AnimalesService } from './animales.service';
 import { AnimalesController } from './animales.controller';
 import { AuthModule } from '../auth/auth.module';
 import { TenantGuard } from '../../common/guards/tenant.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
 
 /**
  * Importa AuthModule para disponer de JwtService (usado por JwtAuthGuard).
@@ -11,6 +12,6 @@ import { TenantGuard } from '../../common/guards/tenant.guard';
 @Module({
   imports: [AuthModule],
   controllers: [AnimalesController],
-  providers: [AnimalesService, TenantGuard],
+  providers: [AnimalesService, TenantGuard, RolesGuard],
 })
 export class AnimalesModule {}
