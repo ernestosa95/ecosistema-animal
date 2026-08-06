@@ -11,7 +11,7 @@ import type { Sesion, Turno, EstadoTurno, Animal, Persona, Especie } from '../ap
 interface Props {
   sesion: Sesion;
   /** Se llama al atender un turno; usalo para abrir la ficha/Nueva consulta del paciente. */
-  onAtender?: (animalId: string) => void;
+  onAtender?: (animal: Animal) => void;
 }
 
 const MOTIVOS = ['Control / Chequeo', 'Vacunación', 'Desparasitación', 'Consulta clínica', 'Urgencia', 'Cirugía'];
@@ -110,7 +110,7 @@ export default function TurnosPage({ sesion, onAtender }: Props) {
     if (destino === 'cancelado' && !window.confirm(`¿Cancelar el turno de ${nombreAnimal(t.animalId)}?`)) return;
     correr(async () => {
       await api.cambiarEstadoTurno(sesion, t.id, { estado: destino });
-      if (destino === 'atendido') onAtender?.(t.animalId);
+      if (destino === 'atendido') { const a = animalPorId.get(t.animalId); if (a) onAtender?.(a); }
     });
   }
 

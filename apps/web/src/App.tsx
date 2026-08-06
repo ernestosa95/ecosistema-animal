@@ -5,13 +5,15 @@ import { PacientesPage } from './pages/PacientesPage';
 import { PacienteDetallePage } from './pages/PacienteDetallePage';
 import { PersonasPage } from './pages/PersonasPage';
 import TurnosPage from './pages/TurnosPage';
+import RecordatoriosPage from './pages/RecordatoriosPage';
 import type { Animal } from './api/types';
 
 type Vista =
   | { nombre: 'pacientes' }
   | { nombre: 'detalle'; animal: Animal }
-  | { nombre: 'agenda' }
-  | { nombre: 'duenos' };
+  | { nombre: 'duenos' }
+  | { nombre: 'turnos' }
+  | { nombre: 'recordatorios' };
 
 export default function App() {
   const { sesion, iniciar, cerrar } = useSesion();
@@ -22,9 +24,13 @@ export default function App() {
   }
 
   const seccion =
-    vista.nombre === 'duenos' ? 'duenos'
-      : vista.nombre === 'agenda' ? 'agenda'
-        : 'pacientes';
+    vista.nombre === 'duenos'
+      ? 'duenos'
+      : vista.nombre === 'turnos'
+        ? 'turnos'
+        : vista.nombre === 'recordatorios'
+          ? 'recordatorios'
+          : 'pacientes';
 
   return (
     <div className="app">
@@ -46,22 +52,25 @@ export default function App() {
           className={seccion === 'pacientes' ? 'nav-item activo' : 'nav-item'}
           onClick={() => setVista({ nombre: 'pacientes' })}
         >
-          Animales
+          Pacientes
         </button>
         <button
-          className={seccion === 'agenda' ? 'nav-item activo' : 'nav-item'}
-          onClick={() => setVista({ nombre: 'agenda' })}
+          className={seccion === 'turnos' ? 'nav-item activo' : 'nav-item'}
+          onClick={() => setVista({ nombre: 'turnos' })}
         >
-          Agenda
+          Turnos
+        </button>
+        <button
+          className={seccion === 'recordatorios' ? 'nav-item activo' : 'nav-item'}
+          onClick={() => setVista({ nombre: 'recordatorios' })}
+        >
+          Recordatorios
         </button>
         <button
           className={seccion === 'duenos' ? 'nav-item activo' : 'nav-item'}
           onClick={() => setVista({ nombre: 'duenos' })}
         >
           Dueños
-        </button>
-        <button className={`nav-item ${vista === 'turnos' ? 'activo' : ''}`} onClick={() => setVista('turnos')}>
-          Turnos
         </button>
       </nav>
 
@@ -72,19 +81,23 @@ export default function App() {
             onAbrir={(animal) => setVista({ nombre: 'detalle', animal })}
           />
         )}
+        {vista.nombre === 'turnos' && (
+          <TurnosPage
+            sesion={sesion}
+            onAtender={(animal) => setVista({ nombre: 'detalle', animal })}
+          />
+        )}
+        {vista.nombre === 'recordatorios' && (
+          <RecordatoriosPage
+            sesion={sesion}
+            onAbrirPaciente={(animal) => setVista({ nombre: 'detalle', animal })}
+          />
+        )}
         {vista.nombre === 'detalle' && (
           <PacienteDetallePage
             sesion={sesion}
             animal={vista.animal}
             onVolver={() => setVista({ nombre: 'pacientes' })}
-          />
-        )}
-        {vista.nombre === 'agenda' && (
-          <TurnosPage
-            onAtender={(_turno) => {
-              // Opcional a futuro: abrir "Nueva consulta" del paciente atendido.
-              // Ej: setVista({ nombre: 'detalle', animal: ... });
-            }}
           />
         )}
         {vista.nombre === 'duenos' && <PersonasPage sesion={sesion} />}

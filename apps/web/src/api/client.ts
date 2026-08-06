@@ -1,4 +1,4 @@
-import type { Sesion, Especie, Animal, Consulta, Persona, Turno, EstadoTurno } from './types';
+import type { Sesion, Especie, Animal, Consulta, Persona, Turno, EstadoTurno, RecordatorioVacuna } from './types';
 
 const API = (import.meta.env.VITE_API_URL as string) || 'http://localhost:3000';
 
@@ -145,6 +145,10 @@ export const api = {
 
   turnosDeAnimal(s: Sesion, animalId: string): Promise<Turno[]> {
     return fetch(`${API}/turnos/animal/${animalId}`, { headers: headers(s) }).then(handle);
+  },
+
+  recordatoriosVacunas(s: Sesion, dias = 30): Promise<RecordatorioVacuna[]> {
+    return fetch(`${API}/vacunaciones/recordatorios?dias=${dias}`, { headers: headers(s) }).then(handle);
   },
 
 };

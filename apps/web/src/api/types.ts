@@ -58,3 +58,13 @@ export interface Turno {
   canal?: string | null;
   veterinarioId?: string | null;
 }
+
+export interface RecordatorioVacuna {
+  id: string;
+  animalId: string;
+  animalNombre: string;
+  codigoLegible: string | null;
+  producto: string;
+  proximaDosis: string;        // 'YYYY-MM-DD'
+  loteProducto?: string | null;
+}
