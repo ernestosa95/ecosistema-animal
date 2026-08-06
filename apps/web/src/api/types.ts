@@ -44,3 +44,17 @@ export interface Consulta {
   pesoKg?: string | null;
   veterinarioId?: string | null;
 }
+
+export type EstadoTurno =
+  | 'solicitado' | 'confirmado' | 'reprogramado' | 'cancelado' | 'atendido' | 'ausente';
+
+export interface Turno {
+  id: string;
+  animalId: string;
+  personaId?: string | null;
+  fechaHora: string;            // ISO (timestamptz)
+  estado: EstadoTurno;
+  motivo?: string | null;
+  canal?: string | null;
+  veterinarioId?: string | null;
+}

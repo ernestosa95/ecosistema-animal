@@ -60,6 +60,9 @@ export default function App() {
         >
           Dueños
         </button>
+        <button className={`nav-item ${vista === 'turnos' ? 'activo' : ''}`} onClick={() => setVista('turnos')}>
+          Turnos
+        </button>
       </nav>
 
       <main className="contenido">

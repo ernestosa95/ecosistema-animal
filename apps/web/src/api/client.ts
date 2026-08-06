@@ -1,4 +1,4 @@
-import type { Sesion, Especie, Animal, Consulta, Persona } from './types';
+import type { Sesion, Especie, Animal, Consulta, Persona, Turno, EstadoTurno } from './types';
 
 const API = (import.meta.env.VITE_API_URL as string) || 'http://localhost:3000';
 
@@ -111,4 +111,40 @@ export const api = {
       body: JSON.stringify(data),
     }).then(handle);
   },
+
+  turnos(s: Sesion, desde?: string, hasta?: string): Promise<Turno[]> {
+    const q = new URLSearchParams();
+    if (desde) q.set('desde', desde);
+    if (hasta) q.set('hasta', hasta);
+    const qs = q.toString();
+    return fetch(`${API}/turnos${qs ? `?${qs}` : ''}`, { headers: headers(s) }).then(handle);
+  },
+
+  crearTurno(
+    s: Sesion,
+    data: { animalId: string; fechaHora: string; motivo?: string; canal?: string },
+  ): Promise<Turno> {
+    return fetch(`${API}/turnos`, {
+      method: 'POST',
+      headers: headers(s),
+      body: JSON.stringify(data),
+    }).then(handle);
+  },
+
+  cambiarEstadoTurno(
+    s: Sesion,
+    id: string,
+    data: { estado: EstadoTurno; fechaHora?: string; veterinarioId?: string },
+  ): Promise<Turno> {
+    return fetch(`${API}/turnos/${id}/estado`, {
+      method: 'PATCH',
+      headers: headers(s),
+      body: JSON.stringify(data),
+    }).then(handle);
+  },
+
+  turnosDeAnimal(s: Sesion, animalId: string): Promise<Turno[]> {
+    return fetch(`${API}/turnos/animal/${animalId}`, { headers: headers(s) }).then(handle);
+  },
+
 };

@@ -4,7 +4,7 @@
 // "jsx": "react" en tsconfig y renombrá este archivo a .tsx.
 import { createElement as h } from 'react';
 import {
-  Document, Page, View, Text, StyleSheet, Svg, Ellipse,
+  Document, Page, View, Text, StyleSheet, Svg, Ellipse, Image,
 } from '@react-pdf/renderer';
 import type { CarnetData } from './carnet.types';
 
@@ -162,7 +162,7 @@ export function CarnetDocument(data: CarnetData) {
       ]),
 
       h(View, { key: 'foot', style: s.footer, fixed: true }, [
-        h(View, { key: 'qr', style: s.qrBox }, h(Text, { style: s.qrText }, 'Portal\nHuella\n(pronto)')),
+        h(Image, { key: 'qr', style: s.qrBox, src: data.qrDataUrl }),
         h(Text, { key: 'note', style: s.footNote }, [
           h(Text, { key: 'a', style: s.footStrong }, `${p.codigoLegible}  ·  ${p.nombre}\n`),
           h(Text, { key: 'b' }, 'Documento generado por Huella — Historia Clínica Electrónica animal. Verificable en el portal del ecosistema.'),

@@ -9,6 +9,8 @@ import { AuthModule } from '../core/auth/auth.module';
 import { TenantGuard } from '../common/guards/tenant.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { CarnetModule } from './carnet/carnet.module';
+import { CarnetController } from './carnet/carnet.controller';   // ← NUEVO
+import { CarnetService } from './carnet/carnet.service';         // ← NUEVO
 
 /**
  * Módulo de la Historia Clínica Electrónica. Agrupa las features de la HCE:
@@ -16,7 +18,7 @@ import { CarnetModule } from './carnet/carnet.module';
  */
 @Module({
   imports: [AuthModule, CarnetModule],
-  controllers: [ConsultasController, VacunacionesController, TurnosController],
-  providers: [ConsultasService, VacunacionesService, TurnosService, TenantGuard, RolesGuard],
+  controllers: [ConsultasController, VacunacionesController, TurnosController, CarnetController],
+  providers: [ConsultasService, VacunacionesService, TurnosService, TenantGuard, RolesGuard, CarnetService],
 })
 export class HceModule {}

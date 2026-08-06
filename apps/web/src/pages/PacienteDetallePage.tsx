@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import type { Sesion, Animal, Especie, Consulta, Persona } from '../api/types';
+import { abrirCarnet } from '../api/carnet';
 
 export function PacienteDetallePage({
   sesion,
@@ -66,6 +67,9 @@ export function PacienteDetallePage({
         <h1>{animal.nombre}</h1>
         <div className="acciones">
           <span className="chip">{animal.estado}</span>
+          <button className="btn-ghost" onClick={onCarnet} disabled={generandoCarnet}>
+            {generandoCarnet ? 'Generando…' : 'Descargar carnet'}
+          </button>
           <button className="btn-ghost" onClick={() => setEditando((v) => !v)}>
             {editando ? 'Cerrar' : 'Editar'}
           </button>
@@ -182,6 +186,18 @@ function EditarPacienteForm({
   const [estado, setEstado] = useState(animal.estado);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [generandoCarnet, setGenerandoCarnet] = useState(false);
+
+  async function onCarnet() {
+    try {
+      setGenerandoCarnet(true);
+      await abrirCarnet(sesion, animal.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo generar el carnet');
+    } finally {
+      setGenerandoCarnet(false);
+    }
+  }
 
   async function guardar(e: React.FormEvent) {
     e.preventDefault();

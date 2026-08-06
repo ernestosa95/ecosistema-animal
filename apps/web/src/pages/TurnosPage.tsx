@@ -1,348 +1,378 @@
 // apps/web/src/pages/TurnosPage.tsx
+// Agenda del día alineada a la API real:
+//   GET   /turnos?desde&hasta        (rango; el backend filtra por fechaHora)
+//   POST  /turnos                    ({ animalId, fechaHora, motivo, canal })
+//   PATCH /turnos/:id/estado         ({ estado, fechaHora? })
+// Los turnos vienen "planos" (sin nombres): resolvemos paciente/dueño en el cliente.
 import { useEffect, useMemo, useState } from 'react';
-import {
-  listarTurnos, crearTurno, confirmarTurno, reprogramarTurno,
-  cancelarTurno, atenderTurno, buscarAnimales,
-  type Turno, type EstadoTurno, type AnimalOpcion,
-} from '../api/turnos';
-
-// ── Config visual ──────────────────────────────────────────────────────────
-const ESPECIES: Record<string, string> = {
-  Canino: '🐕', Felino: '🐈', Equino: '🐎', Bovino: '🐄', Ave: '🦜', Conejo: '🐇',
-};
-const ESTADOS: Record<EstadoTurno, { label: string; color: string }> = {
-  solicitado:   { label: 'Solicitado',   color: '#E9A23B' },
-  confirmado:   { label: 'Confirmado',   color: '#0E7C6B' },
-  reprogramado: { label: 'Reprogramado', color: '#7C5CBF' },
-  atendido:     { label: 'Atendido',     color: '#2E9E5B' },
-  cancelado:    { label: 'Cancelado',    color: '#8A9A96' },
-  ausente:      { label: 'Ausente',      color: '#8A9A96' },
-};
-// Máquina de estados: qué acciones ofrece cada estado
-const ACCIONES: Record<EstadoTurno, Array<['confirmar' | 'atender' | 'reprogramar' | 'cancelar', string]>> = {
-  solicitado:   [['confirmar', 'solid'], ['reprogramar', ''], ['cancelar', 'danger']],
-  confirmado:   [['atender', 'solid'], ['reprogramar', ''], ['cancelar', 'danger']],
-  reprogramado: [['confirmar', 'solid'], ['atender', ''], ['cancelar', 'danger']],
-  atendido:     [],
-  cancelado:    [],
-  ausente:      [],
-};
-const LABEL: Record<string, string> = { confirmar: 'Confirmar', atender: 'Atender', reprogramar: 'Reprogramar', cancelar: 'Cancelar' };
-
-// ── Helpers de fecha ────────────────────────────────────────────────────────
-const iso = (d: Date) => d.toISOString().slice(0, 10);
-const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
-const fechaLarga = (d: Date) => d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
-
-type Modal =
-  | { tipo: 'reprogramar'; turno: Turno }
-  | { tipo: 'cancelar'; turno: Turno }
-  | { tipo: 'nuevo' }
-  | null;
+import { api } from '../api/client';
+import type { Sesion, Turno, EstadoTurno, Animal, Persona, Especie } from '../api/types';
 
 interface Props {
-  /** Se llama al atender un turno; usalo para abrir "Nueva consulta" del paciente. */
-  onAtender?: (turno: Turno) => void;
+  sesion: Sesion;
+  /** Se llama al atender un turno; usalo para abrir la ficha/Nueva consulta del paciente. */
+  onAtender?: (animalId: string) => void;
 }
 
-export default function TurnosPage({ onAtender }: Props) {
+const MOTIVOS = ['Control / Chequeo', 'Vacunación', 'Desparasitación', 'Consulta clínica', 'Urgencia', 'Cirugía'];
+
+const ESTADO_INFO: Record<EstadoTurno, { label: string; color: string }> = {
+  solicitado: { label: 'Solicitado', color: '#E9A23B' },
+  confirmado: { label: 'Confirmado', color: '#0E7C6B' },
+  reprogramado: { label: 'Reprogramado', color: '#7C5CBF' },
+  atendido: { label: 'Atendido', color: '#2E9E5B' },
+  cancelado: { label: 'Cancelado', color: '#8A9A96' },
+  ausente: { label: 'Ausente', color: '#8A9A96' },
+};
+
+// Acciones disponibles por estado (respeta los estados terminales del backend).
+const ACCIONES: Record<EstadoTurno, EstadoTurno[]> = {
+  solicitado: ['confirmado', 'reprogramado', 'cancelado'],
+  confirmado: ['atendido', 'reprogramado', 'cancelado'],
+  reprogramado: ['confirmado', 'atendido', 'cancelado'],
+  atendido: [],
+  cancelado: [],
+  ausente: [],
+};
+const BTN_LABEL: Partial<Record<EstadoTurno, string>> = {
+  confirmado: 'Confirmar', atendido: 'Atender', reprogramado: 'Reprogramar', cancelado: 'Cancelar',
+};
+
+// Helpers de fecha
+const two = (n: number) => String(n).padStart(2, '0');
+const isoDay = (d: Date) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
+const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const fechaLarga = (d: Date) => d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+const horaDe = (iso: string) => { const d = new Date(iso); return `${two(d.getHours())}:${two(d.getMinutes())}`; };
+// Combina 'YYYY-MM-DD' + 'HH:MM' locales en un ISO instantáneo (para el backend).
+const combinar = (dia: string, hora: string) => new Date(`${dia}T${hora}:00`).toISOString();
+
+type Modal =
+  | { tipo: 'nuevo' }
+  | { tipo: 'reprogramar'; turno: Turno }
+  | null;
+
+export default function TurnosPage({ sesion, onAtender }: Props) {
   const [fecha, setFecha] = useState<Date>(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; });
   const [turnos, setTurnos] = useState<Turno[]>([]);
+  const [animales, setAnimales] = useState<Animal[]>([]);
+  const [personas, setPersonas] = useState<Persona[]>([]);
+  const [especies, setEspecies] = useState<Especie[]>([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filtro, setFiltro] = useState<'todos' | EstadoTurno>('todos');
-  const [modal, setModal] = useState<Modal>(null);
   const [ocupado, setOcupado] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [modal, setModal] = useState<Modal>(null);
+
+  // Mapas para resolver nombres en el cliente
+  const animalPorId = useMemo(() => new Map(animales.map((a) => [a.id, a])), [animales]);
+  const personaPorId = useMemo(() => new Map(personas.map((p) => [p.id, p])), [personas]);
+  const especiePorId = useMemo(() => new Map(especies.map((e) => [e.id, e])), [especies]);
+
+  const nombreAnimal = (id: string) => animalPorId.get(id)?.nombre ?? '—';
+  const especieDe = (id: string) => { const a = animalPorId.get(id); return a ? especiePorId.get(a.especieId)?.nombre ?? '' : ''; };
+  const duenoDe = (id: string) => {
+    const a = animalPorId.get(id);
+    const p = a?.personaId ? personaPorId.get(a.personaId) : undefined;
+    return p ? `${p.nombre} ${p.apellido}` : '—';
+  };
 
   async function cargar() {
     setCargando(true); setError(null);
-    try { setTurnos(await listarTurnos(iso(fecha))); }
-    catch (e: any) { setError(e.message ?? 'No se pudieron cargar los turnos'); }
-    finally { setCargando(false); }
+    try {
+      const d0 = new Date(fecha); d0.setHours(0, 0, 0, 0);
+      const d1 = new Date(fecha); d1.setHours(23, 59, 59, 999);
+      const [ts, ans, pers, esp] = await Promise.all([
+        api.turnos(sesion, d0.toISOString(), d1.toISOString()),
+        animales.length ? Promise.resolve(animales) : api.animales(sesion),
+        personas.length ? Promise.resolve(personas) : api.personas(sesion),
+        especies.length ? Promise.resolve(especies) : api.especies(sesion),
+      ]);
+      setTurnos([...ts].sort((a, b) => a.fechaHora.localeCompare(b.fechaHora)));
+      setAnimales(ans); setPersonas(pers); setEspecies(esp);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudieron cargar los turnos');
+    } finally {
+      setCargando(false);
+    }
   }
-  useEffect(() => { cargar(); /* eslint-disable-next-line */ }, [fecha]);
+  useEffect(() => { cargar(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [fecha]);
 
-  function avisar(msg: string) { setToast(msg); setTimeout(() => setToast(null), 2600); }
-
-  async function correr(fn: () => Promise<any>, msg?: string) {
+  async function correr(fn: () => Promise<unknown>) {
     if (ocupado) return;
     setOcupado(true);
-    try { await fn(); await cargar(); if (msg) avisar(msg); }
-    catch (e: any) { avisar(e.message ?? 'Ocurrió un error'); }
+    try { await fn(); await cargar(); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Ocurrió un error'); }
     finally { setOcupado(false); }
   }
 
-  function onAccion(t: Turno, a: string) {
-    if (a === 'confirmar') correr(() => confirmarTurno(t.id), `Turno de ${t.paciente} confirmado`);
-    else if (a === 'atender') correr(async () => { await atenderTurno(t.id); onAtender?.(t); }, `${t.paciente} atendido`);
-    else if (a === 'cancelar') setModal({ tipo: 'cancelar', turno: t });
-    else if (a === 'reprogramar') setModal({ tipo: 'reprogramar', turno: t });
+  function onAccion(t: Turno, destino: EstadoTurno) {
+    if (destino === 'reprogramado') { setModal({ tipo: 'reprogramar', turno: t }); return; }
+    if (destino === 'cancelado' && !window.confirm(`¿Cancelar el turno de ${nombreAnimal(t.animalId)}?`)) return;
+    correr(async () => {
+      await api.cambiarEstadoTurno(sesion, t.id, { estado: destino });
+      if (destino === 'atendido') onAtender?.(t.animalId);
+    });
   }
 
-  const delDia = useMemo(
-    () => (filtro === 'todos' ? turnos : turnos.filter(t => t.estado === filtro)),
-    [turnos, filtro],
-  );
-  const cuenta = (e: EstadoTurno) => turnos.filter(t => t.estado === e).length;
+  const cuenta = (e: EstadoTurno) => turnos.filter((t) => t.estado === e).length;
 
   return (
-    <div className="hu-agenda">
+    <div className="tn-wrap">
       <style>{CSS}</style>
 
-      {/* Navegación de fecha */}
-      <div className="hu-datenav">
-        <button className="hu-nav" onClick={() => setFecha(addDays(fecha, -1))}>‹</button>
-        <div className="hu-datelabel">{fechaLarga(fecha)}</div>
-        <button className="hu-nav" onClick={() => setFecha(addDays(fecha, 1))}>›</button>
-        <button className="hu-btn ghost" onClick={() => { const d = new Date(); d.setHours(0, 0, 0, 0); setFecha(d); }}>Hoy</button>
-        <input type="date" value={iso(fecha)} onChange={e => e.target.value && setFecha(new Date(e.target.value + 'T00:00:00'))} />
+      <div className="tn-datenav">
+        <button className="tn-nav" onClick={() => setFecha(addDays(fecha, -1))}>‹</button>
+        <div className="tn-datelabel">{fechaLarga(fecha)}</div>
+        <button className="tn-nav" onClick={() => setFecha(addDays(fecha, 1))}>›</button>
+        <button className="tn-btn ghost" onClick={() => { const d = new Date(); d.setHours(0, 0, 0, 0); setFecha(d); }}>Hoy</button>
+        <input type="date" value={isoDay(fecha)} onChange={(e) => e.target.value && setFecha(new Date(`${e.target.value}T00:00:00`))} />
+        <button className="tn-btn solid" onClick={() => setModal({ tipo: 'nuevo' })}>+ Nuevo turno</button>
       </div>
 
-      {/* Resumen */}
-      <div className="hu-summary">
-        <div className="hu-stat"><b>{turnos.length}</b><span>turnos</span></div>
-        <div className="hu-stat"><b style={{ color: ESTADOS.solicitado.color }}>{cuenta('solicitado')}</b><span>a confirmar</span></div>
-        <div className="hu-stat"><b style={{ color: ESTADOS.confirmado.color }}>{cuenta('confirmado') + cuenta('reprogramado')}</b><span>en agenda</span></div>
-        <div className="hu-stat"><b style={{ color: ESTADOS.atendido.color }}>{cuenta('atendido')}</b><span>atendidos</span></div>
+      <div className="tn-summary">
+        <div className="tn-stat"><b>{turnos.length}</b><span>turnos</span></div>
+        <div className="tn-stat"><b style={{ color: ESTADO_INFO.solicitado.color }}>{cuenta('solicitado')}</b><span>a confirmar</span></div>
+        <div className="tn-stat"><b style={{ color: ESTADO_INFO.confirmado.color }}>{cuenta('confirmado') + cuenta('reprogramado')}</b><span>en agenda</span></div>
+        <div className="tn-stat"><b style={{ color: ESTADO_INFO.atendido.color }}>{cuenta('atendido')}</b><span>atendidos</span></div>
       </div>
 
-      {/* Filtros */}
-      <div className="hu-filters">
-        {([['todos', 'Todos'], ['solicitado', 'Solicitados'], ['confirmado', 'Confirmados'],
-          ['reprogramado', 'Reprogramados'], ['atendido', 'Atendidos'], ['cancelado', 'Cancelados']] as const)
-          .map(([k, l]) => (
-            <div key={k} className={`hu-chip ${filtro === k ? 'active' : ''}`} onClick={() => setFiltro(k)}>{l}</div>
-          ))}
-      </div>
+      {error && <div className="tn-alerta">{error}</div>}
 
-      {/* Lista */}
       {cargando ? (
-        <div className="hu-empty">Cargando agenda…</div>
-      ) : error ? (
-        <div className="hu-empty" style={{ color: '#C0492F' }}>
-          {error}<br /><button className="hu-btn ghost" style={{ marginTop: 10 }} onClick={cargar}>Reintentar</button>
-        </div>
-      ) : delDia.length === 0 ? (
-        <div className="hu-empty">No hay turnos {filtro !== 'todos' ? 'en este estado' : 'para este día'}.</div>
+        <div className="tn-empty">Cargando agenda…</div>
+      ) : turnos.length === 0 ? (
+        <div className="tn-empty">No hay turnos para este día.</div>
       ) : (
-        delDia.map(t => {
-          const est = ESTADOS[t.estado];
-          return (
-            <div key={t.id} className="hu-card" style={{ borderLeftColor: est.color }}>
-              <div className="hu-time">{t.hora}<small>{t.canal === 'portal' ? 'portal' : 'mostrador'}</small></div>
-              <div className="hu-main">
-                <div className="hu-pac">{ESPECIES[t.especie] || '🐾'} {t.paciente} <span className="hu-sp">· {t.especie}</span></div>
-                <div className="hu-meta">{t.dueno}</div>
-                <div className="hu-motivo">{t.motivo}</div>
-                <div style={{ marginTop: 8 }}>
-                  <span className="hu-badge" style={{ color: est.color, background: est.color + '1a' }}>
-                    <span className="hu-dot" style={{ background: est.color }} />{est.label}
-                  </span>
-                </div>
-                {ACCIONES[t.estado].length > 0 && (
-                  <div className="hu-actions">
-                    {ACCIONES[t.estado].map(([a, cls]) => (
-                      <button key={a} className={`hu-act ${cls}`} disabled={ocupado} onClick={() => onAccion(t, a)}>{LABEL[a]}</button>
-                    ))}
+        <div className="tn-list">
+          {turnos.map((t) => {
+            const info = ESTADO_INFO[t.estado];
+            return (
+              <div key={t.id} className="tn-row">
+                <div className="tn-hora">{horaDe(t.fechaHora)}</div>
+                <div className="tn-info">
+                  <div className="tn-pac">
+                    {nombreAnimal(t.animalId)}
+                    {especieDe(t.animalId) && <span className="tn-esp"> · {especieDe(t.animalId)}</span>}
+                    <span className="tn-due"> · {duenoDe(t.animalId)}</span>
                   </div>
-                )}
-                {t.estado === 'atendido' && <div className="hu-terminal">✓ Consulta registrada</div>}
-                {t.estado === 'cancelado' && <div className="hu-terminal">Turno cancelado</div>}
-                {t.estado === 'ausente' && <div className="hu-terminal">El paciente no asistió</div>}
+                  <div className="tn-motivo">{t.motivo || 'Sin motivo'}</div>
+                </div>
+                <span className="tn-badge" style={{ color: info.color, borderColor: info.color }}>{info.label}</span>
+                <div className="tn-acciones">
+                  {ACCIONES[t.estado].map((destino) => (
+                    <button
+                      key={destino}
+                      disabled={ocupado}
+                      className={`tn-btn ${destino === 'atendido' || destino === 'confirmado' ? 'solid' : destino === 'cancelado' ? 'danger' : 'ghost'}`}
+                      onClick={() => onAccion(t, destino)}
+                    >
+                      {BTN_LABEL[destino]}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          );
-        })
+            );
+          })}
+        </div>
       )}
 
-      <button className="hu-fab" onClick={() => setModal({ tipo: 'nuevo' })}>+ Nuevo turno</button>
+      {modal?.tipo === 'nuevo' && (
+        <NuevoTurno
+          sesion={sesion}
+          fecha={isoDay(fecha)}
+          animales={animales}
+          duenoDe={duenoDe}
+          onClose={() => setModal(null)}
+          onCreado={() => { setModal(null); cargar(); }}
+        />
+      )}
 
       {modal?.tipo === 'reprogramar' && (
-        <ModalReprogramar turno={modal.turno} onClose={() => setModal(null)}
-          onOk={(fecha, hora) => { setModal(null); correr(() => reprogramarTurno(modal.turno.id, { fecha, hora }), 'Turno reprogramado'); setFecha(new Date(fecha + 'T00:00:00')); }} />
+        <Reprogramar
+          turno={modal.turno}
+          nombre={nombreAnimal(modal.turno.animalId)}
+          onClose={() => setModal(null)}
+          onConfirmar={(fechaHora) => {
+            setModal(null);
+            correr(() => api.cambiarEstadoTurno(sesion, modal.turno.id, { estado: 'reprogramado', fechaHora }));
+          }}
+        />
       )}
-      {modal?.tipo === 'cancelar' && (
-        <ModalCancelar turno={modal.turno} onClose={() => setModal(null)}
-          onOk={(motivo) => { setModal(null); correr(() => cancelarTurno(modal.turno.id, motivo), 'Turno cancelado'); }} />
-      )}
-      {modal?.tipo === 'nuevo' && (
-        <ModalNuevo fechaDefault={iso(fecha)} onClose={() => setModal(null)}
-          onOk={(data) => { setModal(null); correr(() => crearTurno(data), 'Turno creado'); setFecha(new Date(data.fecha + 'T00:00:00')); }} />
-      )}
-
-      {toast && <div className="hu-toast">{toast}</div>}
     </div>
   );
 }
 
-// ── Modal: reprogramar ──────────────────────────────────────────────────────
-function ModalReprogramar({ turno, onClose, onOk }: { turno: Turno; onClose: () => void; onOk: (f: string, h: string) => void }) {
-  const [f, setF] = useState(turno.fecha);
-  const [h, setH] = useState(turno.hora);
-  return (
-    <Overlay onClose={onClose}>
-      <h2>Reprogramar turno</h2>
-      <p className="hu-sub">{turno.paciente} · {turno.dueno}</p>
-      <div className="hu-row2">
-        <Field label="Nueva fecha"><input type="date" value={f} onChange={e => setF(e.target.value)} /></Field>
-        <Field label="Nueva hora"><input type="time" value={h} onChange={e => setH(e.target.value)} /></Field>
-      </div>
-      <div className="hu-mactions">
-        <button className="hu-btn ghost" onClick={onClose}>Cancelar</button>
-        <button className="hu-btn primary" onClick={() => onOk(f, h)}>Reprogramar</button>
-      </div>
-    </Overlay>
-  );
-}
-
-// ── Modal: cancelar ─────────────────────────────────────────────────────────
-function ModalCancelar({ turno, onClose, onOk }: { turno: Turno; onClose: () => void; onOk: (motivo: string) => void }) {
-  const [m, setM] = useState('');
-  return (
-    <Overlay onClose={onClose}>
-      <h2>¿Cancelar turno?</h2>
-      <p className="hu-sub">{turno.paciente} · {turno.hora} · {turno.dueno}</p>
-      <Field label="Motivo (opcional)"><input type="text" value={m} onChange={e => setM(e.target.value)} placeholder="Ej: el dueño no puede asistir" /></Field>
-      <div className="hu-mactions">
-        <button className="hu-btn ghost" onClick={onClose}>Volver</button>
-        <button className="hu-btn" style={{ flex: 1, background: '#C0492F', color: '#fff' }} onClick={() => onOk(m)}>Sí, cancelar</button>
-      </div>
-    </Overlay>
-  );
-}
-
-// ── Modal: nuevo turno (con búsqueda de animal) ─────────────────────────────
-function ModalNuevo({ fechaDefault, onClose, onOk }: {
-  fechaDefault: string; onClose: () => void;
-  onOk: (d: { animalId: string; motivo: string; fecha: string; hora: string; paciente?: string; especie?: string; dueno?: string }) => void;
+// ── Modal: nuevo turno ──────────────────────────────────────────────────────
+function NuevoTurno({
+  sesion, fecha, animales, duenoDe, onClose, onCreado,
+}: {
+  sesion: Sesion; fecha: string; animales: Animal[];
+  duenoDe: (animalId: string) => string;
+  onClose: () => void; onCreado: () => void;
 }) {
   const [q, setQ] = useState('');
-  const [ops, setOps] = useState<AnimalOpcion[]>([]);
-  const [sel, setSel] = useState<AnimalOpcion | null>(null);
+  const [animalId, setAnimalId] = useState<string | null>(null);
+  const [dia, setDia] = useState(fecha);
+  const [hora, setHora] = useState('09:00');
   const [motivo, setMotivo] = useState('');
-  const [fecha, setFecha] = useState(fechaDefault);
-  const [hora, setHora] = useState('10:00');
+  const [guardando, setGuardando] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (sel || q.trim().length < 2) { setOps([]); return; }
-    let vivo = true;
-    const t = setTimeout(async () => { try { const r = await buscarAnimales(q.trim()); if (vivo) setOps(r); } catch { /* noop */ } }, 250);
-    return () => { vivo = false; clearTimeout(t); };
-  }, [q, sel]);
+  const filtrados = useMemo(() => {
+    const s = q.toLowerCase();
+    return animales
+      .filter((a) => `${a.nombre} ${duenoDe(a.id)}`.toLowerCase().includes(s))
+      .slice(0, 6);
+  }, [q, animales, duenoDe]);
+  const sel = animales.find((a) => a.id === animalId);
+
+  async function guardar() {
+    if (!animalId) return;
+    setGuardando(true); setErr(null);
+    try {
+      await api.crearTurno(sesion, { animalId, fechaHora: combinar(dia, hora), motivo, canal: 'mostrador' });
+      onCreado();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'No se pudo crear el turno');
+      setGuardando(false);
+    }
+  }
 
   return (
-    <Overlay onClose={onClose}>
-      <h2>Nuevo turno</h2>
-      <p className="hu-sub">Alta desde mostrador (queda confirmado)</p>
+    <Overlay title="Nuevo turno" onClose={onClose}>
+      {err && <div className="tn-alerta">{err}</div>}
+      <label className="tn-lbl">Animal (buscá por animal o dueño)</label>
+      {sel ? (
+        <div className="tn-sel">
+          <span>{sel.nombre} · {duenoDe(sel.id)}</span>
+          <button onClick={() => setAnimalId(null)}>✕</button>
+        </div>
+      ) : (
+        <>
+          <input className="tn-inp" placeholder="Buscar…" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+          {q && (
+            <div className="tn-drop">
+              {filtrados.map((a) => (
+                <button key={a.id} className="tn-opt" onClick={() => { setAnimalId(a.id); setQ(''); }}>
+                  {a.nombre} <span className="tn-due"> · {duenoDe(a.id)}</span>
+                </button>
+              ))}
+              {filtrados.length === 0 && <div className="tn-opt tn-muted">Sin resultados</div>}
+            </div>
+          )}
+        </>
+      )}
 
-      <Field label="Paciente">
-        {sel ? (
-          <div className="hu-selected">
-            <span>{ESPECIES[sel.especie] || '🐾'} {sel.nombre} · {sel.dueno}</span>
-            <button onClick={() => { setSel(null); setQ(''); }}>cambiar</button>
-          </div>
-        ) : (
-          <>
-            <input type="text" value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por nombre…" />
-            {ops.length > 0 && (
-              <div className="hu-suggest">
-                {ops.map(o => (
-                  <div key={o.id} className="hu-sug" onClick={() => { setSel(o); setOps([]); }}>
-                    {ESPECIES[o.especie] || '🐾'} <b>{o.nombre}</b> · {o.dueno}
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </Field>
-
-      <Field label="Motivo"><input type="text" value={motivo} onChange={e => setMotivo(e.target.value)} placeholder="Motivo de la consulta" /></Field>
-      <div className="hu-row2">
-        <Field label="Fecha"><input type="date" value={fecha} onChange={e => setFecha(e.target.value)} /></Field>
-        <Field label="Hora"><input type="time" value={hora} onChange={e => setHora(e.target.value)} /></Field>
+      <div className="tn-grid2">
+        <div>
+          <label className="tn-lbl">Fecha</label>
+          <input className="tn-inp" type="date" value={dia} onChange={(e) => setDia(e.target.value)} />
+        </div>
+        <div>
+          <label className="tn-lbl">Hora</label>
+          <input className="tn-inp" type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
+        </div>
       </div>
-      <div className="hu-mactions">
-        <button className="hu-btn ghost" onClick={onClose}>Cancelar</button>
-        <button className="hu-btn primary" disabled={!sel}
-          onClick={() => sel && onOk({ animalId: sel.id, motivo: motivo || 'Consulta', fecha, hora, paciente: sel.nombre, especie: sel.especie, dueno: sel.dueno })}>
-          Crear turno
+
+      <label className="tn-lbl">Motivo</label>
+      <input className="tn-inp" list="tn-motivos" placeholder="Elegí o escribí un motivo"
+        value={motivo} onChange={(e) => setMotivo(e.target.value)} />
+      <datalist id="tn-motivos">{MOTIVOS.map((m) => <option key={m} value={m} />)}</datalist>
+
+      <div className="tn-modal-foot">
+        <button className="tn-btn ghost" onClick={onClose}>Cancelar</button>
+        <button className="tn-btn solid" disabled={!animalId || guardando} onClick={guardar}>
+          {guardando ? 'Guardando…' : 'Crear turno'}
         </button>
       </div>
     </Overlay>
   );
 }
 
-// ── Piezas compartidas ──────────────────────────────────────────────────────
-function Overlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+// ── Modal: reprogramar ──────────────────────────────────────────────────────
+function Reprogramar({
+  turno, nombre, onClose, onConfirmar,
+}: {
+  turno: Turno; nombre: string; onClose: () => void; onConfirmar: (fechaHora: string) => void;
+}) {
+  const d = new Date(turno.fechaHora);
+  const [dia, setDia] = useState(isoDay(d));
+  const [hora, setHora] = useState(`${two(d.getHours())}:${two(d.getMinutes())}`);
   return (
-    <div className="hu-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="hu-modal">{children}</div>
+    <Overlay title={`Reprogramar — ${nombre}`} onClose={onClose}>
+      <div className="tn-grid2">
+        <div>
+          <label className="tn-lbl">Nueva fecha</label>
+          <input className="tn-inp" type="date" value={dia} onChange={(e) => setDia(e.target.value)} />
+        </div>
+        <div>
+          <label className="tn-lbl">Nueva hora</label>
+          <input className="tn-inp" type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
+        </div>
+      </div>
+      <div className="tn-modal-foot">
+        <button className="tn-btn ghost" onClick={onClose}>Cancelar</button>
+        <button className="tn-btn solid" onClick={() => onConfirmar(combinar(dia, hora))}>Reprogramar</button>
+      </div>
+    </Overlay>
+  );
+}
+
+function Overlay({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="tn-overlay" onClick={onClose}>
+      <div className="tn-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="tn-modal-head"><h3>{title}</h3><button onClick={onClose}>✕</button></div>
+        <div className="tn-modal-body">{children}</div>
+      </div>
     </div>
   );
 }
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="hu-field"><label>{label}</label>{children}</div>;
-}
 
-// ── Estilos (propios, sin framework) ────────────────────────────────────────
+// ── Estilos propios (scoped por prefijo tn-) ────────────────────────────────
 const CSS = `
-.hu-agenda{--teal:#0E7C6B;--teal-dark:#0A5C50;--ink:#17302C;--muted:#6B807B;--line:#DCE6E3;--bg:#F3F8F6;--accent:#E9A23B;
-  color:var(--ink);max-width:760px;margin:0 auto;padding-bottom:80px}
-.hu-agenda *{box-sizing:border-box}
-.hu-datenav{display:flex;align-items:center;gap:8px;margin:8px 0}
-.hu-nav{background:#fff;border:1px solid var(--line);border-radius:10px;width:38px;height:38px;font-size:18px;cursor:pointer;color:var(--ink)}
-.hu-nav:hover{border-color:var(--teal)}
-.hu-datelabel{font-size:16px;font-weight:700;text-transform:capitalize;flex:1;text-align:center}
-.hu-btn{border:none;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer}
-.hu-btn.ghost{background:#fff;border:1px solid var(--line);color:var(--ink)}
-.hu-btn.ghost:hover{border-color:var(--teal)}
-.hu-btn.primary{background:var(--teal);color:#fff}
-.hu-btn.primary:hover{background:var(--teal-dark)}
-.hu-btn:disabled{opacity:.5;cursor:not-allowed}
-.hu-agenda input[type=date],.hu-agenda input[type=time],.hu-agenda input[type=text]{border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-size:14px;background:#fff;color:var(--ink);width:100%}
-.hu-agenda input:focus{outline:none;border-color:var(--teal)}
-.hu-summary{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 12px}
-.hu-stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 12px;min-width:78px}
-.hu-stat b{display:block;font-size:20px;line-height:1}
-.hu-stat span{font-size:11px;color:var(--muted)}
-.hu-filters{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:6px}
-.hu-chip{white-space:nowrap;border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font-size:12.5px;cursor:pointer;color:var(--muted)}
-.hu-chip.active{background:var(--ink);color:#fff;border-color:var(--ink)}
-.hu-card{background:#fff;border:1px solid var(--line);border-left-width:4px;border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start}
-.hu-time{font-weight:800;font-size:15px;min-width:52px}
-.hu-time small{display:block;font-size:10px;color:var(--muted);font-weight:600}
-.hu-main{flex:1;min-width:0}
-.hu-pac{font-weight:700;font-size:15px}
-.hu-sp{font-size:13px;color:var(--muted)}
-.hu-meta{color:var(--muted);font-size:12.5px;margin-top:2px}
-.hu-motivo{font-size:13px;margin-top:6px}
-.hu-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.4px}
-.hu-dot{width:7px;height:7px;border-radius:50%}
-.hu-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
-.hu-act{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 11px;font-size:12.5px;cursor:pointer;font-weight:600;color:var(--ink)}
-.hu-act:hover{border-color:var(--teal);color:var(--teal)}
-.hu-act.solid{background:var(--teal);color:#fff;border-color:var(--teal)}
-.hu-act.solid:hover{background:var(--teal-dark)}
-.hu-act.danger:hover{border-color:#C0492F;color:#C0492F}
-.hu-act:disabled{opacity:.5;cursor:not-allowed}
-.hu-terminal{font-size:12px;color:var(--muted);margin-top:8px;font-style:italic}
-.hu-empty{text-align:center;color:var(--muted);padding:40px 16px;background:#fff;border:1px dashed var(--line);border-radius:12px}
-.hu-fab{position:fixed;right:22px;bottom:22px;background:var(--teal);color:#fff;border:none;border-radius:14px;padding:14px 18px;font-size:14px;font-weight:700;box-shadow:0 6px 20px rgba(14,124,107,.4);cursor:pointer;z-index:15}
-.hu-fab:hover{background:var(--teal-dark)}
-.hu-overlay{position:fixed;inset:0;background:rgba(23,48,44,.45);display:flex;align-items:center;justify-content:center;z-index:40;padding:16px}
-.hu-modal{background:#fff;border-radius:16px;width:100%;max-width:460px;padding:20px}
-.hu-modal h2{margin:0 0 4px;font-size:18px}
-.hu-sub{margin:0 0 16px;color:var(--muted);font-size:13px}
-.hu-field{margin-bottom:12px;position:relative}
-.hu-field label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
-.hu-row2{display:flex;gap:10px}.hu-row2>*{flex:1}
-.hu-mactions{display:flex;gap:8px;margin-top:8px}.hu-mactions .hu-btn{flex:1;padding:12px}
-.hu-suggest{border:1px solid var(--line);border-radius:10px;margin-top:6px;overflow:hidden;max-height:180px;overflow-y:auto}
-.hu-sug{padding:9px 11px;font-size:13.5px;cursor:pointer;border-bottom:1px solid var(--bg)}
-.hu-sug:hover{background:var(--bg)}
-.hu-selected{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--teal);border-radius:10px;padding:9px 11px;font-size:13.5px}
-.hu-selected button{background:none;border:none;color:var(--teal);font-weight:600;cursor:pointer;font-size:12.5px}
-.hu-toast{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;background:var(--ink);color:#fff;padding:11px 18px;border-radius:12px;font-size:13.5px;z-index:60;box-shadow:0 4px 16px rgba(23,48,44,.2)}
+.tn-wrap { max-width: 900px; margin: 0 auto; }
+.tn-datenav { display: flex; align-items: center; gap: .5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.tn-datelabel { font-weight: 700; text-transform: capitalize; min-width: 12rem; }
+.tn-nav { border: 1px solid #d9ddd7; background: #fff; border-radius: 8px; width: 2rem; height: 2rem; cursor: pointer; font-size: 1.1rem; }
+.tn-datenav input[type=date] { border: 1px solid #d9ddd7; border-radius: 8px; padding: .35rem .5rem; }
+.tn-btn { border-radius: 8px; padding: .4rem .8rem; font-weight: 600; font-size: .88rem; cursor: pointer; border: 1px solid transparent; }
+.tn-btn.solid { background: #0E7C6B; color: #fff; }
+.tn-btn.ghost { background: #fff; border-color: #d9ddd7; color: #46514d; }
+.tn-btn.danger { background: #fff; border-color: #f0c0c0; color: #b4423a; }
+.tn-btn:disabled { opacity: .5; cursor: default; }
+.tn-datenav .tn-btn.solid { margin-left: auto; }
+.tn-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: .75rem; margin-bottom: 1rem; }
+.tn-stat { border: 1px solid #e7e9e4; border-radius: 10px; padding: .75rem; background: #fff; }
+.tn-stat b { font-size: 1.5rem; display: block; }
+.tn-stat span { font-size: .75rem; color: #7a857f; }
+.tn-list { border: 1px solid #e7e9e4; border-radius: 10px; overflow: hidden; background: #fff; }
+.tn-row { display: flex; align-items: center; gap: .75rem; padding: .7rem .9rem; border-top: 1px solid #f0f1ee; flex-wrap: wrap; }
+.tn-row:first-child { border-top: none; }
+.tn-hora { font-weight: 700; width: 3.2rem; color: #46514d; }
+.tn-info { flex: 1; min-width: 10rem; }
+.tn-pac { font-weight: 600; }
+.tn-esp, .tn-due { color: #7a857f; font-weight: 400; }
+.tn-motivo { font-size: .82rem; color: #7a857f; }
+.tn-badge { font-size: .72rem; font-weight: 700; padding: .12rem .5rem; border: 1px solid; border-radius: 999px; }
+.tn-acciones { display: flex; gap: .35rem; flex-wrap: wrap; }
+.tn-empty { text-align: center; color: #7a857f; padding: 2.5rem; border: 1px dashed #d9ddd7; border-radius: 10px; }
+.tn-alerta { background: #fdeceb; color: #b4423a; border: 1px solid #f2b8b3; border-radius: 8px; padding: .5rem .7rem; margin-bottom: .75rem; font-size: .88rem; }
+.tn-overlay { position: fixed; inset: 0; background: rgba(20,30,25,.35); display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 50; }
+.tn-modal { background: #fff; border-radius: 14px; width: 100%; max-width: 30rem; max-height: 92vh; overflow: auto; }
+.tn-modal-head { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.1rem; border-bottom: 1px solid #eef0ec; }
+.tn-modal-head h3 { margin: 0; font-size: 1rem; }
+.tn-modal-head button { border: none; background: none; font-size: 1rem; cursor: pointer; color: #7a857f; }
+.tn-modal-body { padding: 1.1rem; }
+.tn-modal-foot { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem; }
+.tn-lbl { display: block; font-size: .78rem; color: #46514d; margin: .6rem 0 .2rem; font-weight: 600; }
+.tn-inp { width: 100%; box-sizing: border-box; border: 1px solid #d9ddd7; border-radius: 8px; padding: .5rem; font-size: .9rem; }
+.tn-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.tn-sel { display: flex; justify-content: space-between; align-items: center; border: 1px solid #0E7C6B; background: #eafaf6; border-radius: 8px; padding: .5rem .7rem; }
+.tn-sel button { border: none; background: none; cursor: pointer; color: #0E7C6B; }
+.tn-drop { border: 1px solid #e7e9e4; border-radius: 8px; margin-top: .3rem; overflow: hidden; }
+.tn-opt { display: block; width: 100%; text-align: left; padding: .5rem .7rem; border: none; background: #fff; cursor: pointer; font-size: .9rem; }
+.tn-opt:hover { background: #f3f7f5; }
+.tn-muted { color: #9aa39e; cursor: default; }
+@media (max-width: 640px) { .tn-summary { grid-template-columns: repeat(2, 1fr); } }
 `;

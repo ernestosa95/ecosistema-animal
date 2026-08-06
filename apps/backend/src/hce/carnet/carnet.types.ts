@@ -29,6 +29,7 @@ export interface CarnetDueno {
 
 export interface CarnetData {
   emitidoEl: string;                 // dd/mm/aaaa
+  qrDataUrl: string;                 // PNG data-url del QR al portal (nuevo)
   paciente: CarnetPaciente;
   dueno: CarnetDueno;
   vacunaciones: CarnetVacuna[];
