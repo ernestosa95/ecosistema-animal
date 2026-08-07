@@ -36,6 +36,7 @@ export class TurnosService {
       .values({
         organizacionId,
         animalId: dto.animalId,
+        veterinarioId: dto.veterinarioId,
         personaId: animal.personaId,
         fechaHora: new Date(dto.fechaHora),
         estado: 'solicitado',

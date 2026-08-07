@@ -2,16 +2,27 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import PortalDuenoPage from './pages/PortalDuenoPage';
+import AdminPage from './pages/AdminPage';
 import './styles.css';
 
-// Ruteo mínimo sin librería: si la URL es /c/{codigo} (o ?c=...), es el
-// portal público del dueño; si no, la app interna de la veterinaria.
+// Ruteo mínimo sin librería, por URL:
+//   /admin        → consola de administración (login propio)
+//   /c/{codigo}   → portal público del dueño
+//   resto         → app interna de la veterinaria
+const path = window.location.pathname;
+const esAdmin = /^\/admin(\/|$)/.test(path);
 const esPortal =
-  /\/c\/[^/]+/.test(window.location.pathname) ||
+  /\/c\/[^/]+/.test(path) ||
   new URLSearchParams(window.location.search).has('c');
+
+function Root() {
+  if (esAdmin) return <AdminPage />;
+  if (esPortal) return <PortalDuenoPage />;
+  return <App />;
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {esPortal ? <PortalDuenoPage /> : <App />}
+    <Root />
   </React.StrictMode>,
 );

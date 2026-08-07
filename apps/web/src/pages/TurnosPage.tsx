@@ -202,7 +202,6 @@ export default function TurnosPage({ sesion, onAtender }: Props) {
   );
 }
 
-// ── Modal: nuevo turno ──────────────────────────────────────────────────────
 function NuevoTurno({
   sesion, fecha, animales, duenoDe, onClose, onCreado,
 }: {
@@ -215,22 +214,39 @@ function NuevoTurno({
   const [dia, setDia] = useState(fecha);
   const [hora, setHora] = useState('09:00');
   const [motivo, setMotivo] = useState('');
+  const [veterinarioId, setVeterinarioId] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // Lista local de animales (para poder sumar el recién creado sin recargar todo).
+  const [animalesLocal, setAnimalesLocal] = useState<Animal[]>(animales);
+  const [crearAbierto, setCrearAbierto] = useState(false);
+
+  // Profesionales (veterinarios) de la organización.
+  const [vets, setVets] = useState<Veterinario[]>([]);
+  useEffect(() => {
+    api.veterinarios(sesion).then(setVets).catch(() => setVets([]));
+  }, [sesion]);
+
   const filtrados = useMemo(() => {
     const s = q.toLowerCase();
-    return animales
+    return animalesLocal
       .filter((a) => `${a.nombre} ${duenoDe(a.id)}`.toLowerCase().includes(s))
       .slice(0, 6);
-  }, [q, animales, duenoDe]);
-  const sel = animales.find((a) => a.id === animalId);
+  }, [q, animalesLocal, duenoDe]);
+  const sel = animalesLocal.find((a) => a.id === animalId);
 
   async function guardar() {
     if (!animalId) return;
     setGuardando(true); setErr(null);
     try {
-      await api.crearTurno(sesion, { animalId, fechaHora: combinar(dia, hora), motivo, canal: 'mostrador' });
+      await api.crearTurno(sesion, {
+        animalId,
+        fechaHora: combinar(dia, hora),
+        motivo,
+        canal: 'mostrador',
+        ...(veterinarioId ? { veterinarioId } : {}),
+      });
       onCreado();
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'No se pudo crear el turno');
@@ -238,9 +254,13 @@ function NuevoTurno({
     }
   }
 
+  const nombreVet = (v: Veterinario) =>
+    `${v.nombre ?? ''} ${v.apellido ?? ''}`.trim() || 'Veterinario/a';
+
   return (
     <Overlay title="Nuevo turno" onClose={onClose}>
       {err && <div className="tn-alerta">{err}</div>}
+
       <label className="tn-lbl">Animal (buscá por animal o dueño)</label>
       {sel ? (
         <div className="tn-sel">
@@ -257,11 +277,38 @@ function NuevoTurno({
                   {a.nombre} <span className="tn-due"> · {duenoDe(a.id)}</span>
                 </button>
               ))}
-              {filtrados.length === 0 && <div className="tn-opt tn-muted">Sin resultados</div>}
+              {filtrados.length === 0 && (
+                <button className="tn-opt tn-crear" onClick={() => setCrearAbierto(true)}>
+                  + Crear paciente {q ? `“${q}”` : ''}
+                </button>
+              )}
             </div>
           )}
         </>
       )}
+
+      {/* Alta rápida de paciente (mini-form propio del modal) */}
+      {crearAbierto && !sel && (
+        <CrearPacienteRapido
+          sesion={sesion}
+          nombreSugerido={q}
+          onCancelar={() => setCrearAbierto(false)}
+          onCreado={(nuevo) => {
+            setAnimalesLocal((prev) => [...prev, nuevo]);
+            setAnimalId(nuevo.id);
+            setCrearAbierto(false);
+            setQ('');
+          }}
+        />
+      )}
+
+      <label className="tn-lbl">Profesional (opcional)</label>
+      <select className="tn-inp" value={veterinarioId} onChange={(e) => setVeterinarioId(e.target.value)}>
+        <option value="">— Sin asignar —</option>
+        {vets.map((v) => (
+          <option key={v.usuarioId} value={v.usuarioId}>{nombreVet(v)}</option>
+        ))}
+      </select>
 
       <div className="tn-grid2">
         <div>
@@ -286,6 +333,75 @@ function NuevoTurno({
         </button>
       </div>
     </Overlay>
+  );
+}
+
+// ── Alta rápida de paciente dentro del modal de turno ───────────────────────
+function CrearPacienteRapido({
+  sesion, nombreSugerido, onCreado, onCancelar,
+}: {
+  sesion: Sesion;
+  nombreSugerido: string;
+  onCreado: (animal: Animal) => void;
+  onCancelar: () => void;
+}) {
+  const [nombre, setNombre] = useState(nombreSugerido);
+  const [especieId, setEspecieId] = useState('');
+  const [personaId, setPersonaId] = useState('');
+  const [especies, setEspecies] = useState<Especie[]>([]);
+  const [personas, setPersonas] = useState<Persona[]>([]);
+  const [guardando, setGuardando] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.all([api.especies(sesion), api.personas(sesion)])
+      .then(([e, p]) => { setEspecies(e); setPersonas(p); })
+      .catch(() => {});
+  }, [sesion]);
+
+  async function crear() {
+    if (!nombre.trim() || !especieId) { setErr('Nombre y especie son obligatorios'); return; }
+    setGuardando(true); setErr(null);
+    try {
+      const data: Record<string, unknown> = { nombre: nombre.trim(), especieId };
+      if (personaId) data.personaId = personaId;
+      const nuevo = await api.crearAnimal(sesion, data);
+      onCreado(nuevo);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'No se pudo crear el paciente');
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <div className="tn-crear-box">
+      <div className="tn-crear-titulo">Nuevo paciente</div>
+      {err && <div className="tn-alerta">{err}</div>}
+      <label className="tn-lbl">Nombre</label>
+      <input className="tn-inp" value={nombre} onChange={(e) => setNombre(e.target.value)} autoFocus />
+      <div className="tn-grid2">
+        <div>
+          <label className="tn-lbl">Especie</label>
+          <select className="tn-inp" value={especieId} onChange={(e) => setEspecieId(e.target.value)}>
+            <option value="">Elegir…</option>
+            {especies.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="tn-lbl">Dueño (opcional)</label>
+          <select className="tn-inp" value={personaId} onChange={(e) => setPersonaId(e.target.value)}>
+            <option value="">Sin dueño</option>
+            {personas.map((p) => <option key={p.id} value={p.id}>{p.nombre} {p.apellido}</option>)}
+          </select>
+        </div>
+      </div>
+      <div className="tn-modal-foot">
+        <button className="tn-btn ghost" onClick={onCancelar}>Cancelar</button>
+        <button className="tn-btn solid" disabled={guardando} onClick={crear}>
+          {guardando ? 'Creando…' : 'Crear paciente'}
+        </button>
+      </div>
+    </div>
   );
 }
 

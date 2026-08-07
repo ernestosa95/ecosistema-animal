@@ -20,4 +20,8 @@ export class CreateTurnoDto {
   @IsOptional()
   @IsIn(['portal', 'telefono', 'mostrador'])
   canal?: 'portal' | 'telefono' | 'mostrador';
+
+  @IsOptional()
+  @IsUUID()
+  veterinarioId?: string;
 }

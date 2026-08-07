@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDB } from '../../database/drizzle.provider';
-import { personas, animales } from '../../database/schema';
+import { personas, animales, membresias, usuarios } from '../../database/schema';
 import { CreatePersonaDto } from './dto/create-persona.dto';
 import { UpdatePersonaDto } from './dto/update-persona.dto';
 
@@ -121,6 +121,25 @@ export class PersonasService {
         and(
           eq(animales.organizacionId, organizacionId),
           eq(animales.personaId, personaId),
+        ),
+      );
+  }
+
+  /** Veterinarios activos de la organización (para asignar en turnos/consultas). */
+  async listarVeterinarios(organizacionId: string) {
+    return this.db
+      .select({
+        usuarioId: usuarios.id,
+        nombre: usuarios.nombre,
+        apellido: usuarios.apellido,
+      })
+      .from(membresias)
+      .innerJoin(usuarios, eq(membresias.usuarioId, usuarios.id))
+      .where(
+        and(
+          eq(membresias.organizacionId, organizacionId),
+          eq(membresias.rol, 'veterinario'),
+          eq(membresias.activo, true),
         ),
       );
   }

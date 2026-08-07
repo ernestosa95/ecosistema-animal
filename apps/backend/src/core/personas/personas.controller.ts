@@ -51,4 +51,10 @@ export class PersonasController {
   animales(@CurrentOrg() organizacionId: string, @Param('id') id: string) {
     return this.personas.listarAnimales(organizacionId, id);
   }
+
+  @Get('veterinarios')
+  @Roles('propietario', 'admin', 'veterinario', 'recepcion')
+  veterinarios(@CurrentOrg() organizacionId: string) {
+    return this.personas.listarVeterinarios(organizacionId);
+  }
 }

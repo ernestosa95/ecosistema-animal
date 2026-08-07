@@ -17,7 +17,13 @@ type Vista =
 
 export default function App() {
   const { sesion, iniciar, cerrar } = useSesion();
-  const [vista, setVista] = useState<Vista>({ nombre: 'pacientes' });
+  // Pestaña inicial según el rol: recepción/admin arrancan en la agenda de turnos.
+  const vistaInicial = (): Vista =>
+    sesion && ['recepcion', 'admin'].includes(sesion.rol)
+      ? { nombre: 'turnos' }
+      : { nombre: 'pacientes' };
+
+  const [vista, setVista] = useState<Vista>(vistaInicial);
 
   if (!sesion) {
     return <LoginPage onSesion={iniciar} />;
