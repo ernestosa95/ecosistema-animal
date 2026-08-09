@@ -1,42 +1,51 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSesion } from './auth/useSesion';
 import { LoginPage } from './pages/LoginPage';
 import { PacientesPage } from './pages/PacientesPage';
 import { PacienteDetallePage } from './pages/PacienteDetallePage';
 import { PersonasPage } from './pages/PersonasPage';
 import TurnosPage from './pages/TurnosPage';
-import RecordatoriosPage from './pages/RecordatoriosPage';
+import { configurarSesionTurnos } from './api/turnos';
 import type { Animal } from './api/types';
 
 type Vista =
-  | { nombre: 'pacientes' }
-  | { nombre: 'detalle'; animal: Animal }
-  | { nombre: 'duenos' }
   | { nombre: 'turnos' }
-  | { nombre: 'recordatorios' };
+  | { nombre: 'animales' }
+  | { nombre: 'detalle'; animal: Animal }
+  | { nombre: 'duenos' };
+
+/** Perfiles administrativos: su primera pantalla es el turnero. */
+const ROLES_ADMIN = new Set(['propietario', 'admin', 'recepcion']);
+
+function homeDe(rol: string | undefined): Vista {
+  return ROLES_ADMIN.has(rol ?? '') ? { nombre: 'turnos' } : { nombre: 'animales' };
+}
 
 export default function App() {
   const { sesion, iniciar, cerrar } = useSesion();
-  // Pestaña inicial según el rol: recepción/admin arrancan en la agenda de turnos.
-  const vistaInicial = (): Vista =>
-    sesion && ['recepcion', 'admin'].includes(sesion.rol)
-      ? { nombre: 'turnos' }
-      : { nombre: 'pacientes' };
+  const [vista, setVista] = useState<Vista | null>(null);
 
-  const [vista, setVista] = useState<Vista>(vistaInicial);
+  // El cliente de turnos toma la sesión desde acá (fuente de verdad).
+  useEffect(() => { configurarSesionTurnos(sesion); }, [sesion]);
+
+  // Al iniciar sesión → pantalla de inicio según rol. Al cerrar → reset.
+  useEffect(() => {
+    if (sesion && vista === null) setVista(homeDe(sesion.rol));
+    if (!sesion && vista !== null) setVista(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sesion]);
 
   if (!sesion) {
     return <LoginPage onSesion={iniciar} />;
   }
 
+  const vistaActual: Vista = vista ?? homeDe(sesion.rol);
   const seccion =
-    vista.nombre === 'duenos'
+    vistaActual.nombre === 'turnos'
+      ? 'turnos'
+      : vistaActual.nombre === 'duenos'
       ? 'duenos'
-      : vista.nombre === 'turnos'
-        ? 'turnos'
-        : vista.nombre === 'recordatorios'
-          ? 'recordatorios'
-          : 'pacientes';
+      : 'animales';
 
   return (
     <div className="app">
@@ -55,22 +64,16 @@ export default function App() {
 
       <nav className="nav">
         <button
-          className={seccion === 'pacientes' ? 'nav-item activo' : 'nav-item'}
-          onClick={() => setVista({ nombre: 'pacientes' })}
-        >
-          Pacientes
-        </button>
-        <button
           className={seccion === 'turnos' ? 'nav-item activo' : 'nav-item'}
           onClick={() => setVista({ nombre: 'turnos' })}
         >
           Turnos
         </button>
         <button
-          className={seccion === 'recordatorios' ? 'nav-item activo' : 'nav-item'}
-          onClick={() => setVista({ nombre: 'recordatorios' })}
+          className={seccion === 'animales' ? 'nav-item activo' : 'nav-item'}
+          onClick={() => setVista({ nombre: 'animales' })}
         >
-          Recordatorios
+          Animales
         </button>
         <button
           className={seccion === 'duenos' ? 'nav-item activo' : 'nav-item'}
@@ -81,32 +84,23 @@ export default function App() {
       </nav>
 
       <main className="contenido">
-        {vista.nombre === 'pacientes' && (
+        {vistaActual.nombre === 'turnos' && (
+          <TurnosPage onAtender={() => setVista({ nombre: 'animales' })} />
+        )}
+        {vistaActual.nombre === 'animales' && (
           <PacientesPage
             sesion={sesion}
             onAbrir={(animal) => setVista({ nombre: 'detalle', animal })}
           />
         )}
-        {vista.nombre === 'turnos' && (
-          <TurnosPage
-            sesion={sesion}
-            onAtender={(animal) => setVista({ nombre: 'detalle', animal })}
-          />
-        )}
-        {vista.nombre === 'recordatorios' && (
-          <RecordatoriosPage
-            sesion={sesion}
-            onAbrirPaciente={(animal) => setVista({ nombre: 'detalle', animal })}
-          />
-        )}
-        {vista.nombre === 'detalle' && (
+        {vistaActual.nombre === 'detalle' && (
           <PacienteDetallePage
             sesion={sesion}
-            animal={vista.animal}
-            onVolver={() => setVista({ nombre: 'pacientes' })}
+            animal={vistaActual.animal}
+            onVolver={() => setVista({ nombre: 'animales' })}
           />
         )}
-        {vista.nombre === 'duenos' && <PersonasPage sesion={sesion} />}
+        {vistaActual.nombre === 'duenos' && <PersonasPage sesion={sesion} />}
       </main>
     </div>
   );

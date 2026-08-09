@@ -10,6 +10,7 @@ import { HceModule } from './hce/hce.module';
 import { PortalModule } from './portal/portal.module';
 import { AdminModule } from './admin/admin.module';
 import { SolicitudesModule } from './solicitudes/solicitudes.module';
+import { UsuariosModule } from './core/usuarios/usuarios.module';
 
 /**
  * Módulo raíz. A medida que sumemos features se importan aquí:
@@ -30,6 +31,7 @@ import { SolicitudesModule } from './solicitudes/solicitudes.module';
     PortalModule,
     AdminModule,
     SolicitudesModule,
+    UsuariosModule,
   ],
 })
 export class AppModule {}

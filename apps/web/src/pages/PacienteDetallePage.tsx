@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import type { Sesion, Animal, Especie, Consulta, Persona } from '../api/types';
-import { abrirCarnet } from '../api/carnet';
+import { camposDeEspecie } from '../config/especieDatos';
+import { CamposEspecie } from '../components/CamposEspecie';
 
 export function PacienteDetallePage({
   sesion,
@@ -20,9 +21,14 @@ export function PacienteDetallePage({
   const [error, setError] = useState<string | null>(null);
   const [mostrarConsulta, setMostrarConsulta] = useState(false);
   const [editando, setEditando] = useState(false);
+  const [generandoCarnet, setGenerandoCarnet] = useState(false);
 
   const especieNombre = useMemo(
     () => especies.find((e) => e.id === animal.especieId)?.nombre ?? '—',
+    [especies, animal.especieId],
+  );
+  const especieActual = useMemo(
+    () => especies.find((e) => e.id === animal.especieId) ?? null,
     [especies, animal.especieId],
   );
   const duenoNombre = useMemo(() => {
@@ -55,12 +61,35 @@ export function PacienteDetallePage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animal.id]);
 
+  // Abre el carnet PDF del animal (GET /animales/:id/carnet.pdf) con la sesión.
+  async function onCarnet() {
+    setGenerandoCarnet(true);
+    try {
+      const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
+      const res = await fetch(`${API}/animales/${animal.id}/carnet.pdf`, {
+        headers: {
+          ...(sesion.token ? { Authorization: `Bearer ${sesion.token}` } : {}),
+          ...(sesion.organizacionId ? { 'X-Organizacion-Id': sesion.organizacionId } : {}),
+        },
+      });
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      alert('No se pudo generar el carnet: ' + (e instanceof Error ? e.message : 'error'));
+    } finally {
+      setGenerandoCarnet(false);
+    }
+  }
+
   const identificador = animal.microchip || animal.codigoLegible || '—';
 
   return (
     <div>
       <button className="link" onClick={onVolver}>
-        ← Volver a pacientes
+        ← Volver a animales
       </button>
 
       <div className="page-head">
@@ -97,6 +126,17 @@ export function PacienteDetallePage({
           <Dato etiqueta="Código" valor={animal.codigoLegible ?? '—'} mono />
           <Dato etiqueta="Microchip" valor={animal.microchip ?? '—'} mono />
           <Dato etiqueta="Identificador" valor={identificador} mono />
+
+          {camposDeEspecie(especieActual).map((c) => {
+            const v = animal.datosEspecificos?.[c.clave];
+            const texto =
+              c.tipo === 'checkbox'
+                ? v ? 'Sí' : 'No'
+                : v === undefined || v === null || v === ''
+                ? '—'
+                : String(v);
+            return <Dato key={c.clave} etiqueta={c.etiqueta} valor={texto} />;
+          })}
         </div>
       )}
 
@@ -184,20 +224,13 @@ function EditarPacienteForm({
   const [fechaNacimiento, setFechaNacimiento] = useState(animal.fechaNacimiento ?? '');
   const [microchip, setMicrochip] = useState(animal.microchip ?? '');
   const [estado, setEstado] = useState(animal.estado);
+  const [datosEspecificos, setDatosEspecificos] = useState<Record<string, unknown>>(
+    animal.datosEspecificos ?? {},
+  );
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
-  const [generandoCarnet, setGenerandoCarnet] = useState(false);
 
-  async function onCarnet() {
-    try {
-      setGenerandoCarnet(true);
-      await abrirCarnet(sesion, animal.id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo generar el carnet');
-    } finally {
-      setGenerandoCarnet(false);
-    }
-  }
+  const especieSel = especies.find((e) => e.id === especieId) ?? null;
 
   async function guardar(e: React.FormEvent) {
     e.preventDefault();
@@ -212,6 +245,7 @@ function EditarPacienteForm({
         sexo: sexo || undefined,
         fechaNacimiento: fechaNacimiento || undefined,
         microchip: microchip || undefined,
+        datosEspecificos,
       };
       const actualizado = await api.actualizarAnimal(sesion, animal.id, data);
       onGuardado(actualizado);
@@ -276,6 +310,9 @@ function EditarPacienteForm({
         Microchip (ISO)
         <input value={microchip} onChange={(e) => setMicrochip(e.target.value)} />
       </label>
+
+      <CamposEspecie especie={especieSel} valores={datosEspecificos} onChange={setDatosEspecificos} />
+
       {error && <div className="alerta span-2">{error}</div>}
       <div className="span-2 acciones">
         <button className="btn" type="submit" disabled={guardando}>
