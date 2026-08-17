@@ -54,14 +54,19 @@ type Modal =
 interface Props {
   /** Se llama al atender un turno; usalo para abrir "Nueva consulta" del paciente. */
   onAtender?: (turno: Turno) => void;
+  /** Id del profesional logueado (para el filtro "Mis turnos"). */
+  miVeterinarioId?: string;
+  /** Arranca con el filtro "Mis turnos" activo (para el rol veterinario). */
+  soloMiosInicial?: boolean;
 }
 
-export default function TurnosPage({ onAtender }: Props) {
+export default function TurnosPage({ onAtender, miVeterinarioId, soloMiosInicial = false }: Props) {
   const [fecha, setFecha] = useState<Date>(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; });
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<'todos' | EstadoTurno>('todos');
+  const [soloMios, setSoloMios] = useState<boolean>(soloMiosInicial);
   const [modal, setModal] = useState<Modal>(null);
   const [ocupado, setOcupado] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -106,10 +111,12 @@ export default function TurnosPage({ onAtender }: Props) {
     else if (a === 'reprogramar') setModal({ tipo: 'reprogramar', turno: t });
   }
 
-  const delDia = useMemo(
-    () => (filtro === 'todos' ? turnos : turnos.filter(t => t.estado === filtro)),
-    [turnos, filtro],
-  );
+  const delDia = useMemo(() => {
+    let list = turnos;
+    if (soloMios && miVeterinarioId) list = list.filter(t => t.veterinarioId === miVeterinarioId);
+    if (filtro !== 'todos') list = list.filter(t => t.estado === filtro);
+    return list;
+  }, [turnos, filtro, soloMios, miVeterinarioId]);
   const cuenta = (e: EstadoTurno) => turnos.filter(t => t.estado === e).length;
 
   return (
@@ -152,6 +159,11 @@ export default function TurnosPage({ onAtender }: Props) {
 
       {/* Filtros */}
       <div className="hu-filters">
+        {miVeterinarioId && (
+          <div className={`hu-chip ${soloMios ? 'active' : ''}`} onClick={() => setSoloMios(v => !v)}>
+            {soloMios ? '★ Mis turnos' : 'Mis turnos'}
+          </div>
+        )}
         {([['todos', 'Todos'], ['solicitado', 'Solicitados'], ['confirmado', 'Confirmados'],
           ['reprogramado', 'Reprogramados'], ['atendido', 'Atendidos'], ['cancelado', 'Cancelados']] as const)
           .map(([k, l]) => (

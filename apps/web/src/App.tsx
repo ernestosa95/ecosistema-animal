@@ -1,24 +1,39 @@
 import { useEffect, useState } from 'react';
 import { useSesion } from './auth/useSesion';
+import { api } from './api/client';
 import { LoginPage } from './pages/LoginPage';
 import { PacientesPage } from './pages/PacientesPage';
 import { PacienteDetallePage } from './pages/PacienteDetallePage';
 import { PersonasPage } from './pages/PersonasPage';
 import TurnosPage from './pages/TurnosPage';
-import { configurarSesionTurnos } from './api/turnos';
+import { configurarSesionTurnos, type Turno } from './api/turnos';
 import type { Animal } from './api/types';
 
 type Vista =
   | { nombre: 'turnos' }
   | { nombre: 'animales' }
-  | { nombre: 'detalle'; animal: Animal }
+  | { nombre: 'detalle'; animal: Animal; abrirConsulta?: boolean }
   | { nombre: 'duenos' };
 
-/** Perfiles administrativos: su primera pantalla es el turnero. */
-const ROLES_ADMIN = new Set(['propietario', 'admin', 'recepcion']);
+/** Roles cuya pantalla de inicio es el turnero. */
+const ROLES_TURNERO = new Set(['propietario', 'admin', 'recepcion', 'veterinario']);
+/** Roles que atienden (se les ofrece el filtro "Mis turnos"). */
+const ROLES_ATIENDEN = new Set(['veterinario', 'propietario']);
 
 function homeDe(rol: string | undefined): Vista {
-  return ROLES_ADMIN.has(rol ?? '') ? { nombre: 'turnos' } : { nombre: 'animales' };
+  return ROLES_TURNERO.has(rol ?? '') ? { nombre: 'turnos' } : { nombre: 'animales' };
+}
+
+/** Decodifica el `sub` (id de usuario) del JWT, sin librerías. */
+function usuarioIdDeToken(token?: string): string | undefined {
+  if (!token) return undefined;
+  try {
+    const parte = token.split('.')[1];
+    const json = JSON.parse(atob(parte.replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof json.sub === 'string' ? json.sub : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export default function App() {
@@ -37,6 +52,20 @@ export default function App() {
 
   if (!sesion) {
     return <LoginPage onSesion={iniciar} />;
+  }
+
+  const miUsuarioId = usuarioIdDeToken(sesion.token);
+  const atiende = ROLES_ATIENDEN.has(sesion.rol);
+
+  // Atender un turno: marca atendido (en TurnosPage) y acá abre la ficha del
+  // paciente con la Nueva consulta lista para cargar.
+  async function atenderDesdeTurno(t: Turno) {
+    try {
+      const animal = await api.obtenerAnimal(sesion, t.pacienteId);
+      setVista({ nombre: 'detalle', animal, abrirConsulta: true });
+    } catch (e) {
+      alert('No se pudo abrir la ficha del paciente: ' + (e instanceof Error ? e.message : 'error'));
+    }
   }
 
   const vistaActual: Vista = vista ?? homeDe(sesion.rol);
@@ -85,7 +114,11 @@ export default function App() {
 
       <main className="contenido">
         {vistaActual.nombre === 'turnos' && (
-          <TurnosPage onAtender={() => setVista({ nombre: 'animales' })} />
+          <TurnosPage
+            onAtender={atenderDesdeTurno}
+            miVeterinarioId={atiende ? miUsuarioId : undefined}
+            soloMiosInicial={sesion.rol === 'veterinario'}
+          />
         )}
         {vistaActual.nombre === 'animales' && (
           <PacientesPage
@@ -97,7 +130,8 @@ export default function App() {
           <PacienteDetallePage
             sesion={sesion}
             animal={vistaActual.animal}
-            onVolver={() => setVista({ nombre: 'animales' })}
+            abrirConsulta={vistaActual.abrirConsulta}
+            onVolver={() => setVista(homeDe(sesion.rol))}
           />
         )}
         {vistaActual.nombre === 'duenos' && <PersonasPage sesion={sesion} />}

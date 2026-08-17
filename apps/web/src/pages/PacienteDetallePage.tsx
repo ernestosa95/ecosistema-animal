@@ -8,10 +8,12 @@ export function PacienteDetallePage({
   sesion,
   animal: animalInicial,
   onVolver,
+  abrirConsulta = false,
 }: {
   sesion: Sesion;
   animal: Animal;
   onVolver: () => void;
+  abrirConsulta?: boolean;
 }) {
   const [animal, setAnimal] = useState<Animal>(animalInicial);
   const [consultas, setConsultas] = useState<Consulta[]>([]);
@@ -19,7 +21,7 @@ export function PacienteDetallePage({
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mostrarConsulta, setMostrarConsulta] = useState(false);
+  const [mostrarConsulta, setMostrarConsulta] = useState(!!abrirConsulta);
   const [editando, setEditando] = useState(false);
   const [generandoCarnet, setGenerandoCarnet] = useState(false);
 
