@@ -1,0 +1,142 @@
+/**
+ * Prueba del motor de sincronización contra un Postgres real (PGlite/WASM),
+ * usando los schemas core/hce reales y las funciones puras de src/sync/sync.core.
+ *
+ * Correr:  pnpm --filter backend test:sync-demo   (o: npx tsx test/sync-flow.demo.ts)
+ * No requiere Postgres instalado.
+ *
+ * Cubre: primera sync (vacía) -> push de creaciones -> pull delta -> update -> delete,
+ * y verifica el aislamiento por organización.
+ */
+import { PGlite } from '@electric-sql/pglite';
+import { drizzle } from 'drizzle-orm/pglite';
+import { eq } from 'drizzle-orm';
+import { randomUUID } from 'crypto';
+import * as core from '../src/database/schema/core';
+import * as hce from '../src/database/schema/hce';
+import { pull, push } from '../src/sync/sync.core';
+
+let ok = 0, fail = 0;
+const check = (n: string, c: boolean) => { c ? (ok++, console.log(`  ✓ ${n}`)) : (fail++, console.log(`  ✗ FALLA: ${n}`)); };
+
+async function main() {
+  const client = new PGlite();
+  await client.exec(`
+    CREATE SCHEMA core; CREATE SCHEMA hce;
+    CREATE TYPE core.tipo_organizacion AS ENUM ('establecimiento','clinica','mixta');
+    CREATE TYPE core.sexo_persona AS ENUM ('masculino','femenino','otro');
+    CREATE TYPE core.sexo_animal AS ENUM ('macho','hembra','indefinido');
+    CREATE TYPE core.estado_animal AS ENUM ('activo','inactivo','fallecido');
+    CREATE TYPE hce.estado_turno AS ENUM ('solicitado','confirmado','reprogramado','cancelado','atendido','ausente');
+
+    CREATE TABLE core.organizaciones (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), nombre text NOT NULL,
+      tipo core.tipo_organizacion NOT NULL DEFAULT 'clinica', cuit text,
+      activo boolean NOT NULL DEFAULT true,
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+    CREATE TABLE core.usuarios (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text NOT NULL UNIQUE, password_hash text NOT NULL,
+      nombre text, apellido text, email_verificado boolean NOT NULL DEFAULT false, ultimo_login timestamptz,
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+    CREATE TABLE core.especies (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), codigo text NOT NULL UNIQUE, nombre text NOT NULL);
+    CREATE TABLE core.personas (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      usuario_id uuid REFERENCES core.usuarios(id),
+      dni text, nombre text NOT NULL, apellido text NOT NULL, sexo core.sexo_persona,
+      fecha_nacimiento date, celular text, telefono text, email text,
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+    CREATE TABLE core.animales (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      persona_id uuid REFERENCES core.personas(id),
+      especie_id uuid NOT NULL REFERENCES core.especies(id),
+      codigo_legible text UNIQUE, microchip text UNIQUE, nombre text NOT NULL,
+      sexo core.sexo_animal, fecha_nacimiento date, fecha_nac_estimada boolean NOT NULL DEFAULT false,
+      foto_url text, estado core.estado_animal NOT NULL DEFAULT 'activo',
+      datos_especificos jsonb NOT NULL DEFAULT '{}',
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+    CREATE TABLE hce.consultas (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      animal_id uuid NOT NULL REFERENCES core.animales(id), veterinario_id uuid REFERENCES core.usuarios(id),
+      fecha timestamptz NOT NULL DEFAULT now(), motivo text, anamnesis text, examen_fisico text,
+      diagnostico text, tratamiento text, peso_kg numeric(6,2), temperatura_c numeric(4,1), observaciones text,
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+    CREATE TABLE hce.vacunaciones (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      animal_id uuid NOT NULL REFERENCES core.animales(id), veterinario_id uuid REFERENCES core.usuarios(id),
+      producto text, vademecum_id uuid, fecha date NOT NULL DEFAULT current_date, proxima_dosis date, lote_producto text,
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+    CREATE TABLE hce.turnos (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      animal_id uuid REFERENCES core.animales(id), persona_id uuid REFERENCES core.personas(id),
+      veterinario_id uuid REFERENCES core.usuarios(id), fecha_hora timestamptz NOT NULL,
+      estado hce.estado_turno NOT NULL DEFAULT 'solicitado', motivo text, canal text,
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+  `);
+
+  const db = drizzle(client, { schema: { ...core, ...hce } });
+
+  // Seed: dos organizaciones + una especie compartida.
+  const [orgA] = await db.insert(core.organizaciones).values({ nombre: 'Clínica A' }).returning();
+  const [orgB] = await db.insert(core.organizaciones).values({ nombre: 'Clínica B' }).returning();
+  const [esp] = await db.insert(core.especies).values({ codigo: 'CAN', nombre: 'Canino' }).returning();
+
+  console.log('1) Primera sync (org A, vacía)');
+  const p0 = await pull(db, orgA.id, 0);
+  check('devuelve timestamp', typeof p0.timestamp === 'number' && p0.timestamp > 0);
+  check('animales.created vacío', p0.changes.animales.created.length === 0);
+
+  console.log('2) Push de creaciones (persona + animal) con UUIDs del cliente');
+  const personaId = randomUUID();
+  const animalId = randomUUID();
+  await push(db, orgA.id, {
+    personas: { created: [{ id: personaId, nombre: 'Renzo', apellido: 'Gardiol', dni: '30111222' }], updated: [], deleted: [] },
+    animales: { created: [{ id: animalId, nombre: 'Duki', especie_id: esp.id, persona_id: personaId, estado: 'activo', datos_especificos: JSON.stringify({ raza: 'Mestizo' }) }], updated: [], deleted: [] },
+  });
+  const enBase = await db.select().from(core.animales).where(eq(core.animales.id, animalId));
+  check('el animal quedó en la base', enBase.length === 1 && enBase[0].nombre === 'Duki');
+  check('respetó el UUID del cliente', enBase[0].id === animalId);
+  check('forzó la organización correcta', enBase[0].organizacionId === orgA.id);
+  check('datos_especificos se guardó como JSON', (enBase[0].datosEspecificos as any)?.raza === 'Mestizo');
+
+  console.log('3) Aislamiento multi-tenant: org B no ve nada de org A');
+  const pB = await pull(db, orgB.id, 0);
+  check('org B no ve el animal de org A', pB.changes.animales.created.length === 0);
+
+  console.log('4) Pull delta (org A) trae lo nuevo');
+  const p1 = await pull(db, orgA.id, 0);
+  check('pull completo trae el animal como created', p1.changes.animales.created.some((a: any) => a.id === animalId));
+  const desde = p0.timestamp;
+  const p1b = await pull(db, orgA.id, desde);
+  check('pull delta (desde t0) trae el animal', p1b.changes.animales.created.some((a: any) => a.id === animalId));
+  check('el created_at viaja como número (ms)', typeof p1b.changes.animales.created[0].created_at === 'number');
+
+  console.log('5) Update por push → aparece en updated del delta');
+  await new Promise((r) => setTimeout(r, 5));
+  const tAntesUpdate = Date.now();
+  await new Promise((r) => setTimeout(r, 5));
+  await push(db, orgA.id, { animales: { created: [], updated: [{ id: animalId, nombre: 'Duki (editado)', especie_id: esp.id }], deleted: [] } });
+  const p2 = await pull(db, orgA.id, tAntesUpdate);
+  check('el animal editado aparece en updated', p2.changes.animales.updated.some((a: any) => a.id === animalId && a.nombre === 'Duki (editado)'));
+  check('no aparece en created (ya existía)', !p2.changes.animales.created.some((a: any) => a.id === animalId));
+
+  console.log('6) Delete por push → aparece en deleted del delta');
+  await new Promise((r) => setTimeout(r, 5));
+  const tAntesDelete = Date.now();
+  await new Promise((r) => setTimeout(r, 5));
+  await push(db, orgA.id, { animales: { created: [], updated: [], deleted: [animalId] } });
+  const p3 = await pull(db, orgA.id, tAntesDelete);
+  check('el animal aparece en deleted (por id)', p3.changes.animales.deleted.includes(animalId));
+  const p3full = await pull(db, orgA.id, 0);
+  check('el pull completo ya no lo trae (soft-deleted)', !p3full.changes.animales.created.some((a: any) => a.id === animalId));
+
+  console.log(`\nRESULTADO: ${ok} OK, ${fail} fallas`);
+  await client.close();
+  process.exit(fail === 0 ? 0 : 1);
+}
+
+main().catch((e) => { console.error(e); process.exit(1); });

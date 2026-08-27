@@ -16,6 +16,7 @@
     "test:hce-demo": "tsx test/hce-flow.demo.ts",
     "test:vacunas-demo": "tsx test/vacunas-flow.demo.ts",
     "test:turnos-demo": "tsx test/turnos-flow.demo.ts",
+    "test:sync-demo": "tsx test/sync-flow.demo.ts",
     "db:local-init": "node scripts/init-local-db.mjs"
   },
   "dependencies": {
@@ -48,7 +49,7 @@
     "jest": "^29.0.0",
     "jsonwebtoken": "^9.0.0",
     "ts-jest": "^29.0.0",
-    "tsx": "^4.0.0",
+    "tsx": "^4.23.1",
     "typescript": "^5.4.0"
   }
 }
