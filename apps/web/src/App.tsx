@@ -14,6 +14,7 @@ import { CajaPage } from './pages/CajaPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { MensajesBanner } from './components/MensajesBanner';
 import { Omnibox } from './components/Omnibox';
+import { TutorialGuiado } from './components/TutorialGuiado';
 import { configurarSesionTurnos, configurarRefrescoSesionTurnos, type Turno } from './api/turnos';
 import type { Animal, Persona } from './api/types';
 
@@ -66,12 +67,50 @@ function usuarioIdDeToken(token?: string): string | undefined {
   }
 }
 
+// Guía interactiva del primer login: se muestra una sola vez por usuario
+// (localStorage, no hace falta un flag en el backend para algo puramente
+// de onboarding) y siempre se puede volver a abrir con el botón "Ayuda".
+const CLAVE_TUTORIAL = 'ecosistema.tutorial.visto';
+
+function tutorialYaVisto(usuarioId?: string): boolean {
+  if (!usuarioId) return true;
+  try {
+    return localStorage.getItem(`${CLAVE_TUTORIAL}.${usuarioId}`) === '1';
+  } catch {
+    return true;
+  }
+}
+
+function marcarTutorialVisto(usuarioId?: string): void {
+  if (!usuarioId) return;
+  try {
+    localStorage.setItem(`${CLAVE_TUTORIAL}.${usuarioId}`, '1');
+  } catch {
+    // localStorage no disponible (modo privado, etc.) — no es crítico.
+  }
+}
+
 export default function App() {
   const { sesion, iniciar, cerrar, actualizarTokens } = useSesion();
   const [vista, setVista] = useState<Vista | null>(null);
+  const [tutorialActivo, setTutorialActivo] = useState(false);
+  const miUsuarioId = usuarioIdDeToken(sesion?.token);
 
   // El cliente de turnos toma la sesión desde acá (fuente de verdad).
   useEffect(() => { configurarSesionTurnos(sesion); }, [sesion]);
+
+  // Primer login de este usuario en este navegador → guía interactiva.
+  useEffect(() => {
+    if (sesion && miUsuarioId && !tutorialYaVisto(miUsuarioId)) {
+      setTutorialActivo(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sesion, miUsuarioId]);
+
+  function cerrarTutorial() {
+    setTutorialActivo(false);
+    marcarTutorialVisto(miUsuarioId);
+  }
 
   // Ambos clientes API avisan acá cuando renuevan el access token solos
   // (401 → POST /auth/refresh), para persistirlo en useSesion/localStorage.
@@ -94,7 +133,6 @@ export default function App() {
     return <LoginPage onSesion={iniciar} />;
   }
 
-  const miUsuarioId = usuarioIdDeToken(sesion.token);
   const atiende = tieneAlguno(sesion.roles, ROLES_ATIENDEN);
 
   // Atender un turno: marca atendido (en TurnosPage) y acá abre la ficha del
@@ -142,6 +180,9 @@ export default function App() {
         </div>
         <div className="topbar-right">
           <span className="rol">{sesion.roles.join(' + ')}</span>
+          <button className="btn-ghost" onClick={() => setTutorialActivo(true)}>
+            ❓ Ayuda
+          </button>
           <button className="btn-ghost" onClick={cerrar}>
             Cerrar sesión
           </button>
@@ -151,6 +192,7 @@ export default function App() {
       <nav className="nav">
         {tieneAlguno(sesion.roles, ROLES_DASHBOARD) && (
           <button
+            data-tour="nav-dashboard"
             className={seccion === 'dashboard' ? 'nav-item activo' : 'nav-item'}
             onClick={() => setVista({ nombre: 'dashboard' })}
           >
@@ -158,18 +200,21 @@ export default function App() {
           </button>
         )}
         <button
+          data-tour="nav-turnos"
           className={seccion === 'turnos' ? 'nav-item activo' : 'nav-item'}
           onClick={() => setVista({ nombre: 'turnos' })}
         >
           Turnos
         </button>
         <button
+          data-tour="nav-animales"
           className={seccion === 'animales' ? 'nav-item activo' : 'nav-item'}
           onClick={() => setVista({ nombre: 'animales' })}
         >
           Animales
         </button>
         <button
+          data-tour="nav-duenos"
           className={seccion === 'duenos' ? 'nav-item activo' : 'nav-item'}
           onClick={() => setVista({ nombre: 'duenos' })}
         >
@@ -177,6 +222,7 @@ export default function App() {
         </button>
         {tieneAlguno(sesion.roles, ROLES_TURNERO) && (
           <button
+            data-tour="nav-recordatorios"
             className={seccion === 'recordatorios' ? 'nav-item activo' : 'nav-item'}
             onClick={() => setVista({ nombre: 'recordatorios' })}
           >
@@ -185,6 +231,7 @@ export default function App() {
         )}
         {tieneAlguno(sesion.roles, ROLES_TROPERA) && (
           <button
+            data-tour="nav-tropera"
             className={seccion === 'tropera' ? 'nav-item activo' : 'nav-item'}
             onClick={() => setVista({ nombre: 'tropera' })}
           >
@@ -193,6 +240,7 @@ export default function App() {
         )}
         {tieneAlguno(sesion.roles, ROLES_USUARIOS) && (
           <button
+            data-tour="nav-usuarios"
             className={seccion === 'usuarios' ? 'nav-item activo' : 'nav-item'}
             onClick={() => setVista({ nombre: 'usuarios' })}
           >
@@ -201,6 +249,7 @@ export default function App() {
         )}
         {tieneAlguno(sesion.roles, ROLES_FARMACIA) && (
           <button
+            data-tour="nav-farmacia"
             className={seccion === 'farmacia' ? 'nav-item activo' : 'nav-item'}
             onClick={() => setVista({ nombre: 'farmacia' })}
           >
@@ -209,6 +258,7 @@ export default function App() {
         )}
         {tieneAlguno(sesion.roles, ROLES_CAJA) && (
           <button
+            data-tour="nav-caja"
             className={seccion === 'caja' ? 'nav-item activo' : 'nav-item'}
             onClick={() => setVista({ nombre: 'caja' })}
           >
@@ -255,6 +305,14 @@ export default function App() {
         {vistaActual.nombre === 'farmacia' && <FarmaciaPage sesion={sesion} />}
         {vistaActual.nombre === 'caja' && <CajaPage sesion={sesion} />}
       </main>
+
+      <TutorialGuiado
+        sesion={sesion}
+        activo={tutorialActivo}
+        seccionActual={seccion}
+        onNavegar={(s) => setVista({ nombre: s })}
+        onTerminar={cerrarTutorial}
+      />
     </div>
   );
 }

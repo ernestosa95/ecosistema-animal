@@ -161,6 +161,18 @@ Sólo visible en la nav para roles `propietario`/`admin`/`veterinario`.
 
 ---
 
+## 12. Tutorial guiado
+
+- [ ] **12.1 — Primer login:** con un usuario que nunca inició sesión en este navegador, entrar → debe aparecer solo el tour (sin tener que pedirlo), con el paso de bienvenida centrado en pantalla.
+- [ ] **12.2 — Recorrido completo:** "Siguiente" hasta el final → cada paso debe resaltar el ítem de nav correcto (o el botón "+ Nuevo ..." en los pasos de Turnos/Animales/Tropera) y, si el paso está en otra sección, la pantalla de atrás debe cambiar sola antes de mostrar el tooltip.
+- [ ] **12.3 — Volver atrás:** en algún paso intermedio, "Atrás" → debe volver al paso anterior (cambiando de sección si hace falta) sin romperse.
+- [ ] **12.4 — Saltar:** "Saltar" en cualquier paso → debe cerrar el tour sin errores.
+- [ ] **12.5 — No se repite solo:** recargar la página (o volver a loguearse) → el tour **no** debe reaparecer solo.
+- [ ] **12.6 — Reabrir manualmente:** botón "❓ Ayuda" (arriba a la derecha) → debe arrancar el tour de nuevo desde el paso 1, en cualquier momento.
+- [ ] **12.7 — Por rol:** repetir 12.1 con un usuario de cada rol (veterinario, recepción, capataz) → el contenido del tour debe ser distinto (más corto, enfocado en lo que ese rol realmente usa) — comparar contra lo que ve un propietario/admin.
+
+---
+
 ## Resumen de límites conocidos (no son bugs, son alcance no construido todavía)
 
 - Tropera: sin seguimiento individual por animal (todo es conteo agregado), sin modo offline.

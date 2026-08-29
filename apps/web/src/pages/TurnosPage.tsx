@@ -138,7 +138,7 @@ export default function TurnosPage({ onAtender, miVeterinarioId, soloMiosInicial
             value={iso(fecha)}
             onChange={e => e.target.value && setFecha(new Date(e.target.value + 'T00:00:00'))}
           />
-          <button className="hu-btn primary" onClick={() => setModal({ tipo: 'nuevo' })}>＋ Nuevo turno</button>
+          <button className="hu-btn primary" data-tour="turnos-nuevo" onClick={() => setModal({ tipo: 'nuevo' })}>＋ Nuevo turno</button>
 
           {/* Contadores del día */}
           <div className="hu-summary">

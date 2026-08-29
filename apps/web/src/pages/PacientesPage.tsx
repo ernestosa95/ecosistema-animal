@@ -71,7 +71,7 @@ export function PacientesPage({
     <div>
       <div className="page-head">
         <h1>Animales</h1>
-        <button className="btn" onClick={() => setMostrarForm((v) => !v)}>
+        <button className="btn" data-tour="animales-nuevo" onClick={() => setMostrarForm((v) => !v)}>
           {mostrarForm ? 'Cerrar' : '+ Nuevo animal'}
         </button>
       </div>

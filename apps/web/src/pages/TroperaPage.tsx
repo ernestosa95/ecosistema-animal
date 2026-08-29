@@ -157,7 +157,7 @@ export function TroperaPage({ sesion }: { sesion: Sesion }) {
     <div>
       <div className="page-head">
         <h1>Tropera</h1>
-        <button className="btn" onClick={() => setMostrarForm((v) => !v)}>
+        <button className="btn" data-tour="tropera-nuevo" onClick={() => setMostrarForm((v) => !v)}>
           {mostrarForm ? 'Cerrar' : '+ Nuevo establecimiento'}
         </button>
       </div>
