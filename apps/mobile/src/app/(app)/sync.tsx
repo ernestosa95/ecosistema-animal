@@ -37,8 +37,9 @@ export default function SincronizacionScreen() {
         <Text style={styles.buttonText}>{estado === 'syncing' ? 'Sincronizando…' : 'Sincronizar ahora'}</Text>
       </Pressable>
       <Text style={styles.hint}>
-        Trae establecimientos/existencias/movimientos/eventos actualizados desde el servidor y
-        envía lo que se cargó offline en este dispositivo.
+        Trae establecimientos/existencias/movimientos/eventos y el seguimiento individual de
+        hacienda (animales de campo, potreros, hallazgos, toros virtuales, muestras, tareas)
+        actualizados desde el servidor, y envía lo que se cargó offline en este dispositivo.
       </Text>
     </View>
   );

@@ -2,12 +2,24 @@ import { appSchema, tableSchema } from '@nozbe/watermelondb';
 
 // Espeja las tablas registradas en el motor de sync del backend
 // (apps/backend/src/sync/sync.core.ts): personas/animales/consultas/
-// vacunaciones/turnos de core+hce (v1→v2) y las 4 de `tropera` (v1).
+// vacunaciones/turnos de core+hce (v1→v2), las 4 de `tropera` F1.1-F1.6 (v1)
+// y el seguimiento individual de Fase E (v2→v3: animales_campo/potreros/
+// hallazgos/toros_virtuales/muestras/tareas/plantillas_tareas/protocolos_iatf
+// + columnas nuevas en `eventos`).
+// NO están acá (y por lo tanto no sincronizan a mobile): `plantilla_items`,
+// `protocolo_iatf_pasos` y `evaluaciones_andrologicas` — les falta
+// updated_at/deleted_at en el schema del backend (son filas hijas
+// inmutables), y el motor de sync genérico asume esas columnas en toda
+// tabla registrada. Sumarlas requeriría antes esa migración de backend,
+// que es una decisión de alcance aparte, no sólo "capa de datos".
+// Tampoco están Farmacia ni Caja (desk/online por diseño, no pensadas para
+// captura offline en el campo) ni `hce.macros`/indicaciones (ayuda de
+// escritorio, bajo valor offline).
 // Nombres de columna en snake_case porque así los serializa
 // `serializeRow`/`valoresParaEscribir` (contrato = objeto WatermelonDB, no
 // el camelCase de Drizzle).
 export const schema = appSchema({
-  version: 2,
+  version: 3,
   tables: [
     tableSchema({
       name: 'personas',
@@ -143,6 +155,116 @@ export const schema = appSchema({
         { name: 'fecha', type: 'string' },
         { name: 'observaciones', type: 'string', isOptional: true },
         { name: 'usuario_id', type: 'string', isOptional: true },
+        // Fase E (v3).
+        { name: 'animal_campo_id', type: 'string', isOptional: true, isIndexed: true },
+        { name: 'retiro_hasta', type: 'string', isOptional: true },
+        { name: 'hallazgo_id', type: 'string', isOptional: true },
+        { name: 'resultado_reproductivo', type: 'string', isOptional: true },
+        { name: 'toro_virtual_id', type: 'string', isOptional: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    // ---- Fase E: seguimiento individual (v3) ----
+    tableSchema({
+      name: 'animales_campo',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'establecimiento_id', type: 'string', isIndexed: true },
+        { name: 'caravana', type: 'string' },
+        { name: 'caravana_definitiva', type: 'boolean' },
+        { name: 'categoria', type: 'string' },
+        { name: 'potrero_id', type: 'string', isOptional: true, isIndexed: true },
+        { name: 'sexo', type: 'string', isOptional: true },
+        { name: 'estado', type: 'string' },
+        { name: 'fecha_alta', type: 'string' },
+        { name: 'observaciones', type: 'string', isOptional: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'potreros',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'establecimiento_id', type: 'string', isIndexed: true },
+        { name: 'nombre', type: 'string' },
+        { name: 'superficie_ha', type: 'number', isOptional: true },
+        { name: 'capacidad_cabezas', type: 'number', isOptional: true },
+        { name: 'observaciones', type: 'string', isOptional: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'hallazgos',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'nombre', type: 'string' },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'toros_virtuales',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'nombre', type: 'string' },
+        { name: 'raza', type: 'string', isOptional: true },
+        { name: 'proveedor', type: 'string', isOptional: true },
+        { name: 'observaciones', type: 'string', isOptional: true },
+        { name: 'activo', type: 'boolean' },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'muestras',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'establecimiento_id', type: 'string', isIndexed: true },
+        { name: 'animal_campo_id', type: 'string', isOptional: true, isIndexed: true },
+        { name: 'caravana', type: 'string', isOptional: true },
+        { name: 'tubo_numero', type: 'number' },
+        { name: 'tipo_muestra', type: 'string', isOptional: true },
+        { name: 'fecha', type: 'string' },
+        { name: 'observaciones', type: 'string', isOptional: true },
+        { name: 'usuario_id', type: 'string', isOptional: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'plantillas_tareas',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'nombre', type: 'string' },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'protocolos_iatf',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'nombre', type: 'string' },
+        { name: 'descripcion', type: 'string', isOptional: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'tareas',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'establecimiento_id', type: 'string', isIndexed: true },
+        { name: 'animal_campo_id', type: 'string', isOptional: true, isIndexed: true },
+        { name: 'protocolo_id', type: 'string', isOptional: true },
+        { name: 'descripcion', type: 'string' },
+        { name: 'producto', type: 'string', isOptional: true },
+        { name: 'fecha_programada', type: 'string' },
+        { name: 'estado', type: 'string' },
+        { name: 'observaciones', type: 'string', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],

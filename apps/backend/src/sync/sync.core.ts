@@ -13,7 +13,11 @@
 import { and, eq, gt, isNull, getTableColumns } from 'drizzle-orm';
 import { personas, animales } from '../database/schema/core';
 import { consultas, vacunaciones, turnos } from '../database/schema/hce';
-import { establecimientos, existencias, movimientos, eventos } from '../database/schema/tropera';
+import {
+  establecimientos, existencias, movimientos, eventos,
+  animalesCampo, potreros, hallazgos, torosVirtuales, muestras,
+  plantillasTareas, protocolosIatf, tareas,
+} from '../database/schema/tropera';
 import { aplicarMovimiento } from '../tropera/movimientos/aplicar-movimiento';
 import { generarProximoCodigoLegible } from '../core/animales/generar-proximo-codigo-legible';
 
@@ -60,6 +64,26 @@ export const REGISTRY: TablaSync[] = [
     table: movimientos,
     afterCreate: (tx, orgId, row) => aplicarMovimiento(tx, orgId, row),
   },
+  // Fase E (seguimiento individual): sólo las tablas que ya tienen
+  // updated_at/deleted_at, que es lo que el motor genérico de pull/push
+  // asume en toda tabla registrada. `plantilla_items`, `protocolo_iatf_pasos`
+  // y `evaluaciones_andrologicas` quedan afuera a propósito — son filas
+  // hijas inmutables sin esas columnas; sumarlas requiere antes esa
+  // migración de schema, una decisión aparte de "cablear el registry".
+  // Orden importante: `potreros` antes de `animales_campo` (potrero_id),
+  // `animales_campo`/`hallazgos`/`toros_virtuales` antes de `eventos` (los
+  // tres son FKs opcionales de eventos), `animales_campo`/`protocolos_iatf`
+  // antes de `tareas` — todo dentro de la misma transacción de push, así
+  // que una fila creada offline en la misma ronda que la referencia debe
+  // insertarse antes.
+  { name: 'potreros', table: potreros },
+  { name: 'animales_campo', table: animalesCampo },
+  { name: 'hallazgos', table: hallazgos },
+  { name: 'toros_virtuales', table: torosVirtuales },
+  { name: 'muestras', table: muestras },
+  { name: 'plantillas_tareas', table: plantillasTareas },
+  { name: 'protocolos_iatf', table: protocolosIatf },
+  { name: 'tareas', table: tareas },
   { name: 'eventos', table: eventos },
 ];
 

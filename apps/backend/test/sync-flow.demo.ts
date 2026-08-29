@@ -104,13 +104,67 @@ async function main() {
       establecimiento_destino_id uuid REFERENCES tropera.establecimientos(id),
       fecha date NOT NULL DEFAULT current_date, observaciones text, usuario_id uuid REFERENCES core.usuarios(id),
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+    CREATE TYPE tropera.estado_animal_campo AS ENUM ('activo','vendido','muerto','transferido');
+    CREATE TYPE tropera.estado_tarea AS ENUM ('pendiente','completada','cancelada');
+    CREATE TABLE tropera.potreros (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      establecimiento_id uuid NOT NULL REFERENCES tropera.establecimientos(id) ON DELETE CASCADE,
+      nombre text NOT NULL, superficie_ha numeric(10,2), capacidad_cabezas integer, observaciones text,
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+    CREATE TABLE tropera.animales_campo (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      establecimiento_id uuid NOT NULL REFERENCES tropera.establecimientos(id) ON DELETE CASCADE,
+      caravana text NOT NULL, caravana_definitiva boolean NOT NULL DEFAULT true,
+      categoria tropera.categoria_hacienda NOT NULL, potrero_id uuid REFERENCES tropera.potreros(id),
+      sexo text, estado tropera.estado_animal_campo NOT NULL DEFAULT 'activo',
+      fecha_alta date NOT NULL DEFAULT current_date, observaciones text,
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+    CREATE TABLE tropera.hallazgos (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      nombre text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+    CREATE TABLE tropera.toros_virtuales (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      nombre text NOT NULL, raza text, proveedor text, observaciones text, activo boolean NOT NULL DEFAULT true,
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+    CREATE TABLE tropera.muestras (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      establecimiento_id uuid NOT NULL REFERENCES tropera.establecimientos(id) ON DELETE CASCADE,
+      animal_campo_id uuid REFERENCES tropera.animales_campo(id), caravana text, tubo_numero integer NOT NULL,
+      tipo_muestra text, fecha date NOT NULL DEFAULT current_date, observaciones text, usuario_id uuid REFERENCES core.usuarios(id),
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+    CREATE TABLE tropera.plantillas_tareas (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      nombre text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+    CREATE TABLE tropera.protocolos_iatf (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      nombre text NOT NULL, descripcion text,
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+    CREATE TABLE tropera.tareas (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      establecimiento_id uuid NOT NULL REFERENCES tropera.establecimientos(id) ON DELETE CASCADE,
+      animal_campo_id uuid REFERENCES tropera.animales_campo(id), protocolo_id uuid REFERENCES tropera.protocolos_iatf(id),
+      descripcion text NOT NULL, producto text, fecha_programada date NOT NULL,
+      estado tropera.estado_tarea NOT NULL DEFAULT 'pendiente', observaciones text,
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
     CREATE TABLE tropera.eventos (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
       establecimiento_id uuid NOT NULL REFERENCES tropera.establecimientos(id) ON DELETE CASCADE,
       tipo tropera.tipo_evento NOT NULL, categoria tropera.categoria_hacienda, cantidad integer, producto text,
       fecha date NOT NULL DEFAULT current_date, observaciones text, usuario_id uuid REFERENCES core.usuarios(id),
-      animal_campo_id uuid, retiro_hasta date, hallazgo_id uuid, resultado_reproductivo text, toro_virtual_id uuid,
+      animal_campo_id uuid REFERENCES tropera.animales_campo(id), retiro_hasta date,
+      hallazgo_id uuid REFERENCES tropera.hallazgos(id), resultado_reproductivo text,
+      toro_virtual_id uuid REFERENCES tropera.toros_virtuales(id),
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
   `);
 
@@ -255,6 +309,46 @@ async function main() {
     'el pull delta trae el animal con su codigo_legible (updatedAt se bumpeó al asignarlo)',
     enCreated?.codigo_legible === animalOffline?.codigoLegible,
   );
+
+  console.log('12) Fase E en un solo push: potrero + animal_campo + hallazgo + toro_virtual + evento que los referencia, todo en la misma ronda offline');
+  const potreroId = randomUUID();
+  const animalCampoId = randomUUID();
+  const hallazgoId = randomUUID();
+  const toroVirtualId = randomUUID();
+  const eventoId = randomUUID();
+  await push(db, orgA.id, {
+    potreros: { created: [{ id: potreroId, establecimiento_id: establecimientoId, nombre: 'Potrero 3' }], updated: [], deleted: [] },
+    animales_campo: {
+      created: [{
+        id: animalCampoId, establecimiento_id: establecimientoId, caravana: 'AR-001',
+        caravana_definitiva: true, categoria: 'vaca', potrero_id: potreroId, estado: 'activo',
+        fecha_alta: '2026-08-29',
+      }], updated: [], deleted: [],
+    },
+    hallazgos: { created: [{ id: hallazgoId, nombre: 'Metritis' }], updated: [], deleted: [] },
+    toros_virtuales: { created: [{ id: toroVirtualId, nombre: 'Toro Genético 1', activo: true }], updated: [], deleted: [] },
+    eventos: {
+      created: [{
+        id: eventoId, establecimiento_id: establecimientoId, tipo: 'diagnostico_prenez',
+        fecha: '2026-08-29', animal_campo_id: animalCampoId, hallazgo_id: hallazgoId,
+        toro_virtual_id: toroVirtualId, resultado_reproductivo: 'prenada',
+      }], updated: [], deleted: [],
+    },
+  });
+  const [animalCampo] = await db.select().from(tropera.animalesCampo).where(eq(tropera.animalesCampo.id, animalCampoId));
+  check('el animal_campo quedó con el potrero asignado (creado en el mismo push)', animalCampo?.potreroId === potreroId);
+  const [eventoFaseE] = await db.select().from(tropera.eventos).where(eq(tropera.eventos.id, eventoId));
+  check(
+    'el evento quedó con las 3 FKs opcionales de Fase E resueltas (creadas en el mismo push)',
+    eventoFaseE?.animalCampoId === animalCampoId && eventoFaseE?.hallazgoId === hallazgoId && eventoFaseE?.toroVirtualId === toroVirtualId,
+  );
+  const p5 = await pull(db, orgA.id, 0);
+  check('el pull completo trae animales_campo/potreros/hallazgos/toros_virtuales', (
+    p5.changes.animales_campo.created.length === 1 &&
+    p5.changes.potreros.created.length === 1 &&
+    p5.changes.hallazgos.created.length === 1 &&
+    p5.changes.toros_virtuales.created.length === 1
+  ));
 
   console.log(`\nRESULTADO: ${ok} OK, ${fail} fallas`);
   await client.close();

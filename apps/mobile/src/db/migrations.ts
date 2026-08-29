@@ -1,11 +1,132 @@
-import { schemaMigrations, createTable } from '@nozbe/watermelondb/Schema/migrations';
+import { schemaMigrations, createTable, addColumns } from '@nozbe/watermelondb/Schema/migrations';
 
 /**
  * v1 → v2: suma personas/animales/consultas/vacunaciones/turnos (HCE).
+ * v2 → v3: seguimiento individual de Fase E — 8 tablas nuevas de tropera
+ * + 5 columnas nuevas en `eventos` (ver nota en schema.ts sobre lo que
+ * quedó afuera: plantilla_items/protocolo_iatf_pasos/evaluaciones_andrologicas).
  * Sólo creación de tablas nuevas — nada de lo existente (tropera.*) cambia.
  */
 export const migrations = schemaMigrations({
   migrations: [
+    {
+      toVersion: 3,
+      steps: [
+        addColumns({
+          table: 'eventos',
+          columns: [
+            { name: 'animal_campo_id', type: 'string', isOptional: true, isIndexed: true },
+            { name: 'retiro_hasta', type: 'string', isOptional: true },
+            { name: 'hallazgo_id', type: 'string', isOptional: true },
+            { name: 'resultado_reproductivo', type: 'string', isOptional: true },
+            { name: 'toro_virtual_id', type: 'string', isOptional: true },
+          ],
+        }),
+        createTable({
+          name: 'animales_campo',
+          columns: [
+            { name: 'organizacion_id', type: 'string', isIndexed: true },
+            { name: 'establecimiento_id', type: 'string', isIndexed: true },
+            { name: 'caravana', type: 'string' },
+            { name: 'caravana_definitiva', type: 'boolean' },
+            { name: 'categoria', type: 'string' },
+            { name: 'potrero_id', type: 'string', isOptional: true, isIndexed: true },
+            { name: 'sexo', type: 'string', isOptional: true },
+            { name: 'estado', type: 'string' },
+            { name: 'fecha_alta', type: 'string' },
+            { name: 'observaciones', type: 'string', isOptional: true },
+            { name: 'created_at', type: 'number' },
+            { name: 'updated_at', type: 'number' },
+          ],
+        }),
+        createTable({
+          name: 'potreros',
+          columns: [
+            { name: 'organizacion_id', type: 'string', isIndexed: true },
+            { name: 'establecimiento_id', type: 'string', isIndexed: true },
+            { name: 'nombre', type: 'string' },
+            { name: 'superficie_ha', type: 'number', isOptional: true },
+            { name: 'capacidad_cabezas', type: 'number', isOptional: true },
+            { name: 'observaciones', type: 'string', isOptional: true },
+            { name: 'created_at', type: 'number' },
+            { name: 'updated_at', type: 'number' },
+          ],
+        }),
+        createTable({
+          name: 'hallazgos',
+          columns: [
+            { name: 'organizacion_id', type: 'string', isIndexed: true },
+            { name: 'nombre', type: 'string' },
+            { name: 'created_at', type: 'number' },
+            { name: 'updated_at', type: 'number' },
+          ],
+        }),
+        createTable({
+          name: 'toros_virtuales',
+          columns: [
+            { name: 'organizacion_id', type: 'string', isIndexed: true },
+            { name: 'nombre', type: 'string' },
+            { name: 'raza', type: 'string', isOptional: true },
+            { name: 'proveedor', type: 'string', isOptional: true },
+            { name: 'observaciones', type: 'string', isOptional: true },
+            { name: 'activo', type: 'boolean' },
+            { name: 'created_at', type: 'number' },
+            { name: 'updated_at', type: 'number' },
+          ],
+        }),
+        createTable({
+          name: 'muestras',
+          columns: [
+            { name: 'organizacion_id', type: 'string', isIndexed: true },
+            { name: 'establecimiento_id', type: 'string', isIndexed: true },
+            { name: 'animal_campo_id', type: 'string', isOptional: true, isIndexed: true },
+            { name: 'caravana', type: 'string', isOptional: true },
+            { name: 'tubo_numero', type: 'number' },
+            { name: 'tipo_muestra', type: 'string', isOptional: true },
+            { name: 'fecha', type: 'string' },
+            { name: 'observaciones', type: 'string', isOptional: true },
+            { name: 'usuario_id', type: 'string', isOptional: true },
+            { name: 'created_at', type: 'number' },
+            { name: 'updated_at', type: 'number' },
+          ],
+        }),
+        createTable({
+          name: 'plantillas_tareas',
+          columns: [
+            { name: 'organizacion_id', type: 'string', isIndexed: true },
+            { name: 'nombre', type: 'string' },
+            { name: 'created_at', type: 'number' },
+            { name: 'updated_at', type: 'number' },
+          ],
+        }),
+        createTable({
+          name: 'protocolos_iatf',
+          columns: [
+            { name: 'organizacion_id', type: 'string', isIndexed: true },
+            { name: 'nombre', type: 'string' },
+            { name: 'descripcion', type: 'string', isOptional: true },
+            { name: 'created_at', type: 'number' },
+            { name: 'updated_at', type: 'number' },
+          ],
+        }),
+        createTable({
+          name: 'tareas',
+          columns: [
+            { name: 'organizacion_id', type: 'string', isIndexed: true },
+            { name: 'establecimiento_id', type: 'string', isIndexed: true },
+            { name: 'animal_campo_id', type: 'string', isOptional: true, isIndexed: true },
+            { name: 'protocolo_id', type: 'string', isOptional: true },
+            { name: 'descripcion', type: 'string' },
+            { name: 'producto', type: 'string', isOptional: true },
+            { name: 'fecha_programada', type: 'string' },
+            { name: 'estado', type: 'string' },
+            { name: 'observaciones', type: 'string', isOptional: true },
+            { name: 'created_at', type: 'number' },
+            { name: 'updated_at', type: 'number' },
+          ],
+        }),
+      ],
+    },
     {
       toVersion: 2,
       steps: [
