@@ -25,7 +25,13 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
     const login = await api.login(email, password);
     const org = login.organizaciones[0];
     if (!org) throw new Error('El usuario no tiene ninguna organización asociada');
-    onSesion({ token: login.accessToken, organizacionId: org.organizacionId, rol: org.rol });
+    onSesion({
+      token: login.accessToken,
+      refreshToken: login.refreshToken,
+      organizacionId: org.organizacionId,
+      roles: org.roles,
+      tipo: org.tipo,
+    });
   }
 
   async function enviar(e: React.FormEvent) {

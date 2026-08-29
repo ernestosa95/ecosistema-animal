@@ -32,6 +32,8 @@ await client.exec(`
     nombre text NOT NULL,
     tipo core.tipo_organizacion NOT NULL DEFAULT 'clinica',
     cuit text,
+    activo boolean NOT NULL DEFAULT true,
+    grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, es_demo boolean NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     deleted_at timestamptz
@@ -51,7 +53,7 @@ await client.exec(`
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     usuario_id uuid NOT NULL REFERENCES core.usuarios(id) ON DELETE CASCADE,
     organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
-    rol core.rol_membresia NOT NULL,
+    rol core.rol_membresia[] NOT NULL,
     activo boolean NOT NULL DEFAULT true,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -77,7 +79,7 @@ async function register(dto: {
     const [u] = await tx.insert(usuarios)
       .values({ email: dto.email, passwordHash, nombre: dto.nombre, apellido: dto.apellido }).returning();
     await tx.insert(membresias)
-      .values({ usuarioId: u.id, organizacionId: org.id, rol: 'propietario' });
+      .values({ usuarioId: u.id, organizacionId: org.id, roles: ['propietario'] });
     return { user: u, org };
   });
   return { accessToken: jwt.sign({ sub: user.id, email: user.email }, SECRET, { expiresIn: '15m' }) };
@@ -88,7 +90,7 @@ async function login(dto: { email: string; password: string }) {
   if (!user) throw new Error('Credenciales inválidas');
   const okPass = await bcrypt.compare(dto.password, user.passwordHash);
   if (!okPass) throw new Error('Credenciales inválidas');
-  const orgs = await db.select({ organizacionId: membresias.organizacionId, rol: membresias.rol })
+  const orgs = await db.select({ organizacionId: membresias.organizacionId, roles: membresias.roles })
     .from(membresias).where(eq(membresias.usuarioId, user.id));
   return { accessToken: jwt.sign({ sub: user.id, email: user.email }, SECRET, { expiresIn: '15m' }), organizaciones: orgs };
 }
@@ -107,7 +109,7 @@ check('la contraseña se guardó hasheada (no en claro)',
   usuariosCreados[0].passwordHash !== 'unaClaveSegura' && usuariosCreados[0].passwordHash.startsWith('$2'));
 
 const membresiasCreadas = await db.select().from(membresias);
-check('se creó la membresía como propietario', membresiasCreadas[0]?.rol === 'propietario');
+check('se creó la membresía como propietario', membresiasCreadas[0]?.roles.includes('propietario'));
 
 console.log('2) Email duplicado');
 let rechazoDuplicado = false;
@@ -136,10 +138,10 @@ check('rechaza un token firmado con otro secreto', rechazoTokenMalo);
 
 console.log('6) Chequeo de tenant (TenantGuard)');
 const orgId = log.organizaciones[0].organizacionId;
-const [m] = await db.select({ rol: membresias.rol }).from(membresias)
+const [m] = await db.select({ roles: membresias.roles }).from(membresias)
   .where(and(eq(membresias.usuarioId, payload.sub), eq(membresias.organizacionId, orgId), eq(membresias.activo, true)))
   .limit(1);
-check('el usuario tiene membresía activa en su organización', m?.rol === 'propietario');
+check('el usuario tiene membresía activa en su organización', !!m?.roles.includes('propietario'));
 
 const idInexistente = '00000000-0000-0000-0000-000000000000';
 const ajeno = await db.select().from(membresias)

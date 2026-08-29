@@ -42,6 +42,16 @@ export const organizaciones = core.table('organizaciones', {
   tipo: tipoOrganizacion('tipo').notNull().default('clinica'),
   cuit: text('cuit'),
   activo: boolean('activo').notNull().default(true),
+  // grupoId/planId son referencias lógicas a plataforma.grupos_organizaciones/
+  // plataforma.planes, sin FK real a nivel DB — plataforma.ts ya importa de
+  // core.ts, así que una FK en sentido contrario crearía un ciclo de
+  // módulos. Mismo criterio que hce.vacunaciones.vademecum_id → farmacia.productos.
+  grupoId: uuid('grupo_id'),
+  planId: uuid('plan_id'),
+  // Control de acceso de la plataforma: null = sin vencimiento (todas las
+  // organizaciones existentes antes de esta columna no se ven afectadas).
+  accesoHasta: timestamp('acceso_hasta', { withTimezone: true }),
+  esDemo: boolean('es_demo').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
@@ -68,7 +78,11 @@ export const membresias = core.table('membresias', {
   organizacionId: uuid('organizacion_id')
     .notNull()
     .references(() => organizaciones.id, { onDelete: 'cascade' }),
-  rol: rolMembresia('rol').notNull(),
+  // Roles apilables: un usuario puede tener más de un rol en la misma
+  // organización (ej. recepción + veterinario) sin necesitar cuentas
+  // separadas. Arreglo de Postgres en vez de tabla intermedia — conjunto
+  // fijo y chico de roles, evita joins en cada lectura.
+  roles: rolMembresia('rol').array().notNull(),
   activo: boolean('activo').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

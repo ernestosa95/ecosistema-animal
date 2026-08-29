@@ -1,5 +1,5 @@
 {
-  "id": "be735bfd-9169-425d-8002-969d1fb8fe34",
+  "id": "86f5f654-9bdf-4d30-bd9d-277481fe4d6f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -345,6 +345,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "activo": {
+          "name": "activo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -490,6 +497,127 @@
           "schemaTo": "core",
           "columnsFrom": [
             "usuario_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "core.solicitudes": {
+      "name": "solicitudes",
+      "schema": "core",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "estado": {
+          "name": "estado",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pendiente'"
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "apellido": {
+          "name": "apellido",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "telefono": {
+          "name": "telefono",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nombre_organizacion": {
+          "name": "nombre_organizacion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tipo_organizacion": {
+          "name": "tipo_organizacion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "organizacion_solicitada": {
+          "name": "organizacion_solicitada",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "motivo_rechazo": {
+          "name": "motivo_rechazo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "resolved_at": {
+          "name": "resolved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resolved_por": {
+          "name": "resolved_por",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "solicitudes_resolved_por_usuarios_id_fk": {
+          "name": "solicitudes_resolved_por_usuarios_id_fk",
+          "tableFrom": "solicitudes",
+          "tableTo": "usuarios",
+          "schemaTo": "core",
+          "columnsFrom": [
+            "resolved_por"
           ],
           "columnsTo": [
             "id"
@@ -1023,6 +1151,315 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
+    },
+    "tropera.establecimientos": {
+      "name": "establecimientos",
+      "schema": "tropera",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "organizacion_id": {
+          "name": "organizacion_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ubicacion": {
+          "name": "ubicacion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "superficie_ha": {
+          "name": "superficie_ha",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "establecimientos_organizacion_id_organizaciones_id_fk": {
+          "name": "establecimientos_organizacion_id_organizaciones_id_fk",
+          "tableFrom": "establecimientos",
+          "tableTo": "organizaciones",
+          "schemaTo": "core",
+          "columnsFrom": [
+            "organizacion_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "tropera.existencias": {
+      "name": "existencias",
+      "schema": "tropera",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "organizacion_id": {
+          "name": "organizacion_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "establecimiento_id": {
+          "name": "establecimiento_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "categoria": {
+          "name": "categoria",
+          "type": "categoria_hacienda",
+          "typeSchema": "tropera",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cantidad": {
+          "name": "cantidad",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "existencias_organizacion_id_organizaciones_id_fk": {
+          "name": "existencias_organizacion_id_organizaciones_id_fk",
+          "tableFrom": "existencias",
+          "tableTo": "organizaciones",
+          "schemaTo": "core",
+          "columnsFrom": [
+            "organizacion_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "existencias_establecimiento_id_establecimientos_id_fk": {
+          "name": "existencias_establecimiento_id_establecimientos_id_fk",
+          "tableFrom": "existencias",
+          "tableTo": "establecimientos",
+          "schemaTo": "tropera",
+          "columnsFrom": [
+            "establecimiento_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "tropera.movimientos": {
+      "name": "movimientos",
+      "schema": "tropera",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "organizacion_id": {
+          "name": "organizacion_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "tipo_movimiento",
+          "typeSchema": "tropera",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "categoria": {
+          "name": "categoria",
+          "type": "categoria_hacienda",
+          "typeSchema": "tropera",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cantidad": {
+          "name": "cantidad",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "establecimiento_origen_id": {
+          "name": "establecimiento_origen_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "establecimiento_destino_id": {
+          "name": "establecimiento_destino_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fecha": {
+          "name": "fecha",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "current_date"
+        },
+        "observaciones": {
+          "name": "observaciones",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "usuario_id": {
+          "name": "usuario_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "movimientos_organizacion_id_organizaciones_id_fk": {
+          "name": "movimientos_organizacion_id_organizaciones_id_fk",
+          "tableFrom": "movimientos",
+          "tableTo": "organizaciones",
+          "schemaTo": "core",
+          "columnsFrom": [
+            "organizacion_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "movimientos_establecimiento_origen_id_establecimientos_id_fk": {
+          "name": "movimientos_establecimiento_origen_id_establecimientos_id_fk",
+          "tableFrom": "movimientos",
+          "tableTo": "establecimientos",
+          "schemaTo": "tropera",
+          "columnsFrom": [
+            "establecimiento_origen_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "movimientos_establecimiento_destino_id_establecimientos_id_fk": {
+          "name": "movimientos_establecimiento_destino_id_establecimientos_id_fk",
+          "tableFrom": "movimientos",
+          "tableTo": "establecimientos",
+          "schemaTo": "tropera",
+          "columnsFrom": [
+            "establecimiento_destino_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "movimientos_usuario_id_usuarios_id_fk": {
+          "name": "movimientos_usuario_id_usuarios_id_fk",
+          "tableFrom": "movimientos",
+          "tableTo": "usuarios",
+          "schemaTo": "core",
+          "columnsFrom": [
+            "usuario_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -1084,11 +1521,35 @@
         "atendido",
         "ausente"
       ]
+    },
+    "tropera.categoria_hacienda": {
+      "name": "categoria_hacienda",
+      "schema": "tropera",
+      "values": [
+        "vaca",
+        "toro",
+        "ternero",
+        "ternera",
+        "vaquillona",
+        "novillo"
+      ]
+    },
+    "tropera.tipo_movimiento": {
+      "name": "tipo_movimiento",
+      "schema": "tropera",
+      "values": [
+        "nacimiento",
+        "compra",
+        "muerte",
+        "venta",
+        "traslado"
+      ]
     }
   },
   "schemas": {
     "core": "core",
-    "hce": "hce"
+    "hce": "hce",
+    "tropera": "tropera"
   },
   "sequences": {
     "core.animales_codigo_seq": {

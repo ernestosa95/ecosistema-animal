@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDB } from '../../database/drizzle.provider';
@@ -17,6 +18,7 @@ export class AuthService {
   constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDB,
     private readonly jwt: JwtService,
+    private readonly config: ConfigService,
   ) {}
 
   /**
@@ -52,12 +54,12 @@ export class AuthService {
       await tx.insert(membresias).values({
         usuarioId: usuario.id,
         organizacionId: org.id,
-        rol: 'propietario',
+        roles: ['propietario'],
       });
       return { user: usuario, org };
     });
 
-    return this.emitirToken(user.id, user.email);
+    return this.emitirTokens(user.id, user.email);
   }
 
   /**
@@ -76,17 +78,50 @@ export class AuthService {
     if (!ok) throw new UnauthorizedException('Credenciales inválidas');
 
     const orgs = await this.db
-      .select({ organizacionId: membresias.organizacionId, rol: membresias.rol })
+      .select({ organizacionId: membresias.organizacionId, roles: membresias.roles, tipo: organizaciones.tipo })
       .from(membresias)
+      .innerJoin(organizaciones, eq(organizaciones.id, membresias.organizacionId))
       .where(eq(membresias.usuarioId, user.id));
 
     return {
-      ...this.emitirToken(user.id, user.email),
+      ...this.emitirTokens(user.id, user.email),
       organizaciones: orgs,
     };
   }
 
-  private emitirToken(sub: string, email: string) {
-    return { accessToken: this.jwt.sign({ sub, email }) };
+  /**
+   * Cambia un refresh token vigente por un par de tokens nuevo (rotación).
+   * Stateless: no hay tabla de refresh tokens, se valida sólo por firma +
+   * expiración + el claim `tipo: 'refresh'` (así no sirve como access token).
+   */
+  async refrescar(refreshToken: string) {
+    let payload: { sub?: string; tipo?: string };
+    try {
+      payload = this.jwt.verify(refreshToken);
+    } catch {
+      throw new UnauthorizedException('Refresh token inválido o expirado');
+    }
+    if (payload.tipo !== 'refresh' || !payload.sub) {
+      throw new UnauthorizedException('Refresh token inválido');
+    }
+
+    const [user] = await this.db
+      .select()
+      .from(usuarios)
+      .where(eq(usuarios.id, payload.sub))
+      .limit(1);
+    if (!user) throw new UnauthorizedException('Usuario no encontrado');
+
+    return this.emitirTokens(user.id, user.email);
+  }
+
+  private emitirTokens(sub: string, email: string) {
+    return {
+      accessToken: this.jwt.sign({ sub, email }),
+      refreshToken: this.jwt.sign(
+        { sub, tipo: 'refresh' },
+        { expiresIn: this.config.get<string>('jwt.refreshExpiresIn') },
+      ),
+    };
   }
 }

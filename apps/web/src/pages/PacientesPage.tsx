@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import type { Sesion, Animal, Especie, Persona } from '../api/types';
+import { CamposEspecie } from '../components/CamposEspecie';
+import { useFormularioPersistente, hayBorrador } from '../hooks/useFormularioPersistente';
+import { ExportBar } from '../components/ExportBar';
 
 export function PacientesPage({
   sesion,
@@ -14,7 +17,7 @@ export function PacientesPage({
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mostrarForm, setMostrarForm] = useState(false);
+  const [mostrarForm, setMostrarForm] = useState(() => hayBorrador('paciente-nuevo'));
   const [busqueda, setBusqueda] = useState('');
 
   const especiesPorId = useMemo(
@@ -103,6 +106,21 @@ export function PacientesPage({
         />
       )}
 
+      {!cargando && filtrados.length > 0 && (
+        <ExportBar
+          nombreArchivo="animales"
+          titulo="Animales"
+          columnas={[
+            { clave: 'nombre', etiqueta: 'Nombre' },
+            { clave: 'especie', etiqueta: 'Especie', valor: (a: Animal) => especiesPorId[a.especieId] ?? '—' },
+            { clave: 'dueno', etiqueta: 'Dueño', valor: (a: Animal) => (a.personaId ? personasPorId[a.personaId] ?? '—' : '—') },
+            { clave: 'codigoLegible', etiqueta: 'Código' },
+            { clave: 'estado', etiqueta: 'Estado' },
+          ]}
+          filas={filtrados}
+        />
+      )}
+
       {cargando ? (
         <p className="muted">Cargando…</p>
       ) : animales.length === 0 ? (
@@ -162,26 +180,47 @@ function NuevoPacienteForm({
   personas: Persona[];
   onCreado: () => void;
 }) {
-  const [nombre, setNombre] = useState('');
-  const [especieId, setEspecieId] = useState('');
-  const [personaId, setPersonaId] = useState('');
-  const [sexo, setSexo] = useState('');
-  const [fechaNacimiento, setFechaNacimiento] = useState('');
-  const [microchip, setMicrochip] = useState('');
+  const [form, setForm, limpiarBorrador] = useFormularioPersistente('paciente-nuevo', {
+    nombre: '', especieId: '', personaId: '',
+    dNombre: '', dApellido: '', dCelular: '', dDni: '',
+    sexo: '', fechaNacimiento: '', microchip: '',
+    datosEspecificos: {} as Record<string, unknown>,
+  });
+  const campo = <K extends keyof typeof form>(k: K) => (v: (typeof form)[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
+  const { nombre, especieId, personaId, dNombre, dApellido, dCelular, dDni, sexo, fechaNacimiento, microchip, datosEspecificos } = form;
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+
+  const especieSel = especies.find((e) => e.id === especieId) ?? null;
 
   async function guardar(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (personaId === '__nuevo__' && (!dNombre.trim() || !dApellido.trim())) {
+      setError('Completá nombre y apellido del dueño nuevo');
+      return;
+    }
     setGuardando(true);
     try {
+      let duenoId = personaId && personaId !== '__nuevo__' ? personaId : undefined;
+      if (personaId === '__nuevo__') {
+        const dueno = await api.crearPersona(sesion, {
+          nombre: dNombre.trim(),
+          apellido: dApellido.trim(),
+          ...(dCelular ? { celular: dCelular } : {}),
+          ...(dDni ? { dni: dDni } : {}),
+        });
+        duenoId = dueno.id;
+      }
       const data: Record<string, unknown> = { nombre, especieId };
-      if (personaId) data.personaId = personaId;
+      if (duenoId) data.personaId = duenoId;
       if (sexo) data.sexo = sexo;
       if (fechaNacimiento) data.fechaNacimiento = fechaNacimiento;
       if (microchip) data.microchip = microchip;
+      if (Object.keys(datosEspecificos).length > 0) data.datosEspecificos = datosEspecificos;
       await api.crearAnimal(sesion, data);
+      limpiarBorrador();
       onCreado();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
@@ -194,11 +233,11 @@ function NuevoPacienteForm({
     <form className="card form-grid" onSubmit={guardar}>
       <label>
         Nombre
-        <input value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+        <input value={nombre} onChange={(e) => campo('nombre')(e.target.value)} required />
       </label>
       <label>
         Especie
-        <select value={especieId} onChange={(e) => setEspecieId(e.target.value)} required>
+        <select value={especieId} onChange={(e) => campo('especieId')(e.target.value)} required>
           <option value="">Elegir…</option>
           {especies.map((e) => (
             <option key={e.id} value={e.id}>
@@ -209,8 +248,9 @@ function NuevoPacienteForm({
       </label>
       <label className="span-2">
         Dueño (opcional)
-        <select value={personaId} onChange={(e) => setPersonaId(e.target.value)}>
+        <select value={personaId} onChange={(e) => campo('personaId')(e.target.value)}>
           <option value="">Sin dueño asignado</option>
+          <option value="__nuevo__">＋ Crear dueño nuevo…</option>
           {personas.map((p) => (
             <option key={p.id} value={p.id}>
               {p.nombre} {p.apellido}
@@ -219,9 +259,31 @@ function NuevoPacienteForm({
           ))}
         </select>
       </label>
+
+      {personaId === '__nuevo__' && (
+        <>
+          <label>
+            Nombre del dueño
+            <input value={dNombre} onChange={(e) => campo('dNombre')(e.target.value)} required />
+          </label>
+          <label>
+            Apellido del dueño
+            <input value={dApellido} onChange={(e) => campo('dApellido')(e.target.value)} required />
+          </label>
+          <label>
+            Celular (opcional)
+            <input value={dCelular} onChange={(e) => campo('dCelular')(e.target.value)} />
+          </label>
+          <label>
+            DNI (opcional)
+            <input value={dDni} onChange={(e) => campo('dDni')(e.target.value)} />
+          </label>
+        </>
+      )}
+
       <label>
         Sexo
-        <select value={sexo} onChange={(e) => setSexo(e.target.value)}>
+        <select value={sexo} onChange={(e) => campo('sexo')(e.target.value)}>
           <option value="">—</option>
           <option value="macho">Macho</option>
           <option value="hembra">Hembra</option>
@@ -230,12 +292,15 @@ function NuevoPacienteForm({
       </label>
       <label>
         Fecha de nacimiento
-        <input type="date" value={fechaNacimiento} onChange={(e) => setFechaNacimiento(e.target.value)} />
+        <input type="date" value={fechaNacimiento} onChange={(e) => campo('fechaNacimiento')(e.target.value)} />
       </label>
       <label className="span-2">
         Microchip (ISO, opcional)
-        <input value={microchip} onChange={(e) => setMicrochip(e.target.value)} />
+        <input value={microchip} onChange={(e) => campo('microchip')(e.target.value)} />
       </label>
+
+      <CamposEspecie especie={especieSel} valores={datosEspecificos} onChange={campo('datosEspecificos')} />
+
       {error && <div className="alerta span-2">{error}</div>}
       <div className="span-2">
         <button className="btn" type="submit" disabled={guardando}>

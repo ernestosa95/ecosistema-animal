@@ -13,19 +13,54 @@
 import { and, eq, gt, isNull, getTableColumns } from 'drizzle-orm';
 import { personas, animales } from '../database/schema/core';
 import { consultas, vacunaciones, turnos } from '../database/schema/hce';
+import { establecimientos, existencias, movimientos, eventos } from '../database/schema/tropera';
+import { aplicarMovimiento } from '../tropera/movimientos/aplicar-movimiento';
+import { generarProximoCodigoLegible } from '../core/animales/generar-proximo-codigo-legible';
 
 export interface TablaSync {
   name: string; // nombre de tabla en WatermelonDB (= nombre SQL)
   table: any;   // tabla Drizzle
+  // Se corre dentro de la misma transacción del push, sólo para filas que
+  // realmente se insertaron (no para reintentos absorbidos por
+  // onConflictDoNothing). Usado por `movimientos` para aplicar el mismo
+  // ajuste de `existencias` que corre en el alta online.
+  afterCreate?: (tx: any, orgId: string, row: any) => Promise<void>;
 }
 
 // Orden = dependencias primero (importa para los inserts del push).
 export const REGISTRY: TablaSync[] = [
   { name: 'personas', table: personas },
-  { name: 'animales', table: animales },
+  {
+    name: 'animales',
+    table: animales,
+    // El código legible depende de nextval('core.animales_codigo_seq') —
+    // no se puede generar en el cliente. El alta offline llega sin él
+    // (columna nullable); acá se le asigna, igual que hace
+    // AnimalesService.crear() en el alta online.
+    afterCreate: async (tx, _orgId, row) => {
+      if (row.codigoLegible) return;
+      const codigoLegible = await generarProximoCodigoLegible(tx, row.especieId);
+      // Bump defensivo de updatedAt: no hace falta para que ESTA fila entre
+      // en el próximo pull delta (su updatedAt de insert, tomado dentro de
+      // este mismo push, ya es posterior al lastPulledAt de la ronda — a
+      // diferencia de `ajustar()` en tropera/movimientos, que sí actualiza
+      // filas de `existencias` preexistentes de rondas anteriores), pero
+      // mantiene la invariante de que updatedAt siempre refleja la última
+      // escritura real de la fila.
+      await tx.update(animales).set({ codigoLegible, updatedAt: new Date() }).where(eq(animales.id, row.id));
+    },
+  },
   { name: 'consultas', table: consultas },
   { name: 'vacunaciones', table: vacunaciones },
   { name: 'turnos', table: turnos },
+  { name: 'establecimientos', table: establecimientos },
+  { name: 'existencias', table: existencias },
+  {
+    name: 'movimientos',
+    table: movimientos,
+    afterCreate: (tx, orgId, row) => aplicarMovimiento(tx, orgId, row),
+  },
+  { name: 'eventos', table: eventos },
 ];
 
 // Columnas que el cliente NO puede escribir (las gobierna el server).
@@ -114,9 +149,13 @@ export async function push(db: any, orgId: string, changes: Record<string, any>)
       if (!c) continue;
       for (const rec of c.created ?? []) {
         const values = valoresParaEscribir(t.table, rec);
-        await tx.insert(t.table)
+        const inserted = await tx.insert(t.table)
           .values({ ...values, id: rec.id, organizacionId: orgId })
-          .onConflictDoNothing(); // idempotente ante reintentos
+          .onConflictDoNothing() // idempotente ante reintentos
+          .returning();
+        if (t.afterCreate && inserted.length > 0) {
+          await t.afterCreate(tx, orgId, inserted[0]);
+        }
       }
       for (const rec of c.updated ?? []) {
         const values = valoresParaEscribir(t.table, rec);

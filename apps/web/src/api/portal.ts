@@ -17,6 +17,14 @@ export type EstadoVacuna = 'al_dia' | 'proxima' | 'vencida';
 export interface VacunaPortal { producto: string; fecha: string | null; proximaDosis: string | null; }
 export interface ConsultaPortal { fecha: string | null; motivo: string | null; diagnostico: string | null; }
 export interface TurnoPortal { fechaHora: string; estado: string; motivo: string | null; }
+export interface TratamientoPortal {
+  farmaco: string;
+  dosis: string | null;
+  frecuencia: string | null;
+  duracionDias: number | null; // null = indicación puntual; con valor = esquema continuo
+  activo: boolean;
+  desde: string;
+}
 
 export interface PortalResumen {
   animal: {
@@ -26,6 +34,7 @@ export interface PortalResumen {
   vacunas: VacunaPortal[];
   consultas: ConsultaPortal[];
   turnos: TurnoPortal[];
+  tratamientos: TratamientoPortal[];
 }
 
 export async function obtenerResumen(codigo: string): Promise<PortalResumen> {

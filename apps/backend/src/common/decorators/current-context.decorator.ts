@@ -12,8 +12,8 @@ export const CurrentOrg = createParamDecorator(
     ctx.switchToHttp().getRequest().organizacionId,
 );
 
-/** Inyecta el rol del usuario en la organización activa (seteado por TenantGuard) */
+/** Inyecta los roles del usuario en la organización activa (arreglo, seteado por TenantGuard) */
 export const CurrentRol = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext) =>
-    ctx.switchToHttp().getRequest().rol,
+    ctx.switchToHttp().getRequest().roles,
 );

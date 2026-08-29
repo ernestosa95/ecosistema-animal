@@ -108,6 +108,30 @@ function Resumen({ data }: { data: PortalResumen }) {
         )}
       </div>
 
+      {/* Plan de tratamiento (§8.1) */}
+      {data.tratamientos.length > 0 && (
+        <>
+          <h3 className="pd-h3">Plan de tratamiento</h3>
+          <div className="pd-card">
+            {data.tratamientos.map((t, i) => (
+              <div key={i} className="pd-row">
+                <div className="pd-row-main">
+                  <b>{t.farmaco}</b>
+                  <span className="pd-muted">
+                    {[t.dosis, t.frecuencia, t.duracionDias ? `${t.duracionDias} días` : null]
+                      .filter(Boolean)
+                      .join(' · ') || 'Sin detalle de dosis'}
+                  </span>
+                </div>
+                <span className="pd-tag" style={!t.activo ? { opacity: 0.5 } : undefined}>
+                  {t.activo ? 'Vigente' : 'Finalizado'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
       {/* Historia clínica */}
       <h3 className="pd-h3">Historia clínica</h3>
       <div className="pd-card">

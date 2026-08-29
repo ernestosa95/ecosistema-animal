@@ -5,7 +5,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import * as bcrypt from 'bcryptjs';
 import { DRIZZLE, DrizzleDB } from '../../database/drizzle.provider';
 import { membresias, usuarios } from '../../database/schema';
@@ -37,7 +37,7 @@ export class UsuariosService {
       isNull(membresias.deletedAt),
     ];
     if (rol) {
-      filtros.push(eq(membresias.rol, rol as Rol));
+      filtros.push(sql`${(rol as Rol)} = ANY(${membresias.roles})`);
     }
 
     return this.db
@@ -45,7 +45,7 @@ export class UsuariosService {
         usuarioId: usuarios.id,
         nombre: usuarios.nombre,
         apellido: usuarios.apellido,
-        rol: membresias.rol,
+        roles: membresias.roles,
       })
       .from(membresias)
       .innerJoin(usuarios, eq(membresias.usuarioId, usuarios.id))
@@ -54,7 +54,7 @@ export class UsuariosService {
 
   /**
    * Resetea la contraseña de un miembro de la organización.
-   * - `actorRol`: rol del que ejecuta (para el safeguard de propietario).
+   * - `actorRoles`: roles del que ejecuta (para el safeguard de propietario).
    * - Si `nuevaPassword` viene, se usa; si no, se genera una temporal y se
    *   devuelve UNA vez para que el admin se la entregue al usuario.
    *
@@ -64,13 +64,13 @@ export class UsuariosService {
    */
   async resetearPassword(
     organizacionId: string,
-    actorRol: string,
+    actorRoles: string[],
     usuarioId: string,
     nuevaPassword?: string,
   ) {
     // 1) El objetivo debe pertenecer a la organización (aislamiento multi-tenant).
     const [m] = await this.db
-      .select({ rol: membresias.rol })
+      .select({ roles: membresias.roles })
       .from(membresias)
       .where(
         and(
@@ -86,7 +86,7 @@ export class UsuariosService {
     }
 
     // 2) Safeguard: no dejar que un admin bloquee a un propietario.
-    if (m.rol === 'propietario' && actorRol !== 'propietario') {
+    if (m.roles.includes('propietario') && !actorRoles.includes('propietario')) {
       throw new ForbiddenException(
         'Solo un propietario puede resetear la contraseña de otro propietario',
       );

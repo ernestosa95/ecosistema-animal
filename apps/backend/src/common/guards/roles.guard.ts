@@ -8,9 +8,10 @@ import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 
 /**
- * Compara el rol del usuario en la organización activa (req.rol, seteado por
- * TenantGuard) contra los roles requeridos por @Roles(). Debe ejecutarse
- * DESPUÉS de TenantGuard.
+ * Compara los roles del usuario en la organización activa (req.roles,
+ * arreglo seteado por TenantGuard — roles apilables) contra los roles
+ * requeridos por @Roles(). Alcanza con que coincida UNO solo. Debe
+ * ejecutarse DESPUÉS de TenantGuard.
  */
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -24,7 +25,8 @@ export class RolesGuard implements CanActivate {
     if (!requeridos?.length) return true;
 
     const req = context.switchToHttp().getRequest();
-    if (!requeridos.includes(req.rol)) {
+    const roles: string[] = req.roles ?? [];
+    if (!requeridos.some((r) => roles.includes(r))) {
       throw new ForbiddenException('No tenés permiso para esta acción');
     }
     return true;

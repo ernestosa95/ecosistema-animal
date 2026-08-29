@@ -5,15 +5,13 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDB } from '../../database/drizzle.provider';
 import { animales, especies, personas } from '../../database/schema';
 import { CreateAnimalDto } from './dto/create-animal.dto';
 import { UpdateAnimalDto } from './dto/update-animal.dto';
-import {
-  generarCodigoLegible,
-  validarMicrochipISO,
-} from './codigo-legible.util';
+import { validarMicrochipISO } from './codigo-legible.util';
+import { generarProximoCodigoLegible } from './generar-proximo-codigo-legible';
 
 @Injectable()
 export class AnimalesService {
@@ -24,9 +22,10 @@ export class AnimalesService {
    * partir de la secuencia de Postgres + la utilidad de código legible.
    */
   async crear(organizacionId: string, dto: CreateAnimalDto) {
-    // 1) Resolver el código de la especie (prefijo del código legible)
+    // 1) Validar que la especie exista (también valida generarProximoCodigoLegible más abajo,
+    // pero se chequea temprano para mantener el orden de errores esperado)
     const [especie] = await this.db
-      .select({ codigo: especies.codigo })
+      .select({ id: especies.id })
       .from(especies)
       .where(eq(especies.id, dto.especieId))
       .limit(1);
@@ -69,11 +68,7 @@ export class AnimalesService {
     }
 
     // 3) Obtener el próximo número de la secuencia y generar el código legible
-    const seqRes = await this.db.execute(
-      sql`SELECT nextval('core.animales_codigo_seq') AS n`,
-    );
-    const secuencia = Number((seqRes.rows[0] as { n: string }).n);
-    const codigoLegible = generarCodigoLegible(especie.codigo, secuencia);
+    const codigoLegible = await generarProximoCodigoLegible(this.db, dto.especieId);
 
     // 4) Insertar (siempre dentro de la organización activa)
     const [animal] = await this.db

@@ -40,9 +40,10 @@ DATABASE_DRIVER=node-postgres
 DATABASE_URL=postgresql://usuario:password@host:5432/ecosistema
 JWT_SECRET=...
 ```
-Luego aplicar migraciones contra esa base:
+Luego aplicar migraciones contra esa base y sembrar los catálogos base (`drizzle-kit migrate` no siembra nada — `db:seed` sí):
 ```
 pnpm --filter backend db:migrate
+DATABASE_DRIVER=node-postgres DATABASE_URL=postgresql://usuario:password@host:5432/ecosistema pnpm --filter backend db:seed
 pnpm --filter backend build && pnpm --filter backend start:prod
 ```
 

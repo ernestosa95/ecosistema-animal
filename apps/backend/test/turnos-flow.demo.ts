@@ -28,6 +28,8 @@ async function main() {
     CREATE TYPE core.sexo_persona AS ENUM ('masculino','femenino','otro');
     CREATE TABLE core.organizaciones (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), nombre text NOT NULL,
       tipo core.tipo_organizacion NOT NULL DEFAULT 'clinica', cuit text,
+      activo boolean NOT NULL DEFAULT true,
+    grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, es_demo boolean NOT NULL DEFAULT false,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
     CREATE TABLE core.personas (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id), usuario_id uuid, dni text,

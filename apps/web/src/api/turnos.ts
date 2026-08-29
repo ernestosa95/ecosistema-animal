@@ -18,9 +18,18 @@ export function configurarSesionTurnos(s: Sesion | null) {
   _sesion = s;
 }
 
-function auth(): { token?: string; organizacionId?: string } {
+// Refresh silencioso, igual criterio que api/client.ts (duplicado a propósito:
+// este cliente mantiene su propia sesión independiente, ver comentario de arriba).
+let _onRefresco: ((tokens: { accessToken: string; refreshToken: string }) => void) | null = null;
+
+/** Llamar desde App.tsx: useEffect(() => configurarRefrescoSesionTurnos(actualizarTokens), []). */
+export function configurarRefrescoSesionTurnos(cb: typeof _onRefresco) {
+  _onRefresco = cb;
+}
+
+function auth(): { token?: string; refreshToken?: string; organizacionId?: string } {
   if (_sesion?.token) {
-    return { token: _sesion.token, organizacionId: _sesion.organizacionId };
+    return { token: _sesion.token, refreshToken: _sesion.refreshToken, organizacionId: _sesion.organizacionId };
   }
   // Fallback defensivo: buscar la sesión en localStorage bajo claves conocidas.
   for (const k of ['huella.sesion', 'ecosistema.sesion']) {
@@ -28,7 +37,7 @@ function auth(): { token?: string; organizacionId?: string } {
       const raw = localStorage.getItem(k);
       if (raw) {
         const s = JSON.parse(raw);
-        if (s?.token) return { token: s.token, organizacionId: s.organizacionId };
+        if (s?.token) return { token: s.token, refreshToken: s.refreshToken, organizacionId: s.organizacionId };
       }
     } catch {
       /* noop */
@@ -46,11 +55,14 @@ function headers(): Record<string, string> {
   };
 }
 
-async function request(path: string, options: RequestInit = {}): Promise<any> {
-  const res = await fetch(`${BASE}${path}`, {
+async function fetchCrudo(path: string, options: RequestInit): Promise<Response> {
+  return fetch(`${BASE}${path}`, {
     ...options,
     headers: { ...headers(), ...((options.headers as Record<string, string>) || {}) },
   });
+}
+
+async function manejarRespuesta(res: Response): Promise<any> {
   if (!res.ok) {
     let msg = `Error ${res.status}`;
     try {
@@ -62,6 +74,31 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
     throw new Error(msg);
   }
   return res.status === 204 ? null : res.json();
+}
+
+async function request(path: string, options: RequestInit = {}): Promise<any> {
+  const res = await fetchCrudo(path, options);
+  const { refreshToken } = auth();
+  if (res.status !== 401 || !refreshToken) return manejarRespuesta(res);
+
+  let tokens: { accessToken: string; refreshToken: string } | null = null;
+  try {
+    const r = await fetch(`${BASE}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+    tokens = r.ok ? await r.json() : null;
+  } catch {
+    tokens = null;
+  }
+  if (!tokens) return manejarRespuesta(res); // refresh también vencido: dejamos que falle con el 401 original
+
+  if (_sesion) _sesion = { ..._sesion, token: tokens.accessToken, refreshToken: tokens.refreshToken };
+  _onRefresco?.(tokens);
+
+  const res2 = await fetchCrudo(path, options);
+  return manejarRespuesta(res2);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -104,7 +141,8 @@ export interface DuenoOpcion {
 export interface Profesional {
   id: string;
   nombre: string;
-  rol: string;
+  roles: string[];
+  rol: string; // roles.join(' + ') — para mostrar en un solo lugar sin repetir el join en cada consumidor
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -272,15 +310,16 @@ export async function listarProfesionales(): Promise<Profesional[]> {
     .map((u) => {
       const id = String(u.usuarioId ?? u.id ?? u.usuario_id ?? '');
       const nombre = `${u.nombre ?? ''} ${u.apellido ?? ''}`.trim();
-      const rol = u.rol ?? u.rolMembresia ?? u.rol_membresia ?? '';
-      return { id, nombre: nombre || rol || 'Profesional', rol };
+      const roles: string[] = u.roles ?? u.roles_membresia ?? [];
+      const rol = roles.join(' + ');
+      return { id, nombre: nombre || rol || 'Profesional', roles, rol };
     })
     .filter((p) => p.id);
 
   // Preferimos quienes atienden (veterinario / propietario). Pero si el filtro
   // deja la lista vacía y sí hay miembros, devolvemos todos: mejor poder elegir.
   const ATIENDEN = new Set(['veterinario', 'propietario']);
-  const soloAtienden = norm.filter((p) => ATIENDEN.has(p.rol));
+  const soloAtienden = norm.filter((p) => p.roles.some((r) => ATIENDEN.has(r)));
   return soloAtienden.length ? soloAtienden : norm;
 }
 

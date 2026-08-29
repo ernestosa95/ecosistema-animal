@@ -6,7 +6,15 @@ const CLAVE = 'ecosistema.sesion';
 function cargar(): Sesion | null {
   try {
     const raw = localStorage.getItem(CLAVE);
-    return raw ? (JSON.parse(raw) as Sesion) : null;
+    if (!raw) return null;
+    const sesion = JSON.parse(raw) as Sesion;
+    // Sesiones guardadas antes de que `rol` pasara a `roles` (arreglo) no
+    // tienen esta propiedad — descartarlas en vez de romper el arranque.
+    if (!Array.isArray(sesion.roles)) {
+      localStorage.removeItem(CLAVE);
+      return null;
+    }
+    return sesion;
   } catch {
     return null;
   }
@@ -25,5 +33,15 @@ export function useSesion() {
     setSesionState(null);
   }
 
-  return { sesion, iniciar, cerrar };
+  /** Reemplaza sólo los tokens (tras un refresh silencioso), sin tocar organizacionId/rol. */
+  function actualizarTokens(token: string, refreshToken: string) {
+    setSesionState((actual) => {
+      if (!actual) return actual;
+      const nueva = { ...actual, token, refreshToken };
+      localStorage.setItem(CLAVE, JSON.stringify(nueva));
+      return nueva;
+    });
+  }
+
+  return { sesion, iniciar, cerrar, actualizarTokens };
 }

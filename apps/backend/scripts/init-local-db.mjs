@@ -10,6 +10,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { sembrarEspecies } from './seed-especies.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const migrationsDir = join(__dirname, '../../../db/migrations');
@@ -32,14 +33,9 @@ for (const file of sqlFiles) {
   console.log(`  ✓ aplicada migración ${file}`);
 }
 
-// Seeds mínimos: especies base
-await client.exec(`
-  INSERT INTO core.especies (codigo, nombre) VALUES
-    ('CAN','Canino'),('FEL','Felino'),('BOV','Bovino'),
-    ('EQU','Equino'),('AVE','Ave'),('POR','Porcino'),
-    ('OVI','Ovino'),('CAP','Caprino')
-  ON CONFLICT (codigo) DO NOTHING;
-`);
+// Seeds mínimos: especies base (compartido con seed-especies.mjs, que es el
+// que hay que correr a mano después de `db:migrate` contra un Postgres real).
+await sembrarEspecies((sql) => client.exec(sql));
 console.log('  ✓ especies base sembradas');
 
 await client.close();

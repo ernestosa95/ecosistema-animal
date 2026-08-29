@@ -2,7 +2,7 @@ import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { and, eq, desc, asc, gte, isNull, inArray } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDB } from '../../database/drizzle.provider';
 import {
-  animales, especies, personas, vacunaciones, consultas, turnos,
+  animales, especies, personas, vacunaciones, consultas, turnos, indicaciones, productos,
 } from '../../database/schema';
 
 // Estados de turno que siguen "vigentes" (para mostrar próximos turnos).
@@ -85,6 +85,26 @@ export class PortalService {
       ))
       .orderBy(asc(turnos.fechaHora));
 
+    const tratamientos = await this.db
+      .select({
+        producto: productos.nombre,
+        productoNombre: indicaciones.productoNombre,
+        origen: indicaciones.origen,
+        dosis: indicaciones.dosis,
+        frecuencia: indicaciones.frecuencia,
+        duracionDias: indicaciones.duracionDias,
+        activo: indicaciones.activo,
+        desde: indicaciones.createdAt,
+      })
+      .from(indicaciones)
+      .leftJoin(productos, eq(productos.id, indicaciones.productoId))
+      .where(and(
+        eq(indicaciones.animalId, a.animalId),
+        eq(indicaciones.organizacionId, a.organizacionId),
+        isNull(indicaciones.deletedAt),
+      ))
+      .orderBy(desc(indicaciones.createdAt));
+
     const datos = (a.datosEspecificos ?? {}) as Record<string, any>;
 
     return {
@@ -101,6 +121,14 @@ export class PortalService {
       vacunas,
       consultas: historia,
       turnos: proximos,
+      tratamientos: tratamientos.map((t) => ({
+        farmaco: t.origen === 'stock_interno' ? (t.producto ?? '—') : (t.productoNombre ?? '—'),
+        dosis: t.dosis,
+        frecuencia: t.frecuencia,
+        duracionDias: t.duracionDias,
+        activo: t.activo,
+        desde: t.desde,
+      })),
     };
   }
 }

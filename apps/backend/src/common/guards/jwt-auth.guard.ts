@@ -21,7 +21,12 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Falta el token de autenticación');
     }
     try {
-      req.user = this.jwt.verify(header.slice(7));
+      const payload = this.jwt.verify(header.slice(7));
+      if (payload?.tipo === 'refresh') {
+        // Un refresh token no habilita acceso: sólo sirve para /auth/refresh.
+        throw new Error('refresh token used as access token');
+      }
+      req.user = payload;
       return true;
     } catch {
       throw new UnauthorizedException('Token inválido o expirado');

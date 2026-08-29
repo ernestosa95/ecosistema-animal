@@ -122,7 +122,7 @@ export class SolicitudesService {
         await tx.insert(membresias).values({
           usuarioId: usuario.id,
           organizacionId: org.id,
-          rol: 'propietario',
+          roles: ['propietario'],
         });
       } else {
         const [org] = await tx
@@ -146,7 +146,7 @@ export class SolicitudesService {
           await tx.insert(membresias).values({
             usuarioId: usuario.id,
             organizacionId: dto.organizacionId!,
-            rol: (dto.rol ?? 'veterinario') as Rol,
+            roles: [(dto.rol ?? 'veterinario') as Rol],
           });
         }
       }

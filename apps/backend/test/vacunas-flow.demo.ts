@@ -27,6 +27,8 @@ async function main() {
     CREATE TYPE core.estado_animal AS ENUM ('activo','inactivo','fallecido');
     CREATE TABLE core.organizaciones (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), nombre text NOT NULL,
       tipo core.tipo_organizacion NOT NULL DEFAULT 'clinica', cuit text,
+      activo boolean NOT NULL DEFAULT true,
+    grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, es_demo boolean NOT NULL DEFAULT false,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
     CREATE TABLE core.usuarios (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text NOT NULL UNIQUE, password_hash text NOT NULL,
       nombre text, apellido text, email_verificado boolean NOT NULL DEFAULT false, ultimo_login timestamptz,

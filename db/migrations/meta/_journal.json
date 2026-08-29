@@ -5,8 +5,64 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1785612246796,
-      "tag": "0000_stormy_domino",
+      "when": 1787876096721,
+      "tag": "0000_ecosistema_base",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787876486588,
+      "tag": "0001_tropera_eventos",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787882808071,
+      "tag": "0002_farmacia",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787884163706,
+      "tag": "0003_farmacia_dispensa",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787914958947,
+      "tag": "0004_wonderful_moon_knight",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787953486033,
+      "tag": "0005_curly_black_crow",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787964160006,
+      "tag": "0006_medical_mister_fear",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787968846990,
+      "tag": "0007_useful_iron_lad",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788002317142,
+      "tag": "0008_blue_wolf_cub",
       "breakpoints": true
     }
   ]

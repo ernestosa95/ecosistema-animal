@@ -3,8 +3,12 @@ import { useEffect, useState } from 'react';
 import {
   login, getToken, clearToken,
   listarOrganizaciones, crearOrganizacion, listarMiembros, agregarMiembro,
-  setOrgActivo, eliminarOrg, exportarOrg, quitarMiembro, setMiembroActivo,
-  type Organizacion, type Miembro,
+  setOrgActivo, eliminarOrg, exportarOrg, quitarMiembro, setMiembroActivo, setMiembroRoles,
+  setAcceso,
+  listarGrupos, crearGrupo, actualizarGrupo, eliminarGrupo,
+  listarPlanes, crearPlan, actualizarPlan, eliminarPlan,
+  listarMensajesAdmin, crearMensaje, eliminarMensaje,
+  type Organizacion, type Miembro, type Grupo, type Plan, type MensajeAdmin, type DestinatarioTipo,
 } from '../api/admin';
 import { listarSolicitudes, aprobarSolicitud, rechazarSolicitud, type Solicitud } from '../api/solicitudes';
 
@@ -58,8 +62,13 @@ function Login({ onOk }: { onOk: () => void }) {
 }
 
 // ── Panel principal ───────────────────────────────────────────────────────
+type Seccion = 'veterinarias' | 'planes' | 'grupos' | 'mensajes';
+
 function Panel({ onSalir }: { onSalir: () => void }) {
+  const [seccion, setSeccion] = useState<Seccion>('veterinarias');
   const [orgs, setOrgs] = useState<Organizacion[]>([]);
+  const [grupos, setGrupos] = useState<Grupo[]>([]);
+  const [planes, setPlanes] = useState<Plan[]>([]);
   const [sel, setSel] = useState<Organizacion | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -73,34 +82,67 @@ function Panel({ onSalir }: { onSalir: () => void }) {
         : (e.message ?? 'Error al cargar'));
     } finally { setCargando(false); }
   }
-  useEffect(() => { cargarOrgs(); }, []);
+  useEffect(() => {
+    cargarOrgs();
+    listarGrupos().then(setGrupos).catch(() => {});
+    listarPlanes().then(setPlanes).catch(() => {});
+  }, []);
 
   return (
     <Shell onSalir={onSalir}>
-      {error && <div className="adm-error" style={{ marginBottom: 12 }}>{error}</div>}
-      <Solicitudes orgs={orgs} />
-      <div className="adm-cols">
-        <div className="adm-col">
-          <h3>Veterinarias</h3>
-          {cargando ? <p className="adm-muted">Cargando…</p> : (
-            <>
-              <div className="adm-list">
-                {orgs.length === 0 && <p className="adm-muted">Todavía no hay veterinarias.</p>}
-                {orgs.map((o) => (
-                  <button key={o.id} className={`adm-item ${sel?.id === o.id ? 'active' : ''}`} onClick={() => setSel(o)}>
-                    <b>{o.nombre}</b><span>{o.activo === false ? 'inactiva' : o.tipo}</span>
-                  </button>
-                ))}
-              </div>
-              <NuevaOrg onCreada={(o) => { setOrgs((prev) => [...prev, o].sort((a, b) => a.nombre.localeCompare(b.nombre))); setSel(o); }} />
-            </>
-          )}
-        </div>
-
-        <div className="adm-col">
-          {sel ? <Miembros org={sel} onOrgActualizada={cargarOrgs} onOrgEliminada={() => { cargarOrgs(); setSel(null); }} /> : <p className="adm-muted">Elegí una veterinaria para ver y agregar sus miembros.</p>}
-        </div>
+      <div className="adm-secnav">
+        {(['veterinarias', 'planes', 'grupos', 'mensajes'] as const).map((s) => (
+          <button
+            key={s}
+            className={`adm-secbtn ${seccion === s ? 'active' : ''}`}
+            onClick={() => setSeccion(s)}
+          >
+            {s === 'veterinarias' ? 'Veterinarias' : s === 'planes' ? 'Planes' : s === 'grupos' ? 'Grupos' : 'Mensajes'}
+          </button>
+        ))}
       </div>
+
+      {error && <div className="adm-error" style={{ marginBottom: 12 }}>{error}</div>}
+
+      {seccion === 'veterinarias' && (
+        <>
+          <Solicitudes orgs={orgs} />
+          <div className="adm-cols">
+            <div className="adm-col">
+              <h3>Veterinarias</h3>
+              {cargando ? <p className="adm-muted">Cargando…</p> : (
+                <>
+                  <div className="adm-list">
+                    {orgs.length === 0 && <p className="adm-muted">Todavía no hay veterinarias.</p>}
+                    {orgs.map((o) => (
+                      <button key={o.id} className={`adm-item ${sel?.id === o.id ? 'active' : ''}`} onClick={() => setSel(o)}>
+                        <b>{o.nombre}</b><span>{o.activo === false ? 'inactiva' : o.tipo}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <NuevaOrg onCreada={(o) => { setOrgs((prev) => [...prev, o].sort((a, b) => a.nombre.localeCompare(b.nombre))); setSel(o); }} />
+                </>
+              )}
+            </div>
+
+            <div className="adm-col">
+              {sel ? (
+                <Miembros
+                  org={sel}
+                  grupos={grupos}
+                  planes={planes}
+                  onOrgActualizada={cargarOrgs}
+                  onOrgEliminada={() => { cargarOrgs(); setSel(null); }}
+                />
+              ) : <p className="adm-muted">Elegí una veterinaria para ver y agregar sus miembros.</p>}
+            </div>
+          </div>
+        </>
+      )}
+
+      {seccion === 'planes' && <Planes planes={planes} onCambio={() => listarPlanes().then(setPlanes)} />}
+      {seccion === 'grupos' && <Grupos grupos={grupos} onCambio={() => listarGrupos().then(setGrupos)} />}
+      {seccion === 'mensajes' && <Mensajes orgs={orgs} grupos={grupos} />}
     </Shell>
   );
 }
@@ -147,8 +189,10 @@ function NuevaOrg({ onCreada }: { onCreada: (o: Organizacion) => void }) {
 }
 
 // ── Miembros de una veterinaria ───────────────────────────────────────────
-function Miembros({ org, onOrgActualizada, onOrgEliminada }: {
+function Miembros({ org, grupos, planes, onOrgActualizada, onOrgEliminada }: {
   org: Organizacion;
+  grupos: Grupo[];
+  planes: Plan[];
   onOrgActualizada: () => void;
   onOrgEliminada: () => void;
 }) {
@@ -157,6 +201,7 @@ function Miembros({ org, onOrgActualizada, onOrgEliminada }: {
   const [error, setError] = useState<string | null>(null);
   const [accion, setAccion] = useState<string | null>(null);
   const [confirmarEliminar, setConfirmarEliminar] = useState(false);
+  const [editandoRoles, setEditandoRoles] = useState<string | null>(null);
 
   async function cargar() {
     setCargando(true); setError(null);
@@ -190,6 +235,11 @@ function Miembros({ org, onOrgActualizada, onOrgEliminada }: {
     try { await quitarMiembro(org.id, m.membresiaId); cargar(); }
     catch (e: any) { setError(e.message ?? 'No se pudo quitar el miembro'); }
   }
+  async function guardarRoles(m: Miembro, roles: string[]) {
+    setError(null);
+    try { await setMiembroRoles(org.id, m.membresiaId, roles); setEditandoRoles(null); cargar(); }
+    catch (e: any) { setError(e.message ?? 'No se pudieron actualizar los roles'); }
+  }
 
   return (
     <>
@@ -207,24 +257,34 @@ function Miembros({ org, onOrgActualizada, onOrgEliminada }: {
 
       {error && <div className="adm-error">{error}</div>}
 
+      <AccesoOrg org={org} grupos={grupos} planes={planes} onActualizada={onOrgActualizada} />
+
       <h4 className="adm-h4">Miembros</h4>
       {cargando ? <p className="adm-muted">Cargando…</p> : (
         <div className="adm-list">
           {miembros.length === 0 && <p className="adm-muted">Sin miembros todavía.</p>}
           {miembros.map((m) => (
-            <div key={m.membresiaId} className="adm-miembro">
-              <div>
-                <b>
-                  {[m.nombre, m.apellido].filter(Boolean).join(' ') || m.email}
-                  {!m.activo && <span className="adm-tag-off"> inactivo</span>}
-                </b>
-                <span>{m.email}</span>
+            <div key={m.membresiaId} className="adm-miembro-block">
+              <div className="adm-miembro">
+                <div>
+                  <b>
+                    {[m.nombre, m.apellido].filter(Boolean).join(' ') || m.email}
+                    {!m.activo && <span className="adm-tag-off"> inactivo</span>}
+                  </b>
+                  <span>{m.email}</span>
+                </div>
+                <div className="adm-miembro-acc">
+                  {m.roles.map((r) => <span key={r} className="adm-rol">{rolLabel(r)}</span>)}
+                  <button className="adm-mini" onClick={() => setEditandoRoles(editandoRoles === m.membresiaId ? null : m.membresiaId)}>
+                    {editandoRoles === m.membresiaId ? 'Cancelar' : 'Editar roles'}
+                  </button>
+                  <button className="adm-mini" onClick={() => toggleMiembro(m)}>{m.activo ? 'Desactivar' : 'Activar'}</button>
+                  <button className="adm-mini danger" onClick={() => quitar(m)}>Quitar</button>
+                </div>
               </div>
-              <div className="adm-miembro-acc">
-                <span className="adm-rol">{rolLabel(m.rol)}</span>
-                <button className="adm-mini" onClick={() => toggleMiembro(m)}>{m.activo ? 'Desactivar' : 'Activar'}</button>
-                <button className="adm-mini danger" onClick={() => quitar(m)}>Quitar</button>
-              </div>
+              {editandoRoles === m.membresiaId && (
+                <RolesCheckboxes valorInicial={m.roles} onGuardar={(roles) => guardarRoles(m, roles)} />
+              )}
             </div>
           ))}
         </div>
@@ -282,9 +342,42 @@ function EliminarModal({ org, onClose, onEliminada }: {
   );
 }
 
+/** Checkboxes de roles apilables (controlado), reusado en alta de miembro y edición de roles existentes. */
+function RolesFieldset({ roles, onToggle }: { roles: string[]; onToggle: (v: string) => void }) {
+  return (
+    <div className="adm-roles-checks">
+      {ROLES.map((r) => (
+        <label key={r.v} className="adm-check">
+          <input type="checkbox" checked={roles.includes(r.v)} onChange={() => onToggle(r.v)} />
+          {r.label}
+        </label>
+      ))}
+    </div>
+  );
+}
+
+/** Editor inline de los roles de una membresía existente (checkboxes + guardar). */
+function RolesCheckboxes({ valorInicial, onGuardar, textoBoton = 'Guardar roles' }: {
+  valorInicial: string[];
+  onGuardar: (roles: string[]) => void;
+  textoBoton?: string;
+}) {
+  const [roles, setRoles] = useState<string[]>(valorInicial);
+  const toggle = (v: string) => setRoles((prev) => (prev.includes(v) ? prev.filter((r) => r !== v) : [...prev, v]));
+
+  return (
+    <div className="adm-formcard">
+      <RolesFieldset roles={roles} onToggle={toggle} />
+      <button className="adm-btn primary" disabled={roles.length === 0} onClick={() => onGuardar(roles)}>
+        {textoBoton}
+      </button>
+    </div>
+  );
+}
+
 function AgregarMiembroForm({ org, onAgregado }: { org: Organizacion; onAgregado: () => void }) {
   const [email, setEmail] = useState('');
-  const [rol, setRol] = useState('veterinario');
+  const [roles, setRoles] = useState<string[]>(['veterinario']);
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
   const [password, setPassword] = useState('');
@@ -292,11 +385,14 @@ function AgregarMiembroForm({ org, onAgregado }: { org: Organizacion; onAgregado
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
 
+  const toggleRol = (v: string) => setRoles((prev) => (prev.includes(v) ? prev.filter((r) => r !== v) : [...prev, v]));
+
   async function agregar() {
+    if (roles.length === 0) { setError('Elegí al menos un rol'); return; }
     setCargando(true); setError(null); setMsg(null);
     try {
       const r = await agregarMiembro(org.id, {
-        email: email.trim(), rol,
+        email: email.trim(), roles,
         nombre: nombre.trim() || undefined,
         apellido: apellido.trim() || undefined,
         password: password || undefined,
@@ -311,13 +407,11 @@ function AgregarMiembroForm({ org, onAgregado }: { org: Organizacion; onAgregado
   return (
     <div className="adm-formcard">
       <h4>Agregar miembro</h4>
-      <div className="adm-row2">
-        <div className="adm-field"><label>Email</label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="vet@ejemplo.com" /></div>
-        <div className="adm-field"><label>Rol</label>
-          <select value={rol} onChange={(e) => setRol(e.target.value)}>
-            {ROLES.map((r) => <option key={r.v} value={r.v}>{r.label}</option>)}
-          </select></div>
+      <div className="adm-field"><label>Email</label>
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="vet@ejemplo.com" /></div>
+      <div className="adm-field">
+        <label>Roles <span className="adm-hint">(puede tener más de uno)</span></label>
+        <RolesFieldset roles={roles} onToggle={toggleRol} />
       </div>
       <div className="adm-row2">
         <div className="adm-field"><label>Nombre</label>
@@ -334,6 +428,311 @@ function AgregarMiembroForm({ org, onAgregado }: { org: Organizacion; onAgregado
       <button className="adm-btn primary" disabled={cargando || !email} onClick={agregar}>
         {cargando ? 'Agregando…' : 'Agregar a la veterinaria'}
       </button>
+    </div>
+  );
+}
+
+// ── Acceso: grupo, plan, vencimiento/demo ──────────────────────────────────
+function AccesoOrg({ org, grupos, planes, onActualizada }: {
+  org: Organizacion; grupos: Grupo[]; planes: Plan[]; onActualizada: () => void;
+}) {
+  const [grupoId, setGrupoId] = useState(org.grupoId ?? '');
+  const [planId, setPlanId] = useState(org.planId ?? '');
+  const [accesoHasta, setAccesoHasta] = useState(org.accesoHasta ? org.accesoHasta.slice(0, 10) : '');
+  const [esDemo, setEsDemo] = useState(!!org.esDemo);
+  const [error, setError] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const [ok, setOk] = useState(false);
+
+  // Si se selecciona otra organización, resetear el formulario a sus valores.
+  useEffect(() => {
+    setGrupoId(org.grupoId ?? '');
+    setPlanId(org.planId ?? '');
+    setAccesoHasta(org.accesoHasta ? org.accesoHasta.slice(0, 10) : '');
+    setEsDemo(!!org.esDemo);
+    setOk(false);
+  }, [org.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const vencido = accesoHasta ? new Date(accesoHasta) < new Date() : false;
+
+  async function guardar() {
+    setGuardando(true); setError(null); setOk(false);
+    try {
+      await setAcceso(org.id, {
+        grupoId: grupoId || null,
+        planId: planId || null,
+        accesoHasta: accesoHasta ? new Date(accesoHasta).toISOString() : null,
+        esDemo,
+      });
+      setOk(true);
+      onActualizada();
+    } catch (e: any) { setError(e.message ?? 'No se pudo guardar el acceso'); }
+    finally { setGuardando(false); }
+  }
+
+  function extender(dias: number) {
+    const base = accesoHasta && new Date(accesoHasta) > new Date() ? new Date(accesoHasta) : new Date();
+    base.setDate(base.getDate() + dias);
+    setAccesoHasta(base.toISOString().slice(0, 10));
+  }
+
+  return (
+    <div className="adm-formcard">
+      <h4>Acceso</h4>
+      <div className="adm-row2">
+        <div className="adm-field"><label>Grupo</label>
+          <select value={grupoId} onChange={(e) => setGrupoId(e.target.value)}>
+            <option value="">Sin grupo</option>
+            {grupos.map((g) => <option key={g.id} value={g.id}>{g.nombre}</option>)}
+          </select></div>
+        <div className="adm-field"><label>Plan</label>
+          <select value={planId} onChange={(e) => setPlanId(e.target.value)}>
+            <option value="">Sin plan</option>
+            {planes.map((p) => <option key={p.id} value={p.id}>{p.nombre}{p.precio ? ` — $${p.precio}` : ''}</option>)}
+          </select></div>
+      </div>
+      <div className="adm-row2">
+        <div className="adm-field">
+          <label>Acceso habilitado hasta {vencido && <span className="adm-tag-off"> vencido</span>}</label>
+          <input type="date" value={accesoHasta} onChange={(e) => setAccesoHasta(e.target.value)} />
+        </div>
+        <div className="adm-field">
+          <label>Es demo</label>
+          <select value={esDemo ? '1' : '0'} onChange={(e) => setEsDemo(e.target.value === '1')}>
+            <option value="0">No</option>
+            <option value="1">Sí</option>
+          </select>
+        </div>
+      </div>
+      <div className="adm-lifebar">
+        <button className="adm-btn ghost" onClick={() => extender(7)}>+7 días</button>
+        <button className="adm-btn ghost" onClick={() => extender(30)}>+30 días</button>
+        <button className="adm-btn ghost" onClick={() => setAccesoHasta('')}>Sin vencimiento</button>
+      </div>
+      {error && <div className="adm-error">{error}</div>}
+      {ok && <div className="adm-ok">Acceso actualizado ✓</div>}
+      <button className="adm-btn primary" disabled={guardando} onClick={guardar}>
+        {guardando ? 'Guardando…' : 'Guardar acceso'}
+      </button>
+    </div>
+  );
+}
+
+// ── Planes ─────────────────────────────────────────────────────────────
+function Planes({ planes, onCambio }: { planes: Plan[]; onCambio: () => void }) {
+  const [nombre, setNombre] = useState('');
+  const [precio, setPrecio] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [cargando, setCargando] = useState(false);
+
+  async function crear() {
+    if (nombre.trim().length < 2) { setError('Poné un nombre'); return; }
+    setCargando(true); setError(null);
+    try {
+      await crearPlan({ nombre: nombre.trim(), precio: precio ? Number(precio) : undefined, descripcion: descripcion.trim() || undefined });
+      setNombre(''); setPrecio(''); setDescripcion(''); onCambio();
+    } catch (e: any) { setError(e.message ?? 'No se pudo crear'); }
+    finally { setCargando(false); }
+  }
+  async function toggleActivo(p: Plan) {
+    try { await actualizarPlan(p.id, { activo: !p.activo }); onCambio(); }
+    catch (e: any) { setError(e.message ?? 'No se pudo actualizar'); }
+  }
+  async function eliminar(p: Plan) {
+    try { await eliminarPlan(p.id); onCambio(); }
+    catch (e: any) { setError(e.message ?? 'No se pudo eliminar'); }
+  }
+
+  return (
+    <div>
+      <h3>Planes</h3>
+      {error && <div className="adm-error">{error}</div>}
+      <div className="adm-list">
+        {planes.length === 0 && <p className="adm-muted">Todavía no hay planes.</p>}
+        {planes.map((p) => (
+          <div key={p.id} className="adm-miembro">
+            <div>
+              <b>{p.nombre} {!p.activo && <span className="adm-tag-off">inactivo</span>}</b>
+              <span>{p.precio ? `$${p.precio}` : 'Sin precio'}{p.descripcion ? ` · ${p.descripcion}` : ''}</span>
+            </div>
+            <div className="adm-miembro-acc">
+              <button className="adm-mini" onClick={() => toggleActivo(p)}>{p.activo ? 'Desactivar' : 'Activar'}</button>
+              <button className="adm-mini danger" onClick={() => eliminar(p)}>Eliminar</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="adm-formcard">
+        <h4>Nuevo plan</h4>
+        <div className="adm-row2">
+          <div className="adm-field"><label>Nombre</label>
+            <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Plan Básico" /></div>
+          <div className="adm-field"><label>Precio (opcional)</label>
+            <input type="number" value={precio} onChange={(e) => setPrecio(e.target.value)} /></div>
+        </div>
+        <div className="adm-field"><label>Descripción (opcional)</label>
+          <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} /></div>
+        <button className="adm-btn primary" disabled={cargando} onClick={crear}>
+          {cargando ? 'Creando…' : 'Crear plan'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Grupos de organizaciones ──────────────────────────────────────────────
+function Grupos({ grupos, onCambio }: { grupos: Grupo[]; onCambio: () => void }) {
+  const [nombre, setNombre] = useState('');
+  const [descripcion, setDescripcion] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [cargando, setCargando] = useState(false);
+
+  async function crear() {
+    if (nombre.trim().length < 2) { setError('Poné un nombre'); return; }
+    setCargando(true); setError(null);
+    try {
+      await crearGrupo({ nombre: nombre.trim(), descripcion: descripcion.trim() || undefined });
+      setNombre(''); setDescripcion(''); onCambio();
+    } catch (e: any) { setError(e.message ?? 'No se pudo crear'); }
+    finally { setCargando(false); }
+  }
+  async function eliminar(g: Grupo) {
+    try { await eliminarGrupo(g.id); onCambio(); }
+    catch (e: any) { setError(e.message ?? 'No se pudo eliminar'); }
+  }
+
+  return (
+    <div>
+      <h3>Grupos de organizaciones</h3>
+      <p className="adm-sub">Sirven para agrupar organizaciones (ej. "cadena de veterinarias") y poder dirigirles mensajes en conjunto.</p>
+      {error && <div className="adm-error">{error}</div>}
+      <div className="adm-list">
+        {grupos.length === 0 && <p className="adm-muted">Todavía no hay grupos.</p>}
+        {grupos.map((g) => (
+          <div key={g.id} className="adm-miembro">
+            <div>
+              <b>{g.nombre}</b>
+              {g.descripcion && <span>{g.descripcion}</span>}
+            </div>
+            <div className="adm-miembro-acc">
+              <button className="adm-mini danger" onClick={() => eliminar(g)}>Eliminar</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="adm-formcard">
+        <h4>Nuevo grupo</h4>
+        <div className="adm-field"><label>Nombre</label>
+          <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Cadena de veterinarias" /></div>
+        <div className="adm-field"><label>Descripción (opcional)</label>
+          <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} /></div>
+        <button className="adm-btn primary" disabled={cargando} onClick={crear}>
+          {cargando ? 'Creando…' : 'Crear grupo'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Mensajes de la plataforma ─────────────────────────────────────────────
+function Mensajes({ orgs, grupos }: { orgs: Organizacion[]; grupos: Grupo[] }) {
+  const [items, setItems] = useState<MensajeAdmin[]>([]);
+  const [titulo, setTitulo] = useState('');
+  const [cuerpo, setCuerpo] = useState('');
+  const [destinatarioTipo, setDestinatarioTipo] = useState<DestinatarioTipo>('todas');
+  const [organizacionId, setOrganizacionId] = useState('');
+  const [grupoId, setGrupoId] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [cargando, setCargando] = useState(false);
+
+  async function cargar() {
+    try { setItems(await listarMensajesAdmin()); }
+    catch (e: any) { setError(e.message ?? 'Error al cargar mensajes'); }
+  }
+  useEffect(() => { cargar(); }, []);
+
+  async function enviar() {
+    if (titulo.trim().length < 2 || cuerpo.trim().length < 2) { setError('Completá título y cuerpo'); return; }
+    if (destinatarioTipo === 'organizacion' && !organizacionId) { setError('Elegí la organización destino'); return; }
+    if (destinatarioTipo === 'grupo' && !grupoId) { setError('Elegí el grupo destino'); return; }
+    setCargando(true); setError(null);
+    try {
+      await crearMensaje({
+        titulo: titulo.trim(), cuerpo: cuerpo.trim(), destinatarioTipo,
+        organizacionId: destinatarioTipo === 'organizacion' ? organizacionId : undefined,
+        grupoId: destinatarioTipo === 'grupo' ? grupoId : undefined,
+      });
+      setTitulo(''); setCuerpo('');
+      cargar();
+    } catch (e: any) { setError(e.message ?? 'No se pudo enviar'); }
+    finally { setCargando(false); }
+  }
+  async function eliminar(m: MensajeAdmin) {
+    try { await eliminarMensaje(m.id); cargar(); }
+    catch (e: any) { setError(e.message ?? 'No se pudo eliminar'); }
+  }
+
+  function destinoLabel(m: MensajeAdmin) {
+    if (m.destinatarioTipo === 'todas') return 'Todas las organizaciones';
+    if (m.destinatarioTipo === 'organizacion') return orgs.find((o) => o.id === m.organizacionId)?.nombre ?? 'Organización';
+    return grupos.find((g) => g.id === m.grupoId)?.nombre ?? 'Grupo';
+  }
+
+  return (
+    <div>
+      <h3>Mensajes de la plataforma</h3>
+      <p className="adm-sub">Anuncios (no chat) que se muestran como banner al loguearse — ej. avisos de precio o de funcionalidades nuevas.</p>
+      {error && <div className="adm-error">{error}</div>}
+
+      <div className="adm-formcard">
+        <h4>Nuevo mensaje</h4>
+        <div className="adm-field"><label>Título</label>
+          <input value={titulo} onChange={(e) => setTitulo(e.target.value)} /></div>
+        <div className="adm-field"><label>Cuerpo</label>
+          <input value={cuerpo} onChange={(e) => setCuerpo(e.target.value)} /></div>
+        <div className="adm-row2">
+          <div className="adm-field"><label>Destinatario</label>
+            <select value={destinatarioTipo} onChange={(e) => setDestinatarioTipo(e.target.value as DestinatarioTipo)}>
+              <option value="todas">Todas las organizaciones</option>
+              <option value="organizacion">Una organización</option>
+              <option value="grupo">Un grupo</option>
+            </select></div>
+          {destinatarioTipo === 'organizacion' && (
+            <div className="adm-field"><label>Organización</label>
+              <select value={organizacionId} onChange={(e) => setOrganizacionId(e.target.value)}>
+                <option value="">Elegir…</option>
+                {orgs.map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
+              </select></div>
+          )}
+          {destinatarioTipo === 'grupo' && (
+            <div className="adm-field"><label>Grupo</label>
+              <select value={grupoId} onChange={(e) => setGrupoId(e.target.value)}>
+                <option value="">Elegir…</option>
+                {grupos.map((g) => <option key={g.id} value={g.id}>{g.nombre}</option>)}
+              </select></div>
+          )}
+        </div>
+        <button className="adm-btn primary" disabled={cargando} onClick={enviar}>
+          {cargando ? 'Enviando…' : 'Enviar'}
+        </button>
+      </div>
+
+      <h4 className="adm-h4">Enviados</h4>
+      <div className="adm-list">
+        {items.length === 0 && <p className="adm-muted">Todavía no se envió ningún mensaje.</p>}
+        {items.map((m) => (
+          <div key={m.id} className="adm-miembro">
+            <div>
+              <b>{m.titulo}</b>
+              <span>{destinoLabel(m)} · {new Date(m.publicadoEn).toLocaleDateString()}</span>
+            </div>
+            <div className="adm-miembro-acc">
+              <button className="adm-mini danger" onClick={() => eliminar(m)}>Eliminar</button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -514,4 +913,13 @@ const CSS = `
 .adm-sub{color:var(--muted);font-size:13px;margin:0 0 14px}
 .adm-mactions{display:flex;gap:8px;margin-top:8px}
 .adm-mactions .adm-btn{flex:1;margin-top:0}
+.adm-secnav{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.adm-secbtn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer}
+.adm-secbtn.active{background:var(--teal);border-color:var(--teal);color:#fff}
+.adm-roles-checks{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+.adm-check{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink);text-transform:none;letter-spacing:0}
+.adm-check input{width:auto}
+.adm-miembro-block{margin-bottom:8px}
+.adm-miembro-block .adm-miembro{margin-bottom:0}
+.adm-miembro-block .adm-formcard{margin-top:6px}
 `;

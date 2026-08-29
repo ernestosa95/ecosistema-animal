@@ -12,7 +12,8 @@ import { membresias, organizaciones } from '../../database/schema';
 /**
  * Resuelve la organización activa (header X-Organizacion-Id) y verifica que el
  * usuario tenga una membresía activa en ella. Adjunta req.organizacionId y
- * req.rol para el resto de la cadena. Debe ejecutarse DESPUÉS de JwtAuthGuard.
+ * req.roles (arreglo — roles apilables) para el resto de la cadena. Debe
+ * ejecutarse DESPUÉS de JwtAuthGuard.
  */
 @Injectable()
 export class TenantGuard implements CanActivate {
@@ -26,7 +27,7 @@ export class TenantGuard implements CanActivate {
     }
 
     const [m] = await this.db
-      .select({ rol: membresias.rol })
+      .select({ roles: membresias.roles })
       .from(membresias)
       .where(
         and(
@@ -42,16 +43,21 @@ export class TenantGuard implements CanActivate {
     }
 
     const [org] = await this.db
-      .select({ activo: organizaciones.activo })
+      .select({ activo: organizaciones.activo, accesoHasta: organizaciones.accesoHasta })
       .from(organizaciones)
       .where(and(eq(organizaciones.id, organizacionId), isNull(organizaciones.deletedAt)))
       .limit(1);
     if (!org || !org.activo) {
       throw new ForbiddenException('La veterinaria está desactivada');
     }
+    // accesoHasta null = sin vencimiento (comportamiento previo a esta
+    // columna, preservado para toda organización que nunca lo configuró).
+    if (org.accesoHasta && org.accesoHasta < new Date()) {
+      throw new ForbiddenException('El acceso de tu organización venció. Contactá al administrador de la plataforma.');
+    }
 
     req.organizacionId = organizacionId;
-    req.rol = m.rol;
+    req.roles = m.roles;
     return true;
   }
 }

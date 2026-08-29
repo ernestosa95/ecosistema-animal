@@ -22,10 +22,20 @@ async function req(path: string, options: RequestInit = {}): Promise<any> {
   return res.status === 204 ? null : res.json();
 }
 
-export interface Organizacion { id: string; nombre: string; tipo: string; cuit?: string; activo?: boolean; createdAt?: string; }
+export interface Organizacion {
+  id: string; nombre: string; tipo: string; cuit?: string; activo?: boolean; createdAt?: string;
+  grupoId?: string | null; planId?: string | null; accesoHasta?: string | null; esDemo?: boolean;
+}
 export interface Miembro {
-  membresiaId: string; rol: string; activo: boolean;
+  membresiaId: string; roles: string[]; activo: boolean;
   usuarioId: string; email: string; nombre?: string; apellido?: string;
+}
+export interface Grupo { id: string; nombre: string; descripcion?: string | null; }
+export interface Plan { id: string; nombre: string; precio?: string | null; descripcion?: string | null; activo: boolean; }
+export type DestinatarioTipo = 'todas' | 'organizacion' | 'grupo';
+export interface MensajeAdmin {
+  id: string; titulo: string; cuerpo: string; destinatarioTipo: DestinatarioTipo;
+  organizacionId?: string | null; grupoId?: string | null; publicadoEn: string;
 }
 
 /** Inicia sesión con las credenciales del super-admin (mismo /auth/login). */
@@ -51,7 +61,7 @@ export const listarMiembros = (orgId: string): Promise<Miembro[]> =>
 
 export const agregarMiembro = (
   orgId: string,
-  d: { email: string; rol: string; nombre?: string; apellido?: string; password?: string },
+  d: { email: string; roles: string[]; nombre?: string; apellido?: string; password?: string },
 ) => req(`/admin/organizaciones/${orgId}/miembros`, { method: 'POST', body: JSON.stringify(d) });
 
 // ── Ciclo de vida de la veterinaria ──────────────────────────────────────
@@ -68,6 +78,51 @@ export const setMiembroActivo = (orgId: string, membresiaId: string, activo: boo
   req(`/admin/organizaciones/${orgId}/miembros/${membresiaId}/activo`, {
     method: 'PATCH', body: JSON.stringify({ activo }),
   });
+
+export const setMiembroRoles = (orgId: string, membresiaId: string, roles: string[]) =>
+  req(`/admin/organizaciones/${orgId}/miembros/${membresiaId}/roles`, {
+    method: 'PATCH', body: JSON.stringify({ roles }),
+  });
+
+// ── Acceso: grupo, plan, vencimiento/demo ────────────────────────────────
+export const setAcceso = (
+  orgId: string,
+  d: { grupoId?: string | null; planId?: string | null; accesoHasta?: string | null; esDemo?: boolean },
+) => req(`/admin/organizaciones/${orgId}/acceso`, { method: 'PATCH', body: JSON.stringify(d) });
+
+// ── Grupos de organizaciones ──────────────────────────────────────────────
+export const listarGrupos = (): Promise<Grupo[]> => req('/admin/grupos-organizaciones');
+
+export const crearGrupo = (d: { nombre: string; descripcion?: string }): Promise<Grupo> =>
+  req('/admin/grupos-organizaciones', { method: 'POST', body: JSON.stringify(d) });
+
+export const actualizarGrupo = (id: string, d: { nombre?: string; descripcion?: string }): Promise<Grupo> =>
+  req(`/admin/grupos-organizaciones/${id}`, { method: 'PATCH', body: JSON.stringify(d) });
+
+export const eliminarGrupo = (id: string) => req(`/admin/grupos-organizaciones/${id}`, { method: 'DELETE' });
+
+// ── Planes ─────────────────────────────────────────────────────────────
+export const listarPlanes = (): Promise<Plan[]> => req('/admin/planes');
+
+export const crearPlan = (d: { nombre: string; precio?: number; descripcion?: string }): Promise<Plan> =>
+  req('/admin/planes', { method: 'POST', body: JSON.stringify(d) });
+
+export const actualizarPlan = (
+  id: string,
+  d: { nombre?: string; precio?: number | null; descripcion?: string; activo?: boolean },
+): Promise<Plan> => req(`/admin/planes/${id}`, { method: 'PATCH', body: JSON.stringify(d) });
+
+export const eliminarPlan = (id: string) => req(`/admin/planes/${id}`, { method: 'DELETE' });
+
+// ── Mensajes de la plataforma ─────────────────────────────────────────────
+export const listarMensajesAdmin = (): Promise<MensajeAdmin[]> => req('/admin/mensajes');
+
+export const crearMensaje = (d: {
+  titulo: string; cuerpo: string; destinatarioTipo: DestinatarioTipo;
+  organizacionId?: string; grupoId?: string;
+}): Promise<MensajeAdmin> => req('/admin/mensajes', { method: 'POST', body: JSON.stringify(d) });
+
+export const eliminarMensaje = (id: string) => req(`/admin/mensajes/${id}`, { method: 'DELETE' });
 
 /** Descarga el respaldo JSON de una veterinaria. */
 export async function exportarOrg(orgId: string, nombre?: string) {

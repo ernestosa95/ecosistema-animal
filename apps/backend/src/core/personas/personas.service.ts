@@ -4,7 +4,7 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDB } from '../../database/drizzle.provider';
 import { personas, animales, membresias, usuarios } from '../../database/schema';
 import { CreatePersonaDto } from './dto/create-persona.dto';
@@ -138,7 +138,7 @@ export class PersonasService {
       .where(
         and(
           eq(membresias.organizacionId, organizacionId),
-          eq(membresias.rol, 'veterinario'),
+          sql`'veterinario' = ANY(${membresias.roles})`,
           eq(membresias.activo, true),
         ),
       );

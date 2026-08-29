@@ -1,7 +1,7 @@
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, gte, isNull, notInArray } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDB } from '../database/drizzle.provider';
-import { animales, especies, vacunaciones, turnos, consultas } from '../database/schema';
+import { animales, especies, vacunaciones, turnos, consultas, indicaciones, productos } from '../database/schema';
 import { SolicitarTurnoDto } from './dto/solicitar-turno.dto';
 
 interface PersonaCtx {
@@ -65,7 +65,7 @@ export class PortalService {
 
     const animalesConDatos = await Promise.all(
       mascotas.map(async (a) => {
-        const [vac, tur, con] = await Promise.all([
+        const [vac, tur, con, ind] = await Promise.all([
           this.db
             .select()
             .from(vacunaciones)
@@ -89,6 +89,22 @@ export class PortalService {
             .where(and(eq(consultas.animalId, a.id), isNull(consultas.deletedAt)))
             .orderBy(desc(consultas.fecha))
             .limit(5),
+          // Plan de tratamiento activo (§8.1 spec UI/UX) — mismo criterio que hce/portal/portal.service.ts.
+          this.db
+            .select({
+              producto: productos.nombre,
+              productoNombre: indicaciones.productoNombre,
+              origen: indicaciones.origen,
+              dosis: indicaciones.dosis,
+              frecuencia: indicaciones.frecuencia,
+              duracionDias: indicaciones.duracionDias,
+              activo: indicaciones.activo,
+              desde: indicaciones.createdAt,
+            })
+            .from(indicaciones)
+            .leftJoin(productos, eq(productos.id, indicaciones.productoId))
+            .where(and(eq(indicaciones.animalId, a.id), isNull(indicaciones.deletedAt)))
+            .orderBy(desc(indicaciones.createdAt)),
         ]);
 
         return {
@@ -114,6 +130,14 @@ export class PortalService {
             fecha: c.fecha,
             motivo: c.motivo ?? '',
             diagnostico: c.diagnostico ?? '',
+          })),
+          tratamientos: ind.map((t) => ({
+            farmaco: t.origen === 'stock_interno' ? (t.producto ?? '—') : (t.productoNombre ?? '—'),
+            dosis: t.dosis,
+            frecuencia: t.frecuencia,
+            duracionDias: t.duracionDias,
+            activo: t.activo,
+            desde: t.desde,
           })),
         };
       }),

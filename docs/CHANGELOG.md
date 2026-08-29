@@ -2,6 +2,495 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-08-29] — Fase D del spec UI/UX: caja chica, auditoría de cierres y honorarios
+
+Última pieza de la sesión, tras cerrar B y C. Antes de codear se acordaron 4 decisiones de alcance con el usuario (todas por la opción recomendada): precio en productos de Farmacia + concepto libre en servicios (sin catálogo de precios completo); una caja diaria **por organización** (no turnos por cajero); honorarios como reporte exportable **sin** cálculo automático de comisión ("liquidar" sólo marca cobros y reinicia el acumulador); egresos con concepto libre, sin categorías. Fuera de alcance a propósito: §2.5 (venta de una *fracción* de una presentación con descuento proporcional de stock) — hoy una venta de mostrador descuenta unidades enteras, igual que el resto de Farmacia; modelar capacidad por presentación queda para otra pasada.
+
+### Backend — nuevo schema `caja`
+- `caja.cajas`: una fila por jornada. `abrir()` rechaza si ya hay una `abierta` en la organización (chequeo a nivel service, mismo criterio que `tropera.existencias`/`farmacia.stock`). `cerrar()` calcula `montoCalculado = inicial + Σcobros − Σegresos`, compara contra `montoDeclarado` (el arqueo), y decide `estadoAuditoria`: `aceptado` automático si no hay diferencia, `pendiente` (entra a la bandeja de auditoría) si la hay — la "alerta silenciosa a la gerencia" del spec.
+- `caja.cobros`: `concepto` + `monto` libres, `veterinarioId` opcional (a quién se le imputa, para honorarios), `productoId`/`cantidad` opcionales (venta de un producto de Farmacia). `crear()` exige una caja abierta (la resuelve del lado del servidor, no confía en un `cajaId` del cliente) y valida producto/consulta si vienen cargados.
+- `caja.egresos`: tabla separada a propósito — "aislamiento de egresos" del spec, nunca se listan junto a los cobros.
+- `farmacia.productos` suma `precio` (opcional). `farmacia.movimientos_stock` suma el tipo `venta` (venta de mostrador, distinta de `uso` que es dispensa ligada a consulta) — mismo patrón que `IndicacionesPanel` (Fase B): el frontend dispara un segundo `POST /farmacia/movimientos` después de crear el cobro, no hay acoplamiento directo entre los dos módulos.
+- Migración `0008_blue_wolf_cub.sql`: `drizzle-kit generate` produjo un diff limpio de una sola pasada (schema nuevo + los dos agregados a `farmacia`) — confirma que el journal sigue sano desde el squash.
+- Endpoints: `POST/GET /caja/cajas`, `GET /caja/cajas/actual`, `PATCH /caja/cajas/:id/cerrar`, `GET /caja/cajas?estadoAuditoria=` (bandeja de auditoría) + `PATCH /caja/cajas/:id/auditoria` (roles `propietario`/`admin` únicamente — §4.1 es "Propietario/Gerente"), `POST/GET /caja/cobros`, `GET /caja/cobros/honorarios` + `PATCH /caja/cobros/honorarios/liquidar`, `POST/GET /caja/egresos`. El resto de operaciones de mostrador (abrir/cerrar/cobrar/egresar) admite además `recepcion`.
+
+### Web — `CajaPage.tsx` (nueva pestaña "Caja")
+- Tres secciones internas (mismo patrón que `AdminPage.tsx`): **Caja del día** (todos los roles de mostrador), **Auditoría de cierres** y **Honorarios** (filtradas a `propietario`/`admin` dentro de la propia página, el switcher de secciones ni siquiera se muestra a `recepcion`).
+- Caja del día: si no hay una abierta, formulario de apertura (monto inicial); si hay una abierta, cobros + egresos en vivo con el total calculado, y un cierre que muestra la diferencia en tiempo real antes de confirmar. Elegir un producto en el cobro sugiere el monto (cantidad × precio, editable) y dispara el movimiento de stock `venta` al guardar.
+- Auditoría: bandeja filtrable por estado, acción "Revisar" por fila con Aceptar/En revisión/Rechazar — las dos últimas piden observación obligatoria (igual que el backend).
+- Honorarios: elegir profesional + rango de fechas, tabla de cobros imputados con `ExportBar` (reusa el centro de exportación de Fase C) y "Marcar como liquidado".
+- `FarmaciaPage.tsx` suma el campo `precio` a alta/edición/detalle de producto, y la etiqueta "Venta (mostrador)" para el nuevo tipo de movimiento.
+
+### Verificado
+- Backend: `nest build` limpio; las 12 suites `test:*-demo` existentes (`auth`, `animales`, `personas`, `hce`, `vacunas`, `turnos`, `sync`, `plataforma`, `roles`, `macros`, `indicaciones`) siguen pasando — hubo que sumar `precio` al DDL a mano de `farmacia.productos` en `indicaciones-flow.demo.ts` (mismo gap recurrente de siempre: cada `*-demo` recrea el schema a mano). Caja no tiene una suite `test:*-demo` propia todavía (gap nuevo, igual que Tropera) — se verificó por API contra un backend efímero, sin tocar el `pgdata` real: abrir caja, rechazo de cobro sin caja abierta, rechazo de doble apertura, cobro con veterinario imputado, venta de producto con descuento real de stock (10 → 8), egreso, cierre con diferencia (calculado 781 vs. declarado 780 → `pendiente`), rechazo de auditoría sin observación, auditoría con observación, honorarios trayendo el cobro correcto, liquidación marcando el flag — los 12 pasos respondieron exactamente como se esperaba. Backend apagado por PID exacto al terminar.
+- Web: `vite build` limpio, `tsc --noEmit` de `apps/backend` contra `apps/web` sin errores nuevos de una clase distinta a los ya preexistentes (mismo ruido de siempre por falta de `@types/react`).
+- **Sin verificar en el navegador** — misma limitación que B y C: sin credenciales ni forma de operar un browser real en esta sesión.
+
+## [2026-08-29] — Fase C del spec UI/UX: drill-down del dashboard + centro de exportación
+
+Continuación de la misma sesión que cerró Fase B. Antes de codear se acordó con el usuario un punto de alcance real: §4.2 pide KPIs de "facturación" y "ticket promedio", pero el sistema no tiene ningún dato de cobros (eso es Fase 5/ARCA, pausada a propósito). Se decidió aplicar el drill-down únicamente a los KPIs **no monetarios** que el dashboard ya tenía desde F5b.1 — nada de facturación se agregó ni se simuló.
+
+### Backend — dos endpoints nuevos para poder desglosar lo que el dashboard ya cuenta
+- `GET /consultas?desde&hasta`: consultas de **toda la organización** en un rango de fechas, con el nombre del paciente (join con `animales`) — antes `ConsultasController` sólo tenía `GET /consultas/animal/:animalId` (acotado a un paciente puntual). Necesario para el drill-down de "Consultas este mes".
+- `GET /tropera/movimientos` suma `desde`/`hasta` opcionales (adicionales a `establecimientoId`, que ya existía), filtrando por `createdAt` — el mismo campo que `DashboardService` usa para contar "movimientos este mes por tipo", para que el desglose coincida exactamente con el número de la tarjeta.
+- "Vacunas por vencer" y "turnos por estado" no necesitaron backend nuevo: ya existían `GET /vacunaciones/recordatorios?dias=` y `GET /turnos?desde&hasta`.
+
+### Web — centro de exportación (§4.5), genérico y reutilizable
+- `utils/exportar.ts`: `exportarCSV` (nativo, con BOM UTF-8 para que Excel no rompa tildes/ñ), `exportarExcel` (usa `xlsx`/SheetJS — única librería nueva agregada en toda la sesión; generar un `.xlsx` real a mano no es razonable, y el truco sin librería de disfrazar una tabla HTML como `.xls` dispara un cartel de advertencia en Excel al abrirlo, peor experiencia que sumar la dependencia) y `exportarPDF` (ventana imprimible + `window.print()` — "Guardar como PDF" es nativo de cualquier navegador, sin sumar una librería de generación de PDF en el cliente).
+- `components/ExportBar.tsx`: tres botones (CSV/Excel/PDF) a partir de `columnas` + `filas` genéricas. Se agregó en **Animales** (`PacientesPage.tsx`), **Dueños** (`PersonasPage.tsx`), **Farmacia** (productos y movimientos por producto), **Tropera** (establecimientos, existencias, movimientos y eventos por establecimiento) y **Turnos** (agenda del día visible) — los cinco lugares que el usuario pidió explícitamente.
+
+### Web — drill-down del dashboard (§4.2)
+- `components/DrawerTabla.tsx`: drawer genérico (mismo patrón visual que el de la línea de tiempo médica de Fase B) con una tabla + `ExportBar` — click en una tarjeta KPI o un chip lo abre sin navegar a otra pantalla.
+- `DashboardPage.tsx` reescrita: "Pacientes activos", "Consultas este mes" y "Vacunas por vencer (30 días)" pasan de `<div>` a `<button>` clickeable; cada chip de "Turnos por estado" y "Movimientos por tipo" también es clickeable. Cada uno dispara un fetch on-demand (nada se precarga de más) y arma la tabla del drawer. "Existencias actuales" ya mostraba el total por categoría; sumó un link "Ver desglose por establecimiento →" que abre el mismo drawer con el detalle sin agregado (ya estaba en `resumen.tropera.existenciasPorCategoria`, no hizo falta otro fetch).
+
+### Gap encontrado y cerrado de paso (Fase B, no de esta fase)
+`FarmaciaPage.tsx` nunca había sumado a sus formularios de alta/edición de producto los campos `concentracion`/`unidadConcentracion`/`dosisSugeridaMgKg` — el backend los soporta desde la migración `0007` (sesión anterior), pero sin estos campos en la UI la calculadora de dosis de `IndicacionesPanel` (Fase B) no tenía forma de activarse nunca desde la web. Se agregaron a ambos formularios y a la ficha de detalle del producto.
+
+### Verificado
+- Backend: `nest build` limpio; `test:hce-demo` (10/10) sigue pasando tras tocar `ConsultasService`. Tropera no tiene una suite `test:*-demo` dedicada (gap preexistente, no introducido acá) — se verificó por API contra un backend efímero (puerto aparte, base PGlite temporal en `/tmp`, el `pgdata` y backend reales del usuario sin tocar): se creó una organización, se le cambió el `tipo` a `mixta` con un script directo contra la base temporal (backend detenido por PID exacto antes del cambio, conteos verificados antes/después, reiniciado después) para poder probar los dos bloques del dashboard a la vez, se cargó una consulta y un movimiento de tropera, `GET /dashboard/resumen` trajo ambos bloques correctamente, y los dos endpoints nuevos (`GET /consultas?desde=`, `GET /tropera/movimientos?desde=`) devolvieron exactamente lo esperado — incluida una fecha futura sin resultados y el filtro combinado `establecimientoId`+`desde` funcionando juntos. Backend apagado por PID exacto al terminar.
+- Web: `vite build` limpio (con warning esperado de tamaño de chunk por sumar `xlsx`, sin acción tomada — es una herramienta interna, no un sitio público optimizado por peso). `tsc --noEmit` de `apps/backend` contra `apps/web/tsconfig.json`: cero errores nuevos atribuibles a este trabajo, mismo ruido preexistente de siempre (namespace `React`, prop `key`, indexado con `any` por falta de `@types/react`).
+- **Sin verificar en el navegador** — misma limitación que Fase B: sin credenciales de prueba ni forma de operar un browser real en esta sesión. La verificación de arriba confirma que el backend devuelve los datos correctos para el drill-down; falta confirmar visualmente que los drawers abren/cierran bien, que los tres formatos de descarga (CSV/Excel/PDF) se abren correctamente en Excel/un lector de PDF real, y que el `chunk` de 600kB no genera un salto perceptible al cargar el dashboard.
+
+## [2026-08-29] — Fase B (clínica) del spec UI/UX: macros, indicaciones + calculadora de dosis, plan de tratamiento en el portal y delta editing/timeline
+
+Retomado tras un corte de sesión (el backend de macros e indicaciones ya había quedado escrito y probado — `test:macros-demo` 7/7, `test:indicaciones-demo` 12/12, migración `0007_useful_iron_lad.sql` ya aplicada a `pgdata` — pero sin ningún consumo desde la web). Se comparó el spec adjunto por el usuario contra el que originó la división en Fases A-E: son idénticos, sin requerimientos nuevos en el documento. Se confirmó alcance con el usuario antes de codear (4 piezas, las 4 elegidas) y se cerraron todas en esta pasada.
+
+### Macros en el formulario de consulta (§3.1)
+- `MacroPicker` (`PacienteDetallePage.tsx`): un `<select>` por campo (anamnesis, examen físico, diagnóstico, tratamiento) que inserta el texto del macro elegido — en los `<textarea>` lo agrega a continuación de lo ya tipeado; en los `<input>` de una línea lo reemplaza. `ConsultaForm` carga el catálogo completo de la organización una sola vez (`PacienteDetallePage.cargar()`) y lo filtra por categoría en cada picker.
+
+### Indicaciones + calculadora de dosis asistida (§3.2 y §3.3)
+- Nuevo `IndicacionesPanel`, mismo patrón que `DispensaPanel` (F4.3): botón "Indicación" por fila de consulta, alterna un panel con lo ya cargado (fármaco, dosis, frecuencia, duración, estado vigente/finalizado) y un formulario de alta.
+- Discrimina origen igual que el backend: `stock_interno` (selecciona producto de Farmacia) vs. `receta_externa` (texto libre, no toca stock).
+- Calculadora de dosis: si el producto tiene `dosisSugeridaMgKg` cargado, muestra un campo de peso (precargado con el peso de la consulta) y una sugerencia (`mg totales` + volumen si hay `concentracion`/`unidadConcentracion`) con un botón **"Confirmar dosis"** explícito — nunca se aplica sola, tal como pide el spec.
+- Al guardar una indicación con origen `stock_interno` y `cantidadStock` cargada, dispara automáticamente un `POST /farmacia/movimientos` (tipo `uso`, mismo `consultaId`) para descontar el inventario — así "stock interno descuenta del inventario" queda cerrado de punta a punta sin duplicar la lógica de ajuste de stock. Si ese segundo llamado falla, la indicación ya quedó guardada y se avisa aparte (no se revierte ni se bloquea).
+
+### Plan de tratamiento en el portal del dueño (§8.1)
+- El portal público por código (`hce/portal/`) ya traía `tratamientos` armado; se agregó el mismo bloque al portal por magic-link (`portal/portal.service.ts`, `resumen()`), que no lo tenía — mismo shape en los dos caminos.
+- `PortalDuenoPage.tsx` y `PortalAccesoPage.tsx` suman una sección "Plan de tratamiento" (sólo si hay indicaciones), con chip "Vigente"/"Finalizado" por fila.
+
+### Delta editing + línea de tiempo médica (§3.1)
+- `ConsultaForm` recibe la consulta anterior del animal (`consultas[0]`, ya ordenada desc por fecha) y precarga **peso y temperatura** con esos valores al dar de alta una consulta nueva — sólo cuando no hay ya un borrador guardado (la persistencia local sigue teniendo prioridad). Un hint ("Anterior: X kg") aclara de dónde salió el valor. FC/FR que menciona el spec no se agregaron: no existen como campos en `hce.consultas` y sumarlos es un cambio de schema fuera del alcance acordado para esta pasada.
+- Nuevo `HistoriaTimeline`: fila horizontal de tarjetas (🩺 consulta / 💉 vacuna) ordenadas por fecha, arriba de la tabla de historia clínica existente — que se deja intacta (edición/borrado/dispensa/indicación siguen viviendo ahí). Un click abre `DrawerItemLinea`, un panel lateral (overlay, no navegación) con el detalle completo del evento — no interrumpe un formulario que esté abierto en el resto de la página.
+
+### Verificado
+- Backend: `nest build` limpio; `test:hce-demo` (10/10), `test:vacunas-demo` (10/10) y `test:turnos-demo` (12/12) siguen pasando tras tocar `portal/portal.service.ts`; una consulta SQL directa contra `pgdata` confirma que el nuevo join de indicaciones en el portal magic-link no tiene errores de columnas. `test:macros-demo` (7/7) y `test:indicaciones-demo` (12/12), ya escritos en la sesión anterior, se re-confirmaron.
+- Web: `vite build` limpio; se corrió además el `tsc --noEmit` de `apps/backend` apuntado a `apps/web/tsconfig.json` (mismo truco ya usado antes para pescar errores de tipos reales, ya que este proyecto no tiene `@types/react`) — cero errores nuevos atribuibles a este trabajo, sólo el ruido preexistente de siempre (namespace `React`, prop `key`, `ImportMeta.env`) que ya aparecía en archivos no tocados hoy.
+- **Gap encontrado y cerrado de paso**: `FarmaciaPage.tsx` nunca había sumado a sus formularios de alta/edición de producto los campos `concentracion`/`unidadConcentracion`/`dosisSugeridaMgKg` (el backend los soporta desde que se agregaron a la migración `0007`) — sin esto, la calculadora de dosis de `IndicacionesPanel` no tenía forma de activarse nunca desde la web. Se agregaron a ambos formularios y a la ficha de detalle del producto.
+- **Verificación de API de punta a punta** (sin navegador, por curl, contra un backend efímero en el puerto 3055 con una base PGlite temporal en `/tmp` — el `pgdata` y el backend reales del usuario no se tocaron): registro → login → alta de dueño/paciente → producto con concentración/dosis sugerida → compra de stock (100) → consulta con peso/temperatura → macros (siembra lazy confirmada, 14) → indicación stock interno (dosis "84.0 mg (~1.68 ml)" para un peso de 8.4kg y dosis sugerida de 10mg/kg sobre una concentración de 50mg/ml, cálculo correcto) → descuento de stock disparado igual que lo haría el frontend (100 → 98, confirmado) → indicación receta externa → listado por animal ordenado por más reciente → plan de tratamiento idéntico en el portal público por código **y** en el magic-link → finalizar/editar/borrar indicaciones y macros por API. Todo respondió como se esperaba. Backend apagado por PID exacto al terminar.
+- **Sigue sin probarse**: todo lo que sólo se puede ver en el DOM real (el `<select>` de `MacroPicker` insertando texto en el campo correcto, el drawer de la timeline abriendo/cerrando visualmente, el hint "Anterior: X kg" mostrándose) — la verificación de arriba confirma que los datos que el backend le da a la web son correctos, no que los componentes React los rendericen bien. Falta un pase en el navegador real con el usuario.
+
+## [2026-08-28] — Verificación en el navegador de Fase A + fix de sync offline en mobile
+
+Verificación manual junto al usuario de lo construido en Fase A (ver entrada de abajo). Encontró y corrigió dos bugs, ninguno del diseño de Fase A en sí:
+
+- **Sesión vieja rompía el arranque de la web**: `localStorage`/`SecureStore` con una sesión guardada de antes del cambio `rol` → `roles` no tenía el arreglo nuevo, y `App.tsx` crasheaba con `sesion.roles is undefined` al leerla. `apps/web/src/auth/useSesion.ts` (`cargar()`) ahora descarta cualquier sesión sin `Array.isArray(sesion.roles)` en vez de propagar el crash — el usuario simplemente vuelve al login.
+- **Borrador de formulario "no volvía" tras recargar**: `NuevoPacienteForm` (`PacientesPage.tsx`) y `ConsultaForm` (`PacienteDetallePage.tsx`) viven detrás de un botón toggle ("+ Nuevo…") que arranca cerrado en cada carga de página — el borrador se guardaba bien en `localStorage`, pero el formulario que lo mostraría no se reabría solo. Nuevo `hayBorrador(clave)` exportado desde `useFormularioPersistente.ts`, usado como inicializador del estado del toggle en ambas páginas.
+- **Sync offline del mobile fallaba con "Recurso no encontrado"** (no relacionado a Fase A, encontrado de paso al verificar el punto anterior): WatermelonDB genera ids propios de 16 caracteres alfanuméricos (`randomId()`, ver `node_modules/@nozbe/watermelondb/utils/common/randomId`), no UUIDs — pero toda columna `id` del backend es `uuid` en Postgres, y `sync.core.ts` respeta el id que manda el cliente tal cual (`id: rec.id` en el insert). Cualquier alta hecha offline (paciente, consulta, vacunación, movimiento de tropera) fallaba en el push con el error de Postgres `22P02 invalid input syntax for type uuid`, que `DbErrorFilter` traduce a un 404 "Recurso no encontrado" — mensaje genérico que no daba ninguna pista de la causa real. Fix: nuevo `apps/mobile/src/db/uuid.ts` (UUID v4 simple, sin librería nueva), aplicado sobreescribiendo `_raw.id` en los 5 `.create()` de registros sincronizables (`paciente/nuevo.tsx`: persona + animal; `paciente/[id].tsx`: consulta + vacunación; `establecimiento/[id].tsx`: movimiento). Nota para quien retome esto: un registro creado offline **antes** de este fix sigue teniendo el id viejo guardado en la SQLite local del dispositivo y va a seguir fallando el push hasta que se borren los datos de la app — no alcanza con actualizar el código instalado.
+- Roles apilados y Omnibox no tuvieron un chequeo dedicado además de este pase — se dan por buenos por reusar patrones ya verificados en otras partes de la web.
+
+**Entregable:** Fase A cerrada (✅ en `Roadmap_Ecosistema.md`).
+
+---
+
+## [2026-08-28] — Fase A del nuevo spec UI/UX: role stacking + Omnibox (Ctrl+K) + persistencia local
+
+El usuario compartió un documento grande de especificación UI/UX (8 roles). Se hizo un análisis de gaps contra el código real, se dividió en fases (A a E), y se identificaron dos decisiones de arquitectura de fondo — role stacking (resuelta acá) y si Tropera pasa a seguimiento individual de animales (**sin decidir**, bloquea la fase de campo). El usuario eligió arrancar por Fase A.
+
+### Backend — roles apilables
+- `core.membresias.rol` (enum único) → `roles` (arreglo, mismo nombre de columna física `rol`, sólo cambia el tipo). Migración `0006_medical_mister_fear.sql`: drizzle-kit generó un `ALTER COLUMN ... SET DATA TYPE` ingenuo sin conversión de datos — se reescribió a mano con `USING ARRAY["rol"]::"core"."rol_membresia"[]` para envolver cada valor existente sin perder nada. Aplicada a mano contra `pgdata` (mismo procedimiento ya establecido), verificado que las 3 membresías existentes quedaron como arreglo de 1 elemento con su rol original.
+- `TenantGuard` resuelve `req.roles` (arreglo) en vez de `req.rol`. `RolesGuard` pasa a `requeridos.some(r => req.roles.includes(r))` — alcanza con que coincida uno solo. Los 24 usos existentes de `@Roles(...)` en los controllers no cambiaron (siguen siendo listas planas de roles permitidos).
+- Actualizados todos los puntos que leían `membresias.rol` directo: `admin.service.ts` (listar/agregar/quitar miembro, protección del último propietario — ahora chequea `roles.includes('propietario')`), `usuarios.service.ts` (filtro por rol vía `sql\`... = ANY(...)\`` — primera vez que se usa este operador de array en el repo), `personas.service.ts` (`listarVeterinarios`), `auth.service.ts` (login), `solicitudes.service.ts` (alta de membresía al aprobar — se dejó como selección de un solo rol al aprobar, envuelto en arreglo de 1 al insertar, por ser una acción de bootstrap puntual, no el lugar donde el stacking importa).
+- Nuevo `AgregarMiembroDto.roles: string[]` (antes `rol: string`) y nuevo endpoint `PATCH /admin/organizaciones/:id/miembros/:membresiaId/roles` para editar los roles de una membresía existente sin recrearla.
+- Nuevo `test/roles-flow.demo.ts` (`test:roles-demo`): `TenantGuard` resuelve el arreglo completo, `RolesGuard` deja pasar con cualquiera de los roles coincidente y rechaza si ninguno coincide, y una membresía "vieja" (backfill de 1 rol) sigue funcionando. 6/6 OK.
+- **Efecto colateral encontrado y corregido**: cambiar `membresias.rol` rompió los 7 scripts `test:*-demo` existentes (mismo patrón que ya había pasado con las columnas de `organizaciones` en la iteración anterior) porque cada uno recrea el DDL a mano. Se actualizaron los 6 que declaran `core.membresias` con `rol` — quedan 9 suites (`auth`, `animales`, `personas`, `hce`, `vacunas`, `turnos`, `sync`, `plataforma`, `roles`), 103 checks, todas OK.
+
+### Web — roles como arreglo
+- `Sesion.rol: string` → `Sesion.roles: string[]`. `App.tsx`: nuevo helper `tieneAlguno(roles, set)`; los 6 sets `ROLES_DASHBOARD/TURNERO/ATIENDEN/TROPERA/USUARIOS/FARMACIA` no cambiaron de definición, sólo la forma de consultarlos — un usuario con roles apilados ve la unión de tabs de todos sus roles sin ningún cambio de diseño de nav. `homeDe()` mantiene la prioridad ya implícita (dashboard > turnero > animales).
+- `AdminPage.tsx`: `AgregarMiembroForm` pasa de un `<select>` único a checkboxes (`RolesFieldset`, componente compartido); cada fila de miembro muestra un chip por rol y un editor inline ("Editar roles") que llama al endpoint nuevo.
+- `UsuariosPage.tsx` y `api/turnos.ts` (lista de profesionales para asignar turnos) también leían `.rol` de `GET /usuarios` — actualizados a `.roles` (con un campo `rol` de sólo display, `roles.join(' + ')`, para no tocar el resto de esos archivos).
+- **Bug preexistente encontrado de paso (no introducido hoy)**: `App.tsx` llama a `api.obtenerAnimal(sesion, t.pacienteId)` en el flujo "Atender" desde un turno, pero ese método nunca se agregó a `client.ts` — rompía en runtime al hacer clic en "Atender". Se agregó (`GET /animales/:id`, que el backend ya tenía). Se encontró porque `vite build` (esbuild) no type-checkea — este proyecto nunca tuvo `@types/react` instalado en `apps/web`, así que ningún error de tipos se detecta en el build normal; se usó por única vez el `tsc` de `apps/backend` apuntado a `apps/web` para pescar errores reales, filtrando el ruido de "no encuentra @types/react".
+
+### Web — Omnibox (Ctrl+K)
+- Nuevo `components/Omnibox.tsx`, 100% cliente: atajo global `Ctrl+K`/`Cmd+K`, sin endpoint de backend nuevo — reusa `GET /personas`/`GET /animales` (ya devuelven todo sin paginar, como el resto de la web). `hooks/useEntidadesBusqueda.ts` cachea ambas listas en memoria para no repetir el fetch en cada apertura.
+- `utils/fuzzy.ts`: matching propio (substring exacto + Levenshtein acotado para tolerar errores de tipeo), sin sumar ninguna librería. Resultados agrupados en Dueños/Pacientes, cruzando `animal.personaId` contra la lista de personas ya cargada para mostrar la relación.
+- Click en un dueño navega a `PersonasPage` con esa persona ya expandida — se agregó un prop opcional `personaIdInicial` que reusa el `busqueda`/`expandida` que la página ya tenía, sin tocar su lógica de filtro.
+
+### Web — Persistencia local de formularios
+- Nuevo `hooks/useFormularioPersistente.ts`: drop-in de `useState` que persiste a `localStorage` (debounced 300ms, TTL 24h para no resucitar un borrador viejo sin que el usuario lo pida), con `limpiar()` para borrar el borrador al guardar exitosamente.
+- Aplicado a los dos formularios largos que motivan el pedido del spec: alta de paciente (`PacientesPage.tsx`, 11 campos que antes eran `useState` sueltos, consolidados en un solo objeto) y alta/edición de consulta (`PacienteDetallePage.tsx`) — en este último, la clave del borrador incluye `animalId` + `consulta?.id ?? 'nueva'` para que editar una consulta existente no pise (ni se confunda con) el borrador de "consulta nueva" de otro momento.
+- El resto de los formularios de la web (personas, movimientos, etc.) queda sin tocar por ahora — el spec los menciona como motivador para los de alta longitud específicamente, no como un requisito universal.
+
+### Sin verificar en el navegador
+Misma limitación que la iteración anterior (Fase 5b): sin credenciales de prueba a mano en la sesión que lo construyó. `nest build` + 9 suites de test limpias, `vite build` limpio, pero eso no reemplaza probarlo. Falta: crear un miembro con dos roles y confirmar que ve la unión de tabs, abrir Ctrl+K y buscar por nombre parcial/DNI/mascota, y confirmar que un borrador de alta sobrevive a una recarga accidental.
+
+---
+
+## [2026-08-28] — Fase 5b: dashboard de indicadores + admin (grupos, planes, acceso, mensajes)
+
+A pedido del usuario, dos features de plataforma nuevas, confirmado por investigación previa que **no existía nada de esto** — ni dashboard, ni control de vencimiento/demo, ni planes, ni mensajería. Se planificó con 3 preguntas de alcance respondidas antes de codear: ambas partes en paralelo, mensajes dirigidos por organización o por un **grupo de organizaciones** (concepto nuevo, ej. "cadena de veterinarias"), y planes **estructurados desde ya** (tabla propia) aunque sin lógica de cobro automático.
+
+### Backend — schema nuevo
+- `plataforma.planes`, `plataforma.grupos_organizaciones`, `plataforma.mensajes`, `plataforma.mensajes_leidos` (schema Postgres separado — es información de la plataforma, no de una organización puntual).
+- `core.organizaciones` suma `grupoId`/`planId`/`accesoHasta`/`esDemo`. `grupoId`/`planId` son **referencias lógicas sin FK real** — `plataforma.ts` ya importa de `core.ts`, así que una FK en sentido inverso crearía un ciclo de módulos; mismo criterio que `hce.vacunaciones.vademecum_id → farmacia.productos`. `accesoHasta` nulo = sin vencimiento, no afecta ninguna organización existente.
+- Migración `0005_curly_black_crow.sql`, aplicada a mano contra `pgdata` con el procedimiento ya establecido (backend detenido por PID exacto, integridad de conteos verificada antes/después).
+
+### Backend — enforcement y endpoints
+- `TenantGuard` rechaza con 403 ("El acceso de tu organización venció...") si `accesoHasta` ya pasó. Cambio de bajo riesgo: sólo afecta organizaciones que alguna vez configuren esa fecha.
+- Nuevos módulos bajo el patrón ya establecido de `admin/` (`JwtAuthGuard + SuperAdminGuard`, módulo propio que importa `AuthModule`): `admin/planes` y `admin/grupos` (CRUD simples), `admin/mensajes` (crear/listar/eliminar anuncios). `admin.controller.ts` suma `PATCH /admin/organizaciones/:id/acceso`.
+- Módulo nuevo **tenant-scoped** (no admin) `mensajes/`: `GET /mensajes/pendientes` resuelve mensajes con destinatario "todas" / la organización actual / el grupo de la organización actual, restando lo ya leído por ese usuario; `POST /mensajes/:id/leido` (idempotente).
+- `GET /dashboard/resumen` (nuevo módulo `dashboard/`, tenant-scoped): primera vez que el repo usa `count()`/`GROUP BY` en Drizzle. Según `organizacion.tipo`, devuelve un bloque `clinica` (pacientes activos, consultas del mes, turnos del mes agrupados por estado, vacunas por vencer — esto último reusando **tal cual** `VacunacionesService.recordatorios()`) y/o un bloque `tropera` (existencias actuales vía `ExistenciasService.listarTodas()` reusado tal cual, movimientos del mes agrupados por tipo). `ExistenciasService` y `VacunacionesService` pasaron a exportarse desde sus módulos para poder inyectarlos en `DashboardModule`.
+- `AuthService.login()` ahora hace `innerJoin` con `organizaciones` para devolver también `tipo` por cada membresía — lo necesita la web para decidir qué dashboard mostrar. Cambio aditivo, no rompe nada existente.
+
+### Web
+- `App.tsx`: `propietario`/`admin` aterrizan en una pantalla nueva "Resumen" (`DashboardPage.tsx`) en vez del turnero; el resto de los roles no cambia. `Sesion` suma `tipo` de organización.
+- `AdminPage.tsx` (archivo monolítico existente, CSS-in-JS propio, sin router de tabs): se agregó un selector de sección simple ("Veterinarias" / "Planes" / "Grupos" / "Mensajes") respetando ese mismo patrón en vez de introducir una librería nueva. El detalle de cada organización suma un bloque "Acceso" (grupo, plan, fecha de vencimiento con atajos +7/+30 días, checkbox demo).
+- `MensajesBanner.tsx`, enganchado en `App.tsx`: banner descartable con lo que devuelva `GET /mensajes/pendientes`, uno a la vez.
+
+### Verificado
+- Backend: `nest build` limpio; **nuevo** `test:plataforma-demo` (6 casos: `TenantGuard` deja pasar sin `accesoHasta`, rechaza con `accesoHasta` vencido, un mensaje por grupo llega a un usuario de una org de ese grupo y no a otra, marcar leído es idempotente y saca el mensaje de "pendientes", el broadcast "todas" llega a cualquier organización) — 6/6 OK.
+- Efecto colateral encontrado y corregido: las nuevas columnas de `organizaciones` rompieron **los 7 scripts `test:*-demo` existentes** (`auth`, `animales`, `personas`, `hce`, `vacunas`, `turnos`, `sync`) porque cada uno recrea el DDL de `core.organizaciones` a mano y Drizzle incluye explícitamente en el INSERT generado toda columna `NOT NULL DEFAULT` de la tabla real. Al arreglarlos también salió a la luz que **`activo` ya faltaba de antes** en 6 de esos 7 DDLs (un gap preexistente a esta sesión, no introducido hoy, que nunca se había notado porque nadie corrió esos scripts en un tiempo) — se sumó junto con las columnas nuevas. Los 7 vuelven a pasar limpio.
+- Corrección sobre el propio trabajo: se había afirmado que el hook `afterCreate` de `animales` (Fase 1.5, sesión anterior del mismo día) necesitaba bumpear `updatedAt` a mano o el `codigo_legible` no llegaría al mobile en el próximo pull delta — **se verificó revirtiéndolo y el test `sync-demo` seguía pasando**, así que no era un bug real (el propio insert ya deja un `updatedAt` posterior al `lastPulledAt` de la ronda). Se dejó el bump como buena práctica defensiva, pero con el comentario corregido para no afirmar algo que no se pudo reproducir.
+- Web: `vite build` limpio. **Sin verificar visualmente en el navegador** — no había credenciales de prueba a mano en la sesión que lo construyó. Falta: ver el dashboard con una organización `clinica` y otra `establecimiento`/`mixta`, y correr el flujo completo de admin (crear grupo → crear plan → asignar a una organización → poner fecha de vencimiento pasada → confirmar que un usuario de esa org no puede entrar → mandar un mensaje al grupo → confirmar que aparece el banner).
+
+---
+
+## [2026-08-28] — HCE en `apps/mobile`: pacientes, consultas, vacunaciones y turnos
+
+Mismo día que F1.5, después de que Tropera quedó verificado en emulador. Alcance acordado con el usuario (dos preguntas explícitas antes de codear): alta completa de persona/animal desde el mobile (no sólo lectura) y turnos en modo sólo lectura (sin cambios de estado offline — tiene una máquina de estados con `atendido`/`cancelado`/etc. que no encaja con el patrón "cargar y sincronizar" de consultas/vacunaciones).
+
+### Backend
+- `personas`, `animales`, `consultas`, `vacunaciones`, `turnos` ya estaban en el `REGISTRY` de `sync/` desde antes de este trabajo (nadie lo había marcado explícitamente, pero ya estaban) — no hizo falta agregarlos.
+- Gap real encontrado: el `codigo_legible` de un animal se genera con `nextval('core.animales_codigo_seq')`, exclusivamente server-side (no se puede calcular en el cliente) — igual que el ajuste de `existencias` de Tropera, `AnimalesService.crear()` tenía esa lógica inline, sin forma de reusarla desde el sync. Se extrajo a `core/animales/generar-proximo-codigo-legible.ts` (compartida) y se sumó un hook `afterCreate` a la entrada `animales` del registry: un animal creado offline llega sin código, y el hook se lo asigna al sincronizar.
+- `test/sync-flow.demo.ts` sumó 2 casos: alta offline de un animal recibe `codigo_legible` válido (Luhn), y ese valor aparece en el siguiente pull delta. 24/24 checks OK.
+- Nota de proceso: al escribir el hook se agregó un bump manual de `updatedAt` pensando que sin él la fila no aparecería en el pull delta siguiente — **se verificó empíricamente revirtiéndolo y corriendo el test, y seguía pasando** (el propio insert ya deja un `updatedAt` posterior al `lastPulledAt` de la ronda, a diferencia del caso de `existencias` en Tropera donde sí hacía falta). Se dejó el bump igual, como buena práctica defensiva, pero corregido en el comentario para no afirmar un bug que en los hechos no se reprodujo.
+
+### Mobile (`apps/mobile`)
+- WatermelonDB pasa de schema v1 a v2 sumando `personas`/`animales`/`consultas`/`vacunaciones`/`turnos`, con una migración (`src/db/migrations.ts`) que sólo crea tablas nuevas — no toca lo de Tropera ya sincronizado en dispositivos que ya venían probando.
+- Tabs nuevas: **Pacientes** (lista + alta con el mismo patrón de quick-create-dueño que ya usa `PacientesPage.tsx` en la web) y **Turnos** (agenda de sólo lectura, cruza `turnos` con `animales` local para mostrar el nombre del paciente).
+- `paciente/[id].tsx`: ficha con historial de consultas y vacunaciones (lectura) + formularios inline para cargar una consulta o vacunación nueva offline — mismo patrón de "guardado local, pendiente hasta sincronizar" que ya usa el detalle de establecimiento de Tropera.
+- Catálogo de especies: no vive en WatermelonDB (no está en el registry de sync, es global y no cambia en runtime) — se pide una vez por `GET /especies` y se cachea en memoria (`src/api/useEspecies.ts`). Limitación conocida y aceptada: si la app arranca sin conectividad antes de haber pedido especies alguna vez, el selector de especie en el alta de paciente queda vacío hasta tener señal.
+- Root `_layout.tsx`: el guard de auth-redirect y la lista de rutas del `Stack` se generalizaron para incluir `paciente/nuevo` y `paciente/[id]` junto a `establecimiento/[id]`.
+
+### Sin verificar en dispositivo
+A diferencia de Tropera F1.5, esta tanda de pantallas **no se probó en el emulador** — el usuario se desconectó a mitad de sesión antes de poder loguearse de nuevo y probar el flujo. `tsc --noEmit` y el build del resto del monorepo están limpios, pero eso es necesario, no suficiente. Falta como mínimo: crear un paciente offline y confirmar que recibe `codigo_legible` al sincronizar, cargar una consulta y una vacunación, y confirmar que turnos ya sincronizados se ven bien en la lista.
+
+---
+
+## [2026-08-28] — Tropera F1.5 (offline) + primera versión conectada de `apps/mobile`
+
+Los dos próximos pasos del roadmap, atacados juntos porque F1.5 no tiene forma de probarse de verdad sin un consumidor mobile real. Dos gaps encontrados antes de tocar código, no sólo "agregar filas al registry de sync": faltaban columnas (`deleted_at`/`updated_at`) en el schema de `tropera`, y el `push()` genérico del motor de sync hace un INSERT crudo — si `tropera.movimientos` se registraba tal cual, un movimiento offline no ajustaría `existencias` ni rechazaría una baja que dejara stock negativo, porque esa lógica sólo vivía en `MovimientosService.crear()`.
+
+### Backend
+- `tropera.existencias` suma `deleted_at`; `tropera.movimientos` y `tropera.eventos` suman `updated_at` + `deleted_at` (nunca se usan para borrar/actualizar vía UI — son ledgers append-only — pero mantienen la convención del proyecto y evitan tener que especializar `sync.core.ts` para tolerar columnas ausentes). Migración `0004_wonderful_moon_knight.sql`, aplicada a mano contra `apps/backend/pgdata` con el mismo procedimiento ya establecido (backend detenido, integridad de conteos verificada antes/después).
+- La lógica de "cómo un movimiento ajusta `existencias`" (validar pertenencia del establecimiento + sumar/restar + rechazar si queda negativo) se extrajo de `MovimientosService.crear()` a una función compartida, `aplicarMovimiento` (`tropera/movimientos/aplicar-movimiento.ts`), para no duplicarla.
+- `sync.core.ts`: el `REGISTRY` ahora acepta un hook opcional `afterCreate` por tabla, invocado dentro de la misma transacción del `push()` y sólo para filas que realmente se insertaron (no para reintentos absorbidos por `onConflictDoNothing`). Las 4 tablas de `tropera` quedaron registradas; `movimientos` usa el hook para llamar `aplicarMovimiento` — un movimiento cargado offline pasa por la misma validación que el alta online.
+- **Tradeoff aceptado:** si un movimiento en cola dejaría stock negativo al sincronizar, se aborta **toda la transacción de push**, no sólo ese movimiento — el resto del lote pendiente tampoco se aplica y hay que reintentar tras resolver el conflicto.
+- `test/sync-flow.demo.ts` sumó DDL de `tropera` y 3 casos nuevos: push de un movimiento de compra ajusta `existencias`; push de una venta que dejaría stock negativo se rechaza (y no deja nada más del lote aplicado, ni siquiera un establecimiento del mismo push); reintentar el mismo push (mismo id) no duplica el ajuste. 21/21 checks OK.
+
+### Mobile (`apps/mobile`)
+- Dejó de ser el scaffold default de `create-expo-app` — se sacaron las rutas/componentes de tutorial (Home/Explore, `app-tabs.*`, `hint-row`, `web-badge`, `collapsible`, `themed-text/view`, `external-link`, el tema/hooks que sólo ellos usaban) por quedar huérfanos.
+- Stack offline elegido: **WatermelonDB** (`@nozbe/watermelondb` + `@morrowdigital/watermelondb-expo-plugin` como config plugin de Expo), porque el backend ya estaba diseñado explícitamente compatible con su `synchronize()` — minimiza código de cliente frente a reimplementar diffing a mano sobre Expo SQLite. Requiere Expo Dev Client (no corre en Expo Go); se agregó `expo-dev-client` y decorators legacy (`@babel/plugin-proposal-decorators`) porque los modelos de WatermelonDB los usan.
+- Sesión (`src/auth/useSesion.ts` + `SesionContext`) y cliente HTTP (`src/api/client.ts`) son un puerto directo del patrón de `apps/web` (headers `Authorization`/`X-Organizacion-Id`, refresh silencioso en 401 con reintento único) usando `expo-secure-store` en vez de `localStorage`.
+- Pantallas nuevas, alcance acotado a Tropera (no HCE en esta iteración): login, lista de establecimientos, detalle con existencias + alta de movimiento offline (queda pendiente de sync, no ajusta `existencias` local hasta sincronizar — el ajuste lo hace el servidor), y una pestaña de sincronización manual.
+- Se homogeneizó el lockfile (`package-lock.json` de npm borrado; queda dentro del `pnpm-lock.yaml` del monorepo).
+- **Sin verificar en un dispositivo/emulador real** — no hay simulador disponible en este entorno. Typecheck (`tsc --noEmit`) y build del resto del monorepo (backend + web) limpios; falta correr `expo prebuild` + un build de Dev Client y probar el circuito login → alta offline → sync en un teléfono real antes de dar F1.5 por cerrado del todo.
+
+### Verificación end-to-end en un emulador Android real (mismo día)
+Con el código escrito, se armó un emulador (Pixel 6, API 34) y se corrió `expo prebuild` + `expo run:android` contra el backend local real del usuario. Se encontraron y resolvieron, en orden, los siguientes problemas — todos reales, ninguno cosmético:
+
+1. **CMake de WatermelonDB no resuelve rutas bajo pnpm**: `native/android-jsi/.../CMakeLists.txt` usa una ruta relativa fija (estilo npm/yarn clásico) para encontrar `react-native/ReactCommon/jsi/jsi/jsi.cpp`, y la estructura de symlinks `.pnpm/` de pnpm no la resuelve. Fix: `apps/mobile/.npmrc` con `node-linker=hoisted`, **acotado a ese workspace** (no en el `.npmrc` raíz) — aplicarlo a todo el monorepo aplana `@types/react` a una sola versión y rompe el typecheck de `apps/backend` (`@react-pdf/renderer` del carnet necesita una versión distinta a la que usa React Native 19).
+2. **`expo-dev-client`/`expo-secure-store`/`@react-native-community/netinfo` en versiones no alineadas a Expo SDK 57**: puestas a mano al principio con un esquema de versión viejo (ej. `expo-dev-client` 6.x en vez de 57.x). `npx expo install --check` las detecta; corregidas a mano cuando `expo install` en sí fallaba (intenta usar npm dentro del workspace pnpm y pisa contra un postinstall roto de otro paquete).
+3. **`@morrowdigital/watermelondb-expo-plugin` inyecta `getJSIModulePackage()`**, una API de RN removida en el template Bridgeless de Expo 57 — `Unresolved reference 'JSIModulePackage'`. Fix: usar el adapter de WatermelonDB sin JSI (`jsi: false`, alcanza de sobra para el volumen de datos de Tropera) + un plugin de Expo propio (`apps/mobile/plugins/withWatermelonJsiFix.js`) que limpia el import roto. Nota de orden no obvia: los mods de `withMainApplication` de distintos plugins corren en orden **inverso** al de declaración en `app.json` (el último declarado corre primero) — el plugin propio tiene que declararse *antes* que el de WatermelonDB para poder limpiar lo que éste inyecta.
+4. **Babel no combina decorators legacy con aserciones `!` de TypeScript** en un mismo campo de clase (`@babel/plugin-transform-typescript` lo rechaza). Fix: sacar el `!` de los modelos de WatermelonDB y `strictPropertyInitialization: false` en `tsconfig.json` — mismo criterio que recomienda TypeORM para clases decoradas.
+5. **`sesion!.organizacionId` explota con `Cannot read property 'organizacionId' of null`**: hay un instante entre que `sesion` pasa a `null` y que `_layout.tsx` redirige a `/login` donde la pantalla de todos modos llega a renderizar. Fix: fallback `sesion?.organizacionId ?? '__none__'` en las queries y un guard `if (!sesion) return null` **después** de todos los hooks (no se pueden llamar condicionalmente).
+6. **Emulador Android usa `10.0.2.2` para el host, no `localhost`** — `EXPO_PUBLIC_API_URL=http://localhost:3000` nunca iba a conectar desde el emulador. Corregido en `apps/mobile/.env`.
+7. **`SyncModule` nunca había sido registrado en `AppModule`**: el motor de sync estaba completo y probado por `test:sync-demo` desde antes, pero como módulo nunca se importó en `app.module.ts`, `/sync` devolvía 404 (`Cannot GET /sync`) en la app real — un gap preexistente a esta iteración, no introducido por el trabajo de hoy, pero que sólo se hizo evidente al tener un consumidor real por primera vez.
+
+Con todo eso resuelto: login → sincronización inicial → alta de movimiento offline → detalle de existencias funcionando de punta a punta en el emulador contra el backend real del usuario. Quedan ajustes de UI menores por pulir (reportados por el usuario, sin especificar todavía).
+
+### Docs
+`Roadmap_Ecosistema.md` actualizado: F1.5 y Tropera (Fase 1 completa) pasan a ✅, la app móvil documentada como verificada en emulador real (no sólo "compila").
+
+---
+
+## [2026-08-28] — Farmacia → HCE: dispensa ligada a una consulta (F4.3)
+
+Segundo punto de la lista de pendientes tras el MVP de Farmacia. Diseño acordado: la dispensa **no es una entidad nueva** — es un `movimientos_stock` de tipo `uso` con un `consulta_id` opcional cargado. Se reutiliza toda la lógica transaccional de movimientos que ya existía (ajuste de stock, rechazo si queda negativo) en vez de inventar un concepto paralelo.
+
+### Backend
+- `farmacia.movimientos_stock` suma la columna nullable `consulta_id` (FK a `hce.consultas`), agregada sin romper ningún movimiento existente (compras, mermas, vencimientos siguen sin consultaId).
+- `MovimientosService.crear()` valida que la consulta exista y sea de la organización antes de insertar (mismo criterio de scoping que el resto de la app); `listar()` acepta un filtro opcional `consultaId` además del existente `productoId`.
+- `GET /farmacia/movimientos?consultaId=...` — sin este filtro, sigue devolviendo todo el historial de la organización.
+
+### Web
+- `PacienteDetallePage.tsx`: cada fila de la tabla de consultas tiene un botón "Dispensar" que abre un panel inline (`DispensaPanel`) con lo ya dispensado en esa consulta y un formulario para cargar una dispensa nueva (producto + cantidad + observaciones), usando el mismo endpoint que ya usa `FarmaciaPage.tsx`.
+
+### Fuera de alcance (sigue igual que en el MVP de Farmacia)
+La FK real desde `hce.vacunaciones.vademecum_id` hacia `farmacia.productos` — dispensar sigue ligado a la consulta, no a una vacunación puntual.
+
+### Migración
+`0003_farmacia_dispensa.sql`: `ALTER TABLE farmacia.movimientos_stock ADD COLUMN consulta_id uuid` + FK. Cuarta migración seguida sin fricción de numeración desde el squash del journal. Probada contra un PGlite temporal (`db:local-init` completo, las 4 migraciones aplican limpio) y luego aplicada a mano contra `apps/backend/pgdata` (mismo procedimiento ya establecido: backend detenido, DDL idempotente, integridad de conteos verificada antes/después, backend reiniciado).
+
+### Verificado
+Por curl contra un backend aislado: compra (+50) y dispensa ligada a consulta (−10, tipo `uso` con `consultaId`) ajustan bien el stock (queda en 40); `GET /farmacia/movimientos?consultaId=X` devuelve sólo esa dispensa; un `consultaId` de otra organización o inexistente se rechaza con 404 sin tocar stock; un movimiento sin `consultaId` (merma) sigue funcionando igual que antes. Build limpio de backend y web.
+
+---
+
+## [2026-08-28] — Farmacia: MVP básico (vademécum + stock + movimientos)
+
+Primer módulo de Farmacia. Igual que pasó con Tropera al arrancar, no había ningún diseño previo de esta vertical — el roadmap sólo tenía un esqueleto de fases (F4.1–F4.4) y `hce.vacunaciones.vademecum_id` como referencia lógica suelta, sin tabla del otro lado. Alcance acordado con el usuario: "algo básico en la línea que venimos llevando" — se tradujo en mirroreara **exactamente** la estructura de Tropera (catálogo + cantidad actual con corrección directa + movimientos transaccionales con historial), sin las partes más complejas.
+
+### Fuera de alcance a propósito
+- **Facturación** (el otro tema del punto 4 original): el roadmap ya la marca como "reservada" por la integración con ARCA (ex-AFIP) — no encaja en "básico", no se tocó.
+- **Dispensa ligada a una consulta** (F4.3, descontar stock automáticamente al aplicar un producto en una consulta/vacunación) y la **FK real** de `hce.vacunaciones.vademecum_id` hacia `farmacia.productos`: quedan para cuando haya que integrar de verdad HCE con Farmacia, no es parte de este MVP.
+
+### Backend — nuevo schema `farmacia`
+- `productos` (vademécum): CRUD simple, `categoria` es texto libre (un vademécum real es demasiado variado para un enum cerrado, a diferencia de las 6 categorías fijas de hacienda en Tropera).
+- `stock`: una fila por producto con la cantidad actual. `GET /farmacia/stock` devuelve **todos** los productos activos con su cantidad (0 si nunca se cargó, vía `LEFT JOIN` con `coalesce`) en una sola llamada — más simple que el equivalente de Tropera porque acá no hay "por establecimiento" de por medio. `PATCH /farmacia/stock/:productoId` es la corrección directa sin historial (mismo criterio que `tropera.existencias`).
+- `movimientos_stock`: ledger transaccional — `compra` (alta) / `uso`, `vencimiento`, `merma` (baja, rechaza si deja stock negativo) — mismo patrón exacto que `tropera.movimientos`.
+- Roles de escritura: `propietario`, `admin`, `veterinario` (sin `capataz`/`recepcion` — es clínico, no de mostrador ni de campo).
+
+### Web
+- Nueva página `FarmaciaPage.tsx`, mismo patrón list→detail que `TroperaPage.tsx`: listado de productos con stock a la vista → detalle con corrección directa + alta de movimiento + historial.
+- Pestaña "Farmacia" en la nav, visible para `propietario`/`admin`/`veterinario`.
+
+### Migraciones — mismo cuidado que las veces anteriores
+`db:generate` volvió a salir limpio y bien numerado (`0002_farmacia.sql`, tercera vez seguida sin fricción desde el squash del journal). Y **otra vez** hizo falta aplicar el schema nuevo a mano contra `apps/backend/pgdata` (la base real del usuario) — el patrón ya es previsible: cualquier tabla nueva necesita este paso aparte, `nest start --watch` sólo recarga código, no aplica DDL. Se hizo con el backend detenido (mismo procedimiento que con Tropera) y se verificó integridad antes/después.
+
+### Verificado
+Build limpio de backend y web. Por curl contra un backend aislado: producto sin stock cargado viene en 0, compra (+100) y uso (−30) ajustan bien, un intento de descontar de más se rechaza con 400 sin tocar el stock, la corrección directa funciona, y el historial de movimientos lista bien. Después, migración aplicada a la base real del usuario con integridad verificada y el backend real respondiendo 401 (no 404/500) en las rutas nuevas.
+
+---
+
+## [2026-08-28] — Tropera: panel consolidado de stock (F1.6)
+
+El usuario eligió F1.6 (panel consolidado) antes que F1.5 (offline) para esta iteración — offline no tiene forma de probarse de verdad todavía porque la app móvil sigue siendo un scaffold sin conectar.
+
+### Backend
+- `ExistenciasService.listarTodas(organizacionId)`: existencias de **todos** los establecimientos de la organización en una sola consulta (sin completar categorías en 0 — eso lo arma el front cruzando con la lista de establecimientos).
+- Nuevo `ExistenciasResumenController` en `GET /tropera/existencias` (ruta separada de `GET /tropera/establecimientos/:id/existencias`, a propósito — evita cualquier ambigüedad de ruteo entre el segmento literal `existencias` y el param `:id`).
+
+### Web
+- `TroperaPage.tsx`: nueva sección "Stock consolidado" arriba del listado de establecimientos — matriz establecimiento × categoría con totales por fila y por columna. Sólo se muestra con 2+ establecimientos (con uno solo no aporta nada que no se vea ya en su propia ficha).
+
+### Verificado
+Build limpio de backend y web. Por curl contra un backend aislado: dos establecimientos con existencias distintas, `GET /tropera/existencias` trae las filas de ambos en una sola llamada — los totales que arma el front (por fila, por columna y gran total) se verificaron a mano contra esos datos.
+
+---
+
+## [2026-08-28] — Seed de especies driver-agnóstico (`db:seed`)
+
+Cierra el gap que había quedado abierto en la entrada anterior (`especies` vacía después de `drizzle-kit migrate`). Nuevo `apps/backend/scripts/seed-especies.mjs`: mismo criterio de driver que `database/drizzle.provider.ts` (`DATABASE_DRIVER=pglite` usa `DATABASE_PATH`, `node-postgres` usa `DATABASE_URL`), idempotente. `init-local-db.mjs` se refactorizó para importarlo (`sembrarEspecies()`) en vez de duplicar el `INSERT`. Nuevo script `pnpm --filter backend db:seed`. README actualizado con el paso que faltaba en "Puesta en marcha (producción)".
+
+### Dos bugs propios encontrados y corregidos en el camino
+1. **El fix de `pgcrypto` de la entrada anterior rompía PGlite.** La extensión no está disponible en la build WASM de `@electric-sql/pglite` (`gen_random_uuid()` ya es nativo ahí, no la necesita) — `CREATE EXTENSION IF NOT EXISTS "pgcrypto"` fallaba con "extension not available" y abortaba toda la migración. Se envolvió en `DO $$ BEGIN EXECUTE '...' EXCEPTION WHEN OTHERS THEN NULL END $$` — best-effort: si la extensión no está disponible pero la función ya es nativa (PGlite, Postgres 13+), sigue sin problema.
+2. **`seed-especies.mjs` nunca ejecutaba `main()`** en este repo. El chequeo estándar de "¿me invocaron directo?" (`import.meta.url === 'file://' + process.argv[1]`) falla cuando el path del repo tiene espacios (`.../01- Projects/...`): `import.meta.url` los codifica como `%20`, `process.argv[1]` no — nunca son iguales. Corregido comparando con `fileURLToPath(import.meta.url) === process.argv[1]` (paths de archivo, no strings de URL).
+
+### Verificado
+`db:local-init` (PGlite) vuelve a andar de punta a punta con la migración corregida. Contra Postgres real: `db:migrate` + `db:seed` corridos dos veces seguidas — 8 especies, sin duplicar ni fallar la segunda vez.
+
+---
+
+## [2026-08-28] — Primera prueba real de la migración contra Postgres (no PGlite)
+
+Hasta esta entrada, `db/migrations/0000_ecosistema_base.sql` sólo se había probado con `init-local-db.mjs` contra PGlite. Se probó por primera vez el camino real de producción: `drizzle-kit migrate` contra un Postgres de verdad (v12, instalado en esta máquina — se creó una base aislada `ecosistema_migracion_test` para la prueba, se destruyó al terminar).
+
+### Bug real encontrado y corregido: `gen_random_uuid()` no existe en Postgres < 13
+Todas las columnas `uuid().defaultRandom()` de Drizzle generan `DEFAULT gen_random_uuid()`. Esa función es nativa recién desde **Postgres 13** — en versiones anteriores hay que habilitar la extensión `pgcrypto`, que la provee. PGlite nunca mostró el problema porque trae la función disponible de entrada (usa una versión de Postgres más nueva internamente). Se agregó `CREATE EXTENSION IF NOT EXISTS "pgcrypto";` al principio de `0000_ecosistema_base.sql` — no rompe el tracking de `drizzle-kit generate` (las extensiones no forman parte del modelo de schema que Drizzle diffea).
+
+### Gap encontrado, sin resolver todavía: no hay seed de `especies` para Postgres real
+`init-local-db.mjs` siembra las 8 especies base, pero es un script **específico de PGlite** (importa `@electric-sql/pglite` directamente) — `drizzle-kit migrate` no siembra nada. Un despliegue real contra Postgres queda con `core.especies` vacía después de migrar, y toda la app depende de que existan especies (alta de animal, etc.). Hace falta un script de seed que funcione contra cualquier driver (o correr el `INSERT` a mano la primera vez). Se sembró manualmente para poder terminar de probar el resto del flujo.
+
+### Verificado (contra Postgres real, con el fix aplicado)
+Las dos migraciones aplican limpio con `drizzle-kit migrate`. Backend completo levantado con `DATABASE_DRIVER=node-postgres`: registro, login, refresh token, alta de animal, consulta, vacunación, **carnet PDF** (genera bien — `@react-pdf/renderer`/`qrcode` a veces tienen problemas con dependencias nativas, no fue el caso), establecimiento + movimiento de Tropera con ajuste de existencias, evento sanitario, y reseteo de contraseña. Todo funcionó igual que contra PGlite, salvo por el seed de especies (gap real, no un bug de la migración en sí).
+
+---
+
+## [2026-08-28] — Portal del dueño por magic-link: UI completa
+
+El backend (`POST /portal/acceso/:personaId`, `GET /portal/resumen`, `POST /portal/turnos`, todo bajo `src/portal/`) ya existía entero desde antes de esta sesión, pero no tenía ningún caller en la web — sólo el portal público por código (`/c/:codigo`, una mascota, sin login) estaba conectado. Esto era más que "falta un botón": tampoco existía el lado del dueño (consumir el token y mostrar el resumen), y el mecanismo es distinto del portal público — el magic-link viaja como `?token=` en la URL pero se manda como header `X-Portal-Token` en cada request, no como query ni como `Authorization: Bearer`.
+
+### Lado staff
+`PersonasPage.tsx`: en "Ver mascotas" de cada dueño, botón "Generar acceso al portal" → `POST /portal/acceso/:personaId` → muestra el link (vale 30 días) para copiar y mandarle al dueño a mano (WhatsApp, email — no hay envío automático).
+
+### Lado dueño
+- `api/portalAcceso.ts`: cliente nuevo, separado de `api/portal.ts` (el del código público) — mismo criterio de "cada superficie pública mantiene su propio cliente" que ya se usa en el resto de la web.
+- `pages/PortalAccesoPage.tsx`: a diferencia del portal público (una mascota), muestra **todas** las mascotas del dueño, cada una con sus vacunas/turnos/consultas, y un botón "Solicitar turno" por mascota (`POST /portal/turnos`).
+- `main.tsx`: nueva detección de ruteo `?token=` → `PortalAccesoPage`, distinta de `?c=`/`/c/:codigo` → `PortalDuenoPage` (conviven sin pisarse, son query params distintos).
+
+### Verificado
+Build limpio de backend y web. Por curl contra un backend aislado: generar acceso, consumir el resumen con el token (trae la vacuna cargada), solicitar un turno, y las dos validaciones de error (sin token → 401, token inválido → 401).
+
+---
+
+## [2026-08-28] — Correcciones tras la primera pasada del protocolo de pruebas
+
+El usuario corrió `docs/Protocolo_Pruebas.md` por primera vez contra su entorno real (no bases de prueba) y reportó varios hallazgos.
+
+### Bug operativo grave: la base real nunca tenía el schema `tropera`
+Todas las pruebas de Tropera de las iteraciones anteriores se hicieron contra bases PGlite temporales — nunca se aplicó la migración a `apps/backend/pgdata` (la base real de desarrollo). Resultado: 500 en cualquier acción de Tropera. Se aplicó el DDL de `tropera` (schema, 3 enums, 4 tablas, FKs) directamente contra la base real, de forma idempotente (`CREATE ... IF NOT EXISTS` / `DO $$ ... EXCEPTION WHEN duplicate_object`), con el backend detenido para evitar acceso concurrente al archivo PGlite. Se verificó integridad antes y después (organizaciones/usuarios/animales existentes intactos).
+
+**Causa raíz de otro incidente relacionado:** durante esta sesión quedaron procesos de backend de prueba huérfanos ocupando el puerto 3000 más de una vez — arrancados como `node dist/src/main` (build compilado), no como `nest start --watch`, así que los `pkill -f "nest start --watch"` no los mataban. Uno de ellos apuntaba a una base temporal vacía y el usuario le estuvo hablando sin saberlo ("no puedo ingresar con mi cuenta de administrador"). Lección para sesiones futuras: matar por PID exacto (`lsof -t -i :3000 | xargs kill -9`), no por patrón de comando, cuando se levantan backends de prueba en paralelo al del usuario.
+
+### Bug: buscador de pacientes en el turnero no asignaba la selección
+`Field` (helper de layout de formularios en `TurnosPage.tsx`) envolvía sus `children` en un `<label>` real. Las sugerencias de búsqueda (divs clickeables) quedaban anidadas dentro de ese mismo `<label>`, junto al `<input>` de texto — el navegador intercepta clicks en hijos de un `<label>` para reenfocar su control asociado, pisando el click sobre la sugerencia. Se cambió `Field` para usar `<div>` en vez de `<label>` (el CSS no dependía de que fuera un label real). No se pudo confirmar en un navegador real (sin acceso); pendiente de que el usuario lo reconfirme.
+
+### Bug: datos por especie ausentes en el alta de animal
+Preexistente a esta sesión: `EditarPacienteForm` (edición) siempre tuvo `CamposEspecie`, pero `NuevoPacienteForm` (alta, en `PacientesPage.tsx`) nunca lo tuvo — se podía cargar raza/pelaje/etc. al editar pero no al crear. Agregado.
+
+### Funcionalidad faltante (no bug): reseteo de contraseña
+El backend ya tenía `PATCH /usuarios/:id/password` completo (contraseña específica o temporal autogenerada, con safeguard para que sólo un propietario resetee a otro propietario), pero **ninguna pantalla lo usaba** — ni `/admin` (gestiona organizaciones/miembros a nivel plataforma, no contraseñas) ni la app normal (no existía ninguna pantalla de "mi personal"). Se creó `UsuariosPage.tsx` (pestaña "Usuarios", visible sólo para `propietario`/`admin`): lista los miembros de la organización (`GET /usuarios`) y por fila permite resetear con una contraseña específica o generar una temporal (que se muestra una única vez, tal como la devuelve el backend).
+
+### Verificado
+Build limpio de backend y web. Reset de contraseña probado de punta a punta en un backend aislado (puerto 3001, sin tocar la base real del usuario): agregar miembro, generar contraseña temporal, login con esa temporal, resetear a una específica, login con la nueva, y confirmación de que la contraseña vieja queda invalidada.
+
+---
+
+## [2026-08-28] — Tropera: eventos sanitarios y reproductivos (F1.4)
+
+### Backend — tabla `tropera.eventos`
+- Nuevo enum `tipo_evento`: sanitarios (`vacunacion`, `desparasitacion`, `tratamiento`) + reproductivos (`servicio`, `diagnostico_prenez`, `destete`). Se dejó afuera `parto`: ya está cubierto por el movimiento `nacimiento` (F1.3) y modelarlo dos veces sería redundante mientras la hacienda sea conteo agregado.
+- A diferencia de `movimientos`, **no ajusta `existencias`** — es sólo registro (vacunar 40 vacas no cambia cuántas vacas hay). `categoria`/`cantidad` son opcionales: un evento puede aplicar a toda la hacienda del establecimiento sin desglosar.
+- `POST /tropera/eventos` / `GET /tropera/eventos?establecimientoId=`. Roles de escritura: `propietario`, `admin`, `capataz`, **y `veterinario`** (a diferencia de establecimientos/existencias/movimientos, acá sí tiene sentido que un veterinario cargue una vacunación).
+
+### Web
+- `TroperaPage.tsx` suma, en el detalle de cada establecimiento, un historial de eventos y el formulario "+ Nuevo evento".
+
+### Migraciones — primera vez que sale redondo
+`db:generate` generó un diff limpio y con la numeración correcta automáticamente (`0001_tropera_eventos.sql` después de `0000_ecosistema_base.sql`) — sin ningún ajuste manual. Confirma que el squash de la entrada anterior dejó el journal sano.
+
+### Verificado
+Build limpio de backend y web. Por curl: vacunación con categoría/cantidad/producto, un evento de servicio sin categoría ni cantidad (aplica a toda la hacienda), tipo inválido rechazado con 400, y confirmación de que `existencias` no se mueve al crear un evento.
+
+---
+
+## [2026-08-28] — Journal de migraciones: squash a una sola migración
+
+Cierra el problema arrastrado desde la primera migración de Tropera (ver entradas de abajo): `0001_solicitudes.sql` y `0002_org_activo.sql` nunca habían quedado registradas en `meta/_journal.json`, así que cada `db:generate` había que revisarlo a mano y `drizzle-kit migrate` contra Postgres real se las hubiera saltado.
+
+**Decisión (confirmada con el usuario, dos caminos posibles):** reconstruir a mano las dos entradas faltantes del journal (mantiene el historial incremental, pero exige escribir a mano los snapshots JSON internos de drizzle-kit — estructuras pensadas para generarse automáticamente, con riesgo real de quedar sutilmente mal) vs. **squash**: como todavía no hay ningún deploy real contra Postgres (`Aprovisionar VM` sigue ⏳ en el roadmap), no hay nada que preservar de un historial de migraciones ya aplicado en producción. Se eligió squash.
+
+### Qué se hizo
+- Se borraron las 5 migraciones existentes (`0000_stormy_domino.sql` … `0004_tropera_movimientos.sql`) y todo `meta/`.
+- `drizzle-kit generate` contra el schema actual completo (core + hce + tropera: 3 schemas, 8 enums, 13 tablas) generó una única migración limpia, renombrada a `db/migrations/0000_ecosistema_base.sql` con el `tag` del journal a juego.
+- El historial incremental sigue existiendo en `git log`/`git blame` de los commits viejos — sólo se sacó de la carpeta `db/migrations/` viva.
+
+### Verificado
+`init-local-db.mjs` aplica la migración única limpia desde cero contra una base PGlite temporal. Backend levantado contra esa base: refresh token, alta de `solicitudes` (la tabla que antes dependía de la migración fantasma), lectura con `organizaciones.activo` (la columna que antes dependía de la otra), una consulta de HCE, y un establecimiento + movimiento de Tropera — todo funcionando igual que antes del squash.
+
+### A partir de ahora
+El journal está 100% controlado por drizzle-kit otra vez: el próximo `db:generate` debería salir limpio sin pasos manuales — si vuelve a hacer falta renombrar un archivo o tocar el journal a mano, algo se rompió de nuevo y hay que investigar por qué, no asumir que es "lo de siempre".
+
+---
+
+## [2026-08-28] — Tropera: movimientos de hacienda (F1.3)
+
+Sigue directo de la entrada de Tropera de abajo. Hasta ahora la cantidad por categoría sólo se podía corregir a mano (`PATCH existencias`, sin dejar rastro). Esta entrada agrega el registro de eventos reales: nacimientos, compras, muertes, ventas y traslados entre establecimientos.
+
+### Backend — tabla `tropera.movimientos`
+- Nuevo enum `tipo_movimiento`: `nacimiento`, `compra`, `muerte`, `venta`, `traslado`.
+- `POST /tropera/movimientos`: crea el movimiento **y ajusta `existencias` en la misma transacción**. `nacimiento`/`compra` suman en `establecimientoId`; `muerte`/`venta` restan; `traslado` resta en `establecimientoId` y suma en `establecimientoDestinoId` (crea la fila de existencias si el destino no tenía esa categoría todavía).
+- Valida que una baja no deje `cantidad` negativa (`BadRequestException` con el stock disponible) — y al estar todo en una transacción, si falla no queda ningún ajuste a medio aplicar.
+- `GET /tropera/movimientos?establecimientoId=` lista el historial, filtrando por establecimiento de origen **o** destino (para que un traslado aparezca en el historial de ambos lados).
+- Roles de escritura: `propietario`, `admin`, `capataz` (mismo criterio que establecimientos/existencias).
+
+### Web
+- `TroperaPage.tsx` suma, en el detalle de cada establecimiento, un historial de movimientos (fecha, tipo, categoría, cantidad con signo, y para traslados la flecha hacia/desde el otro establecimiento) y un formulario "+ Nuevo movimiento" que sólo pide el establecimiento de destino cuando el tipo es `traslado`.
+
+### Migraciones — mismo cuidado que la vez pasada
+`drizzle-kit generate` esta vez sí generó un diff limpio (sólo la tabla nueva, sin volver a traer `solicitudes`/`activo`) — confirma que arreglar el `tag` del journal en la entrada anterior funcionó. Igual hubo que renombrar el archivo a mano: salió como `0002_swift_luminals.sql` (drizzle-kit no sabe de `0001_solicitudes.sql`/`0002_org_activo.sql`, sigue arrancando su propio contador desde donde lo dejó el journal) y se renombró a `0004_tropera_movimientos.sql` para que ordene bien alfabéticamente, con el `tag` del journal actualizado a juego. **Este paso manual (generar → revisar el diff → renombrar con el número correcto → corregir el tag) va a hacer falta cada vez que se corra `db:generate`, hasta que se resuelva el journal roto de fondo.**
+
+### Verificado
+Build limpio de backend y web. Las 5 migraciones se aplican en orden desde cero contra una base temporal. Por curl: nacimiento y compra suman, venta resta, traslado resta en origen y crea la fila en destino si no existía, un intento de vender más de lo disponible da 400 **sin tocar existencias** (transacción revertida), traslado sin destino da 400, y el listado filtrado por establecimiento trae los movimientos correctos en cada lado.
+
+---
+
+## [2026-08-27] — Tropera: MVP de establecimientos + hacienda
+
+Primer módulo de Tropera. **Antes de escribir código se confirmó con el usuario** (no había ningún diseño previo recuperable, ver la entrada de auditoría más abajo): alcance F1.1+F1.2 del roadmap (establecimientos + carga de hacienda), y hacienda registrada como **conteos agregados por categoría** — no una fila por cabeza en `core.animales`. Esto significa que el "principio articulador" que describe el Roadmap (mismo animal individual en Tropera y HCE) **no aplica** a este MVP; quedó así por decisión explícita, no es un olvido.
+
+### Backend — nuevo schema `tropera`
+- `establecimientos`: alta/listado/obtención/edición, acotado a la organización activa. Roles de escritura: `propietario`, `admin`, `capataz`.
+- `existencias`: una fila por (establecimiento, categoría), con `cantidad` entera. 6 categorías fijas (enum `categoria_hacienda`): vaca, toro, ternero, ternera, vaquillona, novillo. `GET .../existencias` siempre devuelve las 6, completando en 0 las que no se cargaron; `PATCH .../existencias` hace upsert manual (busca antes de insertar — no hay constraint compuesta a nivel DB).
+- Nested resource `tropera/establecimientos/:id/existencias`, mismo patrón que `carnet` bajo `animales/:id`.
+
+### Web
+- `TroperaPage.tsx`: listado de establecimientos + alta, y una vista de detalle con edición del establecimiento y una tabla editable de existencias (cantidad + botón guardar por categoría).
+- Pestaña "Tropera" en la nav, visible sólo para `propietario`/`admin`/`capataz` (mismo criterio que la escritura en el backend).
+
+### Hallazgo: `db/migrations` tenía un journal roto
+Al generar la migración de Tropera, `drizzle-kit generate` volvió a incluir `core.solicitudes` y `organizaciones.activo` en el SQL nuevo — porque **`0001_solicitudes.sql` y `0002_org_activo.sql` nunca quedaron registrados en `meta/_journal.json`** (se agregaron por fuera de `drizzle-kit generate` en algún momento). Se corrigió a mano: la migración de Tropera quedó como `0003_tropera_establecimientos.sql` con sólo las sentencias de Tropera, y el journal apunta a ese nombre.
+**Pendiente sin resolver, hay que decidirlo:** como esas dos migraciones nunca estuvieron en el journal, `drizzle-kit migrate` (el camino de producción contra Postgres real) nunca las aplicaría — sólo aplicaría `0000_stormy_domino`. Hoy nadie lo notó porque el desarrollo local usa `scripts/init-local-db.mjs`, que ignora el journal y aplica por orden alfabético de archivo. Si se llega a desplegar contra Postgres real con `db:migrate` tal como está, faltarían `solicitudes` y `organizaciones.activo`.
+
+### Verificado
+Build limpio de backend y web. Por curl contra una base PGlite temporal (sin tocar la de desarrollo): las 4 migraciones se aplican en orden desde cero sin errores; alta de establecimiento, existencias iniciales en 0 para las 6 categorías, carga y corrección de cantidades (el upsert actualiza, no duplica fila), edición del establecimiento, y categoría inválida rechazada con 400.
+
+---
+
+## [2026-08-27] — Refresh token
+
+Cierra el pendiente de sesión: antes el access token expiraba a los 15 minutos (`JWT_EXPIRES_IN`) sin ninguna forma de renovarlo, así que cualquier uso real de la web (cargar varias consultas, una sesión de turnero larga) terminaba en un 401 sorpresivo.
+
+### Backend
+- `AuthService.emitirTokens()` (antes `emitirToken`, singular) devuelve `{ accessToken, refreshToken }`. El refresh token es un JWT con el mismo secreto pero payload `{ sub, tipo: 'refresh' }` y vencimiento `JWT_REFRESH_EXPIRES_IN` (ya existía la variable, no se usaba).
+- Stateless a propósito: no hay tabla de refresh tokens ni revocación — se valida sólo por firma + expiración + el claim `tipo`. Coherente con que tampoco hay revocación de access tokens hoy. Login/registro devuelven ambos tokens; nuevo `POST /auth/refresh` los rota (uno vigente → par nuevo).
+- `JwtAuthGuard` ahora rechaza un token con `tipo: 'refresh'` usado como Bearer — sin este chequeo, el refresh token (de vida más larga) hubiera funcionado como access token igual, total es el mismo secreto.
+
+### Web
+- `Sesion` suma `refreshToken`. `useSesion` suma `actualizarTokens()` para reemplazar sólo los tokens (persiste a localStorage) sin recrear toda la sesión.
+- `api/client.ts` y `api/turnos.ts` (cada uno mantiene su propia sesión, ver `Estructura_Proyecto.md`) implementan el mismo mecanismo por separado: ante un 401, intentan `POST /auth/refresh` una vez, reintentan el pedido original con el token nuevo, y avisan a `App.tsx` (`configurarRefrescoSesion` / `configurarRefrescoSesionTurnos`) para persistir el cambio. Es transparente para el usuario — no hay ningún cartel de "sesión renovada".
+
+### Verificado
+Build limpio de backend y web. Por curl: refresh token rechazado como access token (401), `POST /auth/refresh` con un token real rota el par (nuevo `refreshToken` distinto al usarlo con más de un segundo de diferencia — con menos, el JWT sale idéntico porque `iat` tiene granularidad de segundo, no es un bug), el access token nuevo funciona, y un refresh token basura da 401.
+
+---
+
+## [2026-08-27] — Cierre de gaps de la HC: vacunaciones, recordatorios, consultas y alta rápida de dueño
+
+Resuelve los bloqueantes que había marcado la auditoría del mismo día (ver entrada de abajo).
+
+### Vacunaciones (nuevo en la web)
+- `PacienteDetallePage.tsx`: sección "Vacunaciones" en la ficha del paciente — tabla de lo ya cargado + botón "+ Nueva vacuna" (producto, fecha de aplicación, próxima dosis, lote).
+- `api/client.ts`: `vacunacionesDeAnimal()` y `registrarVacunacion()`, contra los endpoints del backend que ya existían.
+
+### Recordatorios (ahora ruteada)
+- `RecordatoriosPage.tsx` (ya existía, estaba huérfana) se agregó como pestaña "Recordatorios" en `App.tsx`, visible para los mismos roles que ven el turnero. Abrir un paciente desde ahí lleva a su ficha.
+
+### Consultas: formulario completo + edición/borrado
+- Backend: `UpdateConsultaDto` + `PATCH /consultas/:id` y `DELETE /consultas/:id` (soft delete) en `ConsultasController`/`ConsultasService`. `historiaPorAnimal` y `obtener` ahora filtran `deletedAt` (antes no lo hacían porque nada borraba una consulta).
+- Web: `NuevaConsultaForm` se unificó en un solo `ConsultaForm` (alta y edición) que ahora expone **anamnesis**, **examen físico** y **temperatura**, antes sólo en el modelo y no en la UI. La tabla de consultas suma acciones "Editar"/"Borrar" por fila.
+
+### Alta rápida de dueño al cargar un animal
+- `PacientesPage.tsx` (alta de animal desde "Animales"): el selector de dueño suma la opción "＋ Crear dueño nuevo…", que despliega nombre/apellido/celular/DNI y crea la persona (`POST /personas`) antes de crear el animal — mismo patrón que ya usaba el alta rápida del turnero (`TurnosPage.tsx` / `crearPacienteRapido`), ahora también disponible en el alta directa de "Animales".
+
+### Verificado
+Build limpio de backend y web, y un flujo completo por curl (alta de dueño → animal → consulta con los campos nuevos → editar → borrar → confirmar que desaparece de la historia y da 404 al pedirla puntual).
+
+---
+
+## [2026-08-27] — Auditoría de estado real vs. documentado
+
+Se releyó el código (no los docs) para corregir varias entradas que habían quedado atrasadas. No hay cambios de código en esta entrada, sólo puesta al día de la documentación.
+
+### Confirmado como hecho (los docs decían pendiente o mock)
+- **Carnet PDF**: `carnet.service.ts` ya consulta Drizzle real (animal + especie + dueño + vacunaciones) y arma el QR al portal — **ya no devuelve datos mock**, a pesar de lo que decían `CHANGELOG` y `CLAUDE.md` hasta ahora.
+- **Portal del dueño**: implementado por **dos caminos** distintos, ambos operativos:
+  - Público por código legible (`GET /portal/c/:codigo`, sin login — `src/hce/portal/`), consumido por `PortalDuenoPage.tsx` en `/c/{codigo}`.
+  - Magic-link emitido por el staff (`POST /portal/acceso/:personaId`, `GET /portal/resumen`, `POST /portal/turnos` — `src/portal/`, con `PortalGuard`/`PortalTokenService`), para que el dueño solicite turnos sin cuenta propia.
+  - **Ojo**: ambos módulos se llaman `PortalController`/`PortalService`/`PortalModule` en archivos distintos (`src/portal/` vs `src/hce/portal/`) — mismo nombre, features distintas. Fuente de confusión al buscar "el" PortalService.
+- **Consola de administración** (`AdminPage.tsx`, ruteada en `/admin` vía `main.tsx`): login propio de super-admin, alta/baja de organizaciones y miembros, y aprobación/rechazo de `solicitudes`.
+- **Alta de cuenta con aprobación**: la web ya no llama al registro directo; `LoginPage.tsx` crea una `solicitud` (`crearSolicitud`) que un super-admin aprueba desde `/admin`. El endpoint viejo (`AuthService.register`, alta+organización inmediata) sigue vivo en el backend pero sin ningún caller en la web.
+- **Motor de sincronización offline** (`sync/`): `pull`/`push` completos, contrato compatible con `synchronize()` de WatermelonDB, multi-tenant forzado por `organizacionId`, última-escritura-gana por `updated_at`, soft delete. Probado por `test:sync-demo`. El roadmap lo listaba como ⏳ — está ✅ en el backend (falta el consumidor: la app móvil).
+
+### Gaps reales detectados (no estaban anotados, o estaban subestimados)
+- **Vacunaciones no tiene ninguna UI en la web.** El backend está completo (`registrar`, `historiaPorAnimal`, `recordatorios`), pero `api/client.ts` no tiene método para darla de alta y no existe ningún formulario. Es el hueco más grande para una HC funcional: hoy sólo se puede cargar una vacuna pegándole directo a la API.
+- **`RecordatoriosPage.tsx` es código muerto**: 195 líneas, no está importada ni en `App.tsx` ni en `main.tsx`. Nadie puede ver recordatorios de vacunas desde la web aunque se resuelva el punto anterior.
+- **Formulario de consulta incompleto respecto del modelo**: el DTO/schema soportan `anamnesis`, `examenFisico`, `temperaturaC` y `fecha` retroactiva; `NuevaConsultaForm` sólo expone motivo/diagnóstico/tratamiento/peso/observaciones.
+- **Sin edición ni borrado de consultas**: `ConsultasController` sólo tiene crear + listar + obtener puntual.
+- **Sin refresh token**: existe la variable `JWT_REFRESH_EXPIRES_IN` en `configuration.ts` pero no hay endpoint ni lógica de refresh en `core/auth/`. El access token expira a los 15 minutos (default) sin renovación silenciosa.
+
+---
+
 ## [agosto 2026] — Turnero pulido, sesión robusta, carnet y datos por especie
 
 ### Turnero (web)

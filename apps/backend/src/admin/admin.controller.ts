@@ -13,6 +13,8 @@ import { SuperAdminGuard } from '../common/guards/super-admin.guard';
 import { AdminService } from './admin.service';
 import { CrearOrganizacionDto } from './dto/crear-organizacion.dto';
 import { AgregarMiembroDto } from './dto/agregar-miembro.dto';
+import { SetRolesDto } from './dto/set-roles.dto';
+import { SetAccesoDto } from './dto/set-acceso.dto';
 
 /** Todas las rutas requieren usuario autenticado + super-admin de plataforma. */
 @Controller('admin')
@@ -33,6 +35,11 @@ export class AdminController {
   @Patch('organizaciones/:id/activo')
   setActivo(@Param('id') id: string, @Body('activo') activo: boolean) {
     return this.admin.setActivo(id, activo);
+  }
+
+  @Patch('organizaciones/:id/acceso')
+  setAcceso(@Param('id') id: string, @Body() dto: SetAccesoDto) {
+    return this.admin.setAcceso(id, dto);
   }
 
   @Delete('organizaciones/:id')
@@ -67,5 +74,14 @@ export class AdminController {
     @Body('activo') activo: boolean,
   ) {
     return this.admin.setMiembroActivo(id, membresiaId, activo);
+  }
+
+  @Patch('organizaciones/:id/miembros/:membresiaId/roles')
+  setRoles(
+    @Param('id') id: string,
+    @Param('membresiaId') membresiaId: string,
+    @Body() dto: SetRolesDto,
+  ) {
+    return this.admin.setRoles(id, membresiaId, dto.roles as any);
   }
 }

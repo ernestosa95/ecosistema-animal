@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDB } from '../database/drizzle.provider';
 import {
   organizaciones, usuarios, membresias,
@@ -30,10 +30,36 @@ export class AdminService {
         tipo: organizaciones.tipo,
         cuit: organizaciones.cuit,
         activo: organizaciones.activo,
+        grupoId: organizaciones.grupoId,
+        planId: organizaciones.planId,
+        accesoHasta: organizaciones.accesoHasta,
+        esDemo: organizaciones.esDemo,
         createdAt: organizaciones.createdAt,
       })
       .from(organizaciones)
       .orderBy(asc(organizaciones.nombre));
+  }
+
+  /** Gestión de acceso: grupo, plan y vencimiento (null = sin vencimiento). */
+  async setAcceso(
+    organizacionId: string,
+    dto: { grupoId?: string | null; planId?: string | null; accesoHasta?: string | null; esDemo?: boolean },
+  ) {
+    await this.verificarOrg(organizacionId);
+    const [org] = await this.db
+      .update(organizaciones)
+      .set({
+        ...(dto.grupoId !== undefined && { grupoId: dto.grupoId }),
+        ...(dto.planId !== undefined && { planId: dto.planId }),
+        ...(dto.accesoHasta !== undefined && {
+          accesoHasta: dto.accesoHasta ? new Date(dto.accesoHasta) : null,
+        }),
+        ...(dto.esDemo !== undefined && { esDemo: dto.esDemo }),
+        updatedAt: new Date(),
+      })
+      .where(eq(organizaciones.id, organizacionId))
+      .returning();
+    return org;
   }
 
   /** Crea una organización (veterinaria) vacía. */
@@ -83,7 +109,7 @@ export class AdminService {
             email: usuarios.email,
             nombre: usuarios.nombre,
             apellido: usuarios.apellido,
-            rol: membresias.rol,
+            roles: membresias.roles,
             activo: membresias.activo,
           })
           .from(membresias)
@@ -109,7 +135,7 @@ export class AdminService {
     return this.db
       .select({
         membresiaId: membresias.id,
-        rol: membresias.rol,
+        roles: membresias.roles,
         activo: membresias.activo,
         usuarioId: usuarios.id,
         email: usuarios.email,
@@ -165,12 +191,12 @@ export class AdminService {
     await this.db.insert(membresias).values({
       usuarioId: usuario.id,
       organizacionId,
-      rol: dto.rol as Rol,
+      roles: dto.roles as Rol[],
     });
 
     return {
       creado,
-      rol: dto.rol,
+      roles: dto.roles,
       usuario: {
         id: usuario.id,
         email: usuario.email,
@@ -211,7 +237,7 @@ export class AdminService {
 
   private async obtenerMembresia(organizacionId: string, membresiaId: string) {
     const [m] = await this.db
-      .select({ id: membresias.id, rol: membresias.rol, activo: membresias.activo })
+      .select({ id: membresias.id, roles: membresias.roles, activo: membresias.activo })
       .from(membresias)
       .where(and(eq(membresias.id, membresiaId), eq(membresias.organizacionId, organizacionId)))
       .limit(1);
@@ -222,21 +248,36 @@ export class AdminService {
   /** Evita dejar la veterinaria sin ningún propietario activo. */
   private async protegerUltimoPropietario(
     organizacionId: string,
-    m: { rol: string; activo: boolean },
+    m: { roles: string[]; activo: boolean },
   ) {
-    if (m.rol !== 'propietario' || !m.activo) return;
+    if (!m.roles.includes('propietario') || !m.activo) return;
     const propietariosActivos = await this.db
       .select({ id: membresias.id })
       .from(membresias)
       .where(
         and(
           eq(membresias.organizacionId, organizacionId),
-          eq(membresias.rol, 'propietario'),
+          sql`'propietario' = ANY(${membresias.roles})`,
           eq(membresias.activo, true),
         ),
       );
     if (propietariosActivos.length <= 1) {
       throw new BadRequestException('No podés dejar la veterinaria sin propietario activo');
     }
+  }
+
+  /** Actualiza los roles apilados de una membresía (reemplaza el conjunto completo). */
+  async setRoles(organizacionId: string, membresiaId: string, roles: Rol[]) {
+    const m = await this.obtenerMembresia(organizacionId, membresiaId);
+    // Si se le está quitando "propietario", aplica la misma protección que
+    // desactivar/quitar: no puede quedar la organización sin propietario activo.
+    if (m.roles.includes('propietario') && !roles.includes('propietario')) {
+      await this.protegerUltimoPropietario(organizacionId, m);
+    }
+    await this.db
+      .update(membresias)
+      .set({ roles, updatedAt: new Date() })
+      .where(eq(membresias.id, membresiaId));
+    return { ok: true, roles };
   }
 }

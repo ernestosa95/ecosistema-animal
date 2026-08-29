@@ -1,0 +1,151 @@
+import { appSchema, tableSchema } from '@nozbe/watermelondb';
+
+// Espeja las tablas registradas en el motor de sync del backend
+// (apps/backend/src/sync/sync.core.ts): personas/animales/consultas/
+// vacunaciones/turnos de core+hce (v1→v2) y las 4 de `tropera` (v1).
+// Nombres de columna en snake_case porque así los serializa
+// `serializeRow`/`valoresParaEscribir` (contrato = objeto WatermelonDB, no
+// el camelCase de Drizzle).
+export const schema = appSchema({
+  version: 2,
+  tables: [
+    tableSchema({
+      name: 'personas',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'dni', type: 'string', isOptional: true },
+        { name: 'nombre', type: 'string' },
+        { name: 'apellido', type: 'string' },
+        { name: 'sexo', type: 'string', isOptional: true },
+        { name: 'fecha_nacimiento', type: 'string', isOptional: true },
+        { name: 'celular', type: 'string', isOptional: true },
+        { name: 'telefono', type: 'string', isOptional: true },
+        { name: 'email', type: 'string', isOptional: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'animales',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'persona_id', type: 'string', isOptional: true, isIndexed: true },
+        { name: 'especie_id', type: 'string', isIndexed: true },
+        { name: 'codigo_legible', type: 'string', isOptional: true },
+        { name: 'microchip', type: 'string', isOptional: true },
+        { name: 'nombre', type: 'string' },
+        { name: 'sexo', type: 'string', isOptional: true },
+        { name: 'fecha_nacimiento', type: 'string', isOptional: true },
+        { name: 'fecha_nac_estimada', type: 'boolean' },
+        { name: 'foto_url', type: 'string', isOptional: true },
+        { name: 'estado', type: 'string' },
+        { name: 'datos_especificos', type: 'string' },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'consultas',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'animal_id', type: 'string', isIndexed: true },
+        { name: 'veterinario_id', type: 'string', isOptional: true },
+        { name: 'fecha', type: 'number' },
+        { name: 'motivo', type: 'string', isOptional: true },
+        { name: 'anamnesis', type: 'string', isOptional: true },
+        { name: 'examen_fisico', type: 'string', isOptional: true },
+        { name: 'diagnostico', type: 'string', isOptional: true },
+        { name: 'tratamiento', type: 'string', isOptional: true },
+        { name: 'peso_kg', type: 'number', isOptional: true },
+        { name: 'temperatura_c', type: 'number', isOptional: true },
+        { name: 'observaciones', type: 'string', isOptional: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'vacunaciones',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'animal_id', type: 'string', isIndexed: true },
+        { name: 'veterinario_id', type: 'string', isOptional: true },
+        { name: 'producto', type: 'string', isOptional: true },
+        { name: 'vademecum_id', type: 'string', isOptional: true },
+        { name: 'fecha', type: 'string' },
+        { name: 'proxima_dosis', type: 'string', isOptional: true },
+        { name: 'lote_producto', type: 'string', isOptional: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'turnos',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'animal_id', type: 'string', isOptional: true, isIndexed: true },
+        { name: 'persona_id', type: 'string', isOptional: true },
+        { name: 'veterinario_id', type: 'string', isOptional: true },
+        { name: 'fecha_hora', type: 'number' },
+        { name: 'estado', type: 'string' },
+        { name: 'motivo', type: 'string', isOptional: true },
+        { name: 'canal', type: 'string', isOptional: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'establecimientos',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'nombre', type: 'string' },
+        { name: 'ubicacion', type: 'string', isOptional: true },
+        { name: 'superficie_ha', type: 'number', isOptional: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'existencias',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'establecimiento_id', type: 'string', isIndexed: true },
+        { name: 'categoria', type: 'string' },
+        { name: 'cantidad', type: 'number' },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'movimientos',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'tipo', type: 'string' },
+        { name: 'categoria', type: 'string' },
+        { name: 'cantidad', type: 'number' },
+        { name: 'establecimiento_origen_id', type: 'string', isOptional: true, isIndexed: true },
+        { name: 'establecimiento_destino_id', type: 'string', isOptional: true, isIndexed: true },
+        { name: 'fecha', type: 'string' },
+        { name: 'observaciones', type: 'string', isOptional: true },
+        { name: 'usuario_id', type: 'string', isOptional: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'eventos',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'establecimiento_id', type: 'string', isIndexed: true },
+        { name: 'tipo', type: 'string' },
+        { name: 'categoria', type: 'string', isOptional: true },
+        { name: 'cantidad', type: 'number', isOptional: true },
+        { name: 'producto', type: 'string', isOptional: true },
+        { name: 'fecha', type: 'string' },
+        { name: 'observaciones', type: 'string', isOptional: true },
+        { name: 'usuario_id', type: 'string', isOptional: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+  ],
+});

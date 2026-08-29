@@ -14,7 +14,9 @@ import { eq } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import * as core from '../src/database/schema/core';
 import * as hce from '../src/database/schema/hce';
+import * as tropera from '../src/database/schema/tropera';
 import { pull, push } from '../src/sync/sync.core';
+import { validarCodigoLegible } from '../src/core/animales/codigo-legible.util';
 
 let ok = 0, fail = 0;
 const check = (n: string, c: boolean) => { c ? (ok++, console.log(`  ✓ ${n}`)) : (fail++, console.log(`  ✗ FALLA: ${n}`)); };
@@ -23,6 +25,7 @@ async function main() {
   const client = new PGlite();
   await client.exec(`
     CREATE SCHEMA core; CREATE SCHEMA hce;
+    CREATE SEQUENCE core.animales_codigo_seq START 1;
     CREATE TYPE core.tipo_organizacion AS ENUM ('establecimiento','clinica','mixta');
     CREATE TYPE core.sexo_persona AS ENUM ('masculino','femenino','otro');
     CREATE TYPE core.sexo_animal AS ENUM ('macho','hembra','indefinido');
@@ -33,6 +36,7 @@ async function main() {
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), nombre text NOT NULL,
       tipo core.tipo_organizacion NOT NULL DEFAULT 'clinica', cuit text,
       activo boolean NOT NULL DEFAULT true,
+      grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, es_demo boolean NOT NULL DEFAULT false,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
     CREATE TABLE core.usuarios (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text NOT NULL UNIQUE, password_hash text NOT NULL,
@@ -76,9 +80,40 @@ async function main() {
       veterinario_id uuid REFERENCES core.usuarios(id), fecha_hora timestamptz NOT NULL,
       estado hce.estado_turno NOT NULL DEFAULT 'solicitado', motivo text, canal text,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+
+    CREATE SCHEMA tropera;
+    CREATE TYPE tropera.categoria_hacienda AS ENUM ('vaca','toro','ternero','ternera','vaquillona','novillo');
+    CREATE TYPE tropera.tipo_movimiento AS ENUM ('nacimiento','compra','muerte','venta','traslado');
+    CREATE TYPE tropera.tipo_evento AS ENUM ('vacunacion','desparasitacion','tratamiento','servicio','diagnostico_prenez','destete');
+    CREATE TABLE tropera.establecimientos (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      nombre text NOT NULL, ubicacion text, superficie_ha numeric(10,2),
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+    CREATE TABLE tropera.existencias (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      establecimiento_id uuid NOT NULL REFERENCES tropera.establecimientos(id) ON DELETE CASCADE,
+      categoria tropera.categoria_hacienda NOT NULL, cantidad integer NOT NULL DEFAULT 0,
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+    CREATE TABLE tropera.movimientos (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      tipo tropera.tipo_movimiento NOT NULL, categoria tropera.categoria_hacienda NOT NULL, cantidad integer NOT NULL,
+      establecimiento_origen_id uuid REFERENCES tropera.establecimientos(id),
+      establecimiento_destino_id uuid REFERENCES tropera.establecimientos(id),
+      fecha date NOT NULL DEFAULT current_date, observaciones text, usuario_id uuid REFERENCES core.usuarios(id),
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+    CREATE TABLE tropera.eventos (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      establecimiento_id uuid NOT NULL REFERENCES tropera.establecimientos(id) ON DELETE CASCADE,
+      tipo tropera.tipo_evento NOT NULL, categoria tropera.categoria_hacienda, cantidad integer, producto text,
+      fecha date NOT NULL DEFAULT current_date, observaciones text, usuario_id uuid REFERENCES core.usuarios(id),
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
   `);
 
-  const db = drizzle(client, { schema: { ...core, ...hce } });
+  const db = drizzle(client, { schema: { ...core, ...hce, ...tropera } });
 
   // Seed: dos organizaciones + una especie compartida.
   const [orgA] = await db.insert(core.organizaciones).values({ nombre: 'Clínica A' }).returning();
@@ -133,6 +168,92 @@ async function main() {
   check('el animal aparece en deleted (por id)', p3.changes.animales.deleted.includes(animalId));
   const p3full = await pull(db, orgA.id, 0);
   check('el pull completo ya no lo trae (soft-deleted)', !p3full.changes.animales.created.some((a: any) => a.id === animalId));
+
+  console.log('7) Tropera: push de establecimiento + movimiento de compra ajusta existencias');
+  const establecimientoId = randomUUID();
+  await push(db, orgA.id, {
+    establecimientos: { created: [{ id: establecimientoId, nombre: 'Campo Norte' }], updated: [], deleted: [] },
+  });
+  const movCompraId = randomUUID();
+  await push(db, orgA.id, {
+    movimientos: {
+      created: [{
+        id: movCompraId, tipo: 'compra', categoria: 'vaca', cantidad: 10,
+        establecimiento_destino_id: establecimientoId, fecha: '2026-08-28',
+      }],
+      updated: [], deleted: [],
+    },
+  });
+  const exDespuesCompra = await db.select().from(tropera.existencias)
+    .where(eq(tropera.existencias.establecimientoId, establecimientoId));
+  check('la compra creó la fila de existencias', exDespuesCompra.length === 1);
+  check('existencias quedó en 10 tras la compra', exDespuesCompra[0]?.cantidad === 10);
+  const movsEnBase = await db.select().from(tropera.movimientos).where(eq(tropera.movimientos.id, movCompraId));
+  check('el movimiento de compra quedó insertado', movsEnBase.length === 1);
+
+  console.log('8) Tropera: push de venta que dejaría stock negativo se rechaza (y no rompe el resto del lote)');
+  const otroEstablecimientoId = randomUUID();
+  let rechazado = false;
+  try {
+    await push(db, orgA.id, {
+      establecimientos: { created: [{ id: otroEstablecimientoId, nombre: 'Campo Sur' }], updated: [], deleted: [] },
+      movimientos: {
+        created: [{
+          id: randomUUID(), tipo: 'venta', categoria: 'vaca', cantidad: 999,
+          establecimiento_origen_id: establecimientoId, fecha: '2026-08-28',
+        }],
+        updated: [], deleted: [],
+      },
+    });
+  } catch {
+    rechazado = true;
+  }
+  check('el push que dejaría stock negativo lanza y se rechaza', rechazado);
+  const exSinCambios = await db.select().from(tropera.existencias)
+    .where(eq(tropera.existencias.establecimientoId, establecimientoId));
+  check('existencias no cambió tras el rechazo', exSinCambios[0]?.cantidad === 10);
+  const establecimientosSur = await db.select().from(tropera.establecimientos)
+    .where(eq(tropera.establecimientos.id, otroEstablecimientoId));
+  check('el establecimiento del mismo lote tampoco quedó (rollback de toda la transacción)', establecimientosSur.length === 0);
+
+  console.log('9) Tropera: reintentar el mismo push (mismo id de movimiento) no duplica el ajuste');
+  await push(db, orgA.id, {
+    movimientos: {
+      created: [{
+        id: movCompraId, tipo: 'compra', categoria: 'vaca', cantidad: 10,
+        establecimiento_destino_id: establecimientoId, fecha: '2026-08-28',
+      }],
+      updated: [], deleted: [],
+    },
+  });
+  const exTrasReintento = await db.select().from(tropera.existencias)
+    .where(eq(tropera.existencias.establecimientoId, establecimientoId));
+  check('el reintento (onConflictDoNothing) no volvió a sumar stock', exTrasReintento[0]?.cantidad === 10);
+
+  console.log('10) Alta offline de un animal (sin codigo_legible) recibe uno al sincronizar');
+  const animalOfflineId = randomUUID();
+  const tAntesAltaOffline = Date.now();
+  await new Promise((r) => setTimeout(r, 5));
+  await push(db, orgA.id, {
+    animales: {
+      created: [{
+        id: animalOfflineId, nombre: 'Firulais', especie_id: esp.id, estado: 'activo',
+        datos_especificos: '{}',
+      }],
+      updated: [], deleted: [],
+    },
+  });
+  const [animalOffline] = await db.select().from(core.animales).where(eq(core.animales.id, animalOfflineId));
+  check('el animal offline quedó con codigo_legible asignado', !!animalOffline?.codigoLegible);
+  check('el codigo_legible generado es válido (Luhn)', validarCodigoLegible(animalOffline?.codigoLegible ?? ''));
+
+  console.log('11) El codigo_legible asignado por el hook aparece en el próximo pull delta (no sólo en un full resync)');
+  const p4 = await pull(db, orgA.id, tAntesAltaOffline);
+  const enCreated = p4.changes.animales.created.find((a: any) => a.id === animalOfflineId);
+  check(
+    'el pull delta trae el animal con su codigo_legible (updatedAt se bumpeó al asignarlo)',
+    enCreated?.codigo_legible === animalOffline?.codigoLegible,
+  );
 
   console.log(`\nRESULTADO: ${ok} OK, ${fail} fallas`);
   await client.close();

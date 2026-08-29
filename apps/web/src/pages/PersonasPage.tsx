@@ -1,15 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import type { Sesion, Persona, Animal } from '../api/types';
+import { ExportBar } from '../components/ExportBar';
 
-export function PersonasPage({ sesion }: { sesion: Sesion }) {
+export function PersonasPage({ sesion, personaIdInicial }: { sesion: Sesion; personaIdInicial?: string }) {
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mostrarNuevo, setMostrarNuevo] = useState(false);
   const [editando, setEditando] = useState<Persona | null>(null);
-  const [expandida, setExpandida] = useState<string | null>(null);
+  const [expandida, setExpandida] = useState<string | null>(personaIdInicial ?? null);
   const [busqueda, setBusqueda] = useState('');
+
+  // Viene del Omnibox con una persona ya elegida: la deja expandida y
+  // visible en el filtro apenas se cargó la lista.
+  useEffect(() => {
+    if (!personaIdInicial || personas.length === 0) return;
+    const p = personas.find((x) => x.id === personaIdInicial);
+    if (p) {
+      setExpandida(p.id);
+      setBusqueda(`${p.nombre} ${p.apellido}`.trim());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [personaIdInicial, personas.length]);
 
   const filtradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -86,6 +99,20 @@ export function PersonasPage({ sesion }: { sesion: Sesion }) {
         />
       )}
 
+      {!cargando && filtradas.length > 0 && (
+        <ExportBar
+          nombreArchivo="duenos"
+          titulo="Dueños"
+          columnas={[
+            { clave: 'nombre', etiqueta: 'Nombre', valor: (p: Persona) => `${p.nombre} ${p.apellido}` },
+            { clave: 'dni', etiqueta: 'DNI', valor: (p: Persona) => p.dni ?? '—' },
+            { clave: 'celular', etiqueta: 'Celular', valor: (p: Persona) => p.celular ?? '—' },
+            { clave: 'email', etiqueta: 'Email', valor: (p: Persona) => p.email ?? '—' },
+          ]}
+          filas={filtradas}
+        />
+      )}
+
       {cargando ? (
         <p className="muted">Cargando…</p>
       ) : personas.length === 0 ? (
@@ -144,6 +171,9 @@ function PersonaFila({
   onEditar: () => void;
 }) {
   const [animales, setAnimales] = useState<Animal[] | null>(null);
+  const [portalUrl, setPortalUrl] = useState<string | null>(null);
+  const [generando, setGenerando] = useState(false);
+  const [errorPortal, setErrorPortal] = useState<string | null>(null);
 
   useEffect(() => {
     if (abierta && animales === null) {
@@ -153,6 +183,19 @@ function PersonaFila({
   }, [abierta]);
 
   const contacto = persona.celular || persona.telefono || persona.email || '—';
+
+  async function generarAcceso() {
+    setErrorPortal(null);
+    setGenerando(true);
+    try {
+      const r = await api.generarAccesoPortal(sesion, persona.id);
+      setPortalUrl(r.portalUrl);
+    } catch (err) {
+      setErrorPortal(err instanceof Error ? err.message : 'No se pudo generar el acceso');
+    } finally {
+      setGenerando(false);
+    }
+  }
 
   return (
     <>
@@ -188,6 +231,20 @@ function PersonaFila({
                 ))}
               </div>
             )}
+
+            <div style={{ marginTop: '0.75rem', paddingTop: '0.6rem', borderTop: '1px solid #f0f1ee' }}>
+              {portalUrl ? (
+                <div className="dato">
+                  <span className="dato-label">Enlace del portal (vale 30 días) — copiá y mandale este link al dueño</span>
+                  <span className="mono" style={{ wordBreak: 'break-all' }}>{portalUrl}</span>
+                </div>
+              ) : (
+                <button className="btn-ghost" onClick={generarAcceso} disabled={generando}>
+                  {generando ? 'Generando…' : 'Generar acceso al portal'}
+                </button>
+              )}
+              {errorPortal && <div className="alerta">{errorPortal}</div>}
+            </div>
           </td>
         </tr>
       )}

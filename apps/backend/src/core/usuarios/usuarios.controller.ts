@@ -23,17 +23,17 @@ export class UsuariosController {
 
   /**
    * Resetea la contraseña de un miembro de la organización.
-   * Solo propietario/admin. RolesGuard corre después de TenantGuard (usa req.rol).
+   * Solo propietario/admin. RolesGuard corre después de TenantGuard (usa req.roles).
    */
   @Patch(':id/password')
   @Roles('propietario', 'admin')
   @UseGuards(RolesGuard)
   resetPassword(
     @CurrentOrg() organizacionId: string,
-    @CurrentRol() actorRol: string,
+    @CurrentRol() actorRoles: string[],
     @Param('id') id: string,
     @Body() dto: ResetPasswordDto,
   ) {
-    return this.usuarios.resetearPassword(organizacionId, actorRol, id, dto.nuevaPassword);
+    return this.usuarios.resetearPassword(organizacionId, actorRoles, id, dto.nuevaPassword);
   }
 }

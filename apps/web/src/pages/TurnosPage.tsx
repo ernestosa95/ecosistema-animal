@@ -9,6 +9,7 @@ import {
   type Turno, type EstadoTurno, type AnimalOpcion,
   type EspecieOpcion, type DuenoOpcion, type Profesional,
 } from '../api/turnos';
+import { ExportBar } from '../components/ExportBar';
 
 // ── Config visual ────────────────────────────────────────────────────────────
 const ESPECIES: Record<string, string> = {
@@ -172,6 +173,20 @@ export default function TurnosPage({ onAtender, miVeterinarioId, soloMiosInicial
       </div>
 
       {/* Lista */}
+      {!cargando && delDia.length > 0 && (
+        <ExportBar
+          nombreArchivo={`turnos-${iso(fecha)}`}
+          titulo={`Turnos — ${fechaLarga(fecha)}`}
+          columnas={[
+            { clave: 'hora', etiqueta: 'Hora' },
+            { clave: 'paciente', etiqueta: 'Paciente' },
+            { clave: 'dueno', etiqueta: 'Dueño' },
+            { clave: 'estado', etiqueta: 'Estado', valor: (t: Turno) => ESTADOS[t.estado]?.label ?? t.estado },
+            { clave: 'motivo', etiqueta: 'Motivo' },
+          ]}
+          filas={delDia}
+        />
+      )}
       {cargando ? (
         <div className="hu-empty">Cargando agenda…</div>
       ) : error ? (
@@ -549,10 +564,10 @@ function Overlay({ children, onClose }: { children: React.ReactNode; onClose: ()
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="hu-field">
+    <div className="hu-field">
       <span>{label}</span>
       {children}
-    </label>
+    </div>
   );
 }
 

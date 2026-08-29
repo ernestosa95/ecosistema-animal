@@ -17,7 +17,12 @@
     "test:vacunas-demo": "tsx test/vacunas-flow.demo.ts",
     "test:turnos-demo": "tsx test/turnos-flow.demo.ts",
     "test:sync-demo": "tsx test/sync-flow.demo.ts",
-    "db:local-init": "node scripts/init-local-db.mjs"
+    "test:plataforma-demo": "tsx test/plataforma-flow.demo.ts",
+    "test:roles-demo": "tsx test/roles-flow.demo.ts",
+    "test:macros-demo": "tsx test/macros-flow.demo.ts",
+    "test:indicaciones-demo": "tsx test/indicaciones-flow.demo.ts",
+    "db:local-init": "node scripts/init-local-db.mjs",
+    "db:seed": "node scripts/seed-especies.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
