@@ -13,6 +13,7 @@ export class Persona extends Model {
   @text('celular') celular: string | null;
   @text('telefono') telefono: string | null;
   @text('email') email: string | null;
+  @text('domicilio') domicilio: string | null;
   @readonly @date('created_at') createdAt: Date;
   @readonly @date('updated_at') updatedAt: Date;
 }

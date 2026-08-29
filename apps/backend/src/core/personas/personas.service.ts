@@ -45,6 +45,7 @@ export class PersonasService {
         celular: dto.celular,
         telefono: dto.telefono,
         email: dto.email,
+        domicilio: dto.domicilio,
       })
       .returning();
 
@@ -103,6 +104,7 @@ export class PersonasService {
         ...(dto.celular !== undefined && { celular: dto.celular }),
         ...(dto.telefono !== undefined && { telefono: dto.telefono }),
         ...(dto.email !== undefined && { email: dto.email }),
+        ...(dto.domicilio !== undefined && { domicilio: dto.domicilio }),
         updatedAt: new Date(),
       })
       .where(and(eq(personas.id, id), eq(personas.organizacionId, organizacionId)))

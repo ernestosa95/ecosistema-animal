@@ -39,4 +39,8 @@ export class CreatePersonaDto {
   @IsOptional()
   @IsEmail()
   email?: string;
+
+  @IsOptional()
+  @IsString()
+  domicilio?: string;
 }

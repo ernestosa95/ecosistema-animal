@@ -108,6 +108,7 @@ export function PersonasPage({ sesion, personaIdInicial }: { sesion: Sesion; per
             { clave: 'dni', etiqueta: 'DNI', valor: (p: Persona) => p.dni ?? '—' },
             { clave: 'celular', etiqueta: 'Celular', valor: (p: Persona) => p.celular ?? '—' },
             { clave: 'email', etiqueta: 'Email', valor: (p: Persona) => p.email ?? '—' },
+            { clave: 'domicilio', etiqueta: 'Domicilio', valor: (p: Persona) => p.domicilio ?? '—' },
           ]}
           filas={filtradas}
         />
@@ -271,6 +272,7 @@ function DuenoForm({
   const [fechaNacimiento, setFechaNacimiento] = useState(inicial?.fechaNacimiento ?? '');
   const [celular, setCelular] = useState(inicial?.celular ?? '');
   const [email, setEmail] = useState(inicial?.email ?? '');
+  const [domicilio, setDomicilio] = useState(inicial?.domicilio ?? '');
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -285,6 +287,7 @@ function DuenoForm({
       data.fechaNacimiento = fechaNacimiento || undefined;
       data.celular = celular || undefined;
       data.email = email || undefined;
+      data.domicilio = domicilio || undefined;
       if (esEdicion && inicial) {
         await api.actualizarPersona(sesion, inicial.id, data);
       } else {
@@ -333,6 +336,10 @@ function DuenoForm({
       <label className="span-2">
         Email
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      </label>
+      <label className="span-2">
+        Domicilio
+        <input value={domicilio} onChange={(e) => setDomicilio(e.target.value)} placeholder="Calle, número, localidad…" />
       </label>
       {error && <div className="alerta span-2">{error}</div>}
       <div className="span-2 acciones">

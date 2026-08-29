@@ -36,7 +36,7 @@ await client.exec(`
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
     usuario_id uuid, dni text, nombre text NOT NULL, apellido text NOT NULL,
-    sexo core.sexo_persona, fecha_nacimiento date, celular text, telefono text, email text,
+    sexo core.sexo_persona, fecha_nacimiento date, celular text, telefono text, email text, domicilio text,
     created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz,
     UNIQUE (organizacion_id, dni)
   );

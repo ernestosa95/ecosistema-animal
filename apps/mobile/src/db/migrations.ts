@@ -5,10 +5,20 @@ import { schemaMigrations, createTable, addColumns } from '@nozbe/watermelondb/S
  * v2 → v3: seguimiento individual de Fase E — 8 tablas nuevas de tropera
  * + 5 columnas nuevas en `eventos` (ver nota en schema.ts sobre lo que
  * quedó afuera: plantilla_items/protocolo_iatf_pasos/evaluaciones_andrologicas).
+ * v3 → v4: `personas.domicilio`.
  * Sólo creación de tablas nuevas — nada de lo existente (tropera.*) cambia.
  */
 export const migrations = schemaMigrations({
   migrations: [
+    {
+      toVersion: 4,
+      steps: [
+        addColumns({
+          table: 'personas',
+          columns: [{ name: 'domicilio', type: 'string', isOptional: true }],
+        }),
+      ],
+    },
     {
       toVersion: 3,
       steps: [

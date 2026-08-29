@@ -51,6 +51,7 @@ export class CarnetService {
         duenoCelular: personas.celular,
         duenoTelefono: personas.telefono,
         duenoEmail: personas.email,
+        duenoDomicilio: personas.domicilio,
       })
       .from(animales)
       .innerJoin(especies, eq(especies.id, animales.especieId))
@@ -113,8 +114,7 @@ export class CarnetService {
         dni: row.duenoDni ?? '—',
         telefono: row.duenoCelular ?? row.duenoTelefono ?? '—',
         email: row.duenoEmail ?? '—',
-        // core.personas no modela domicilio todavía; cuando se agregue, mapearlo acá.
-        domicilio: '—',
+        domicilio: row.duenoDomicilio ?? '—',
       },
       vacunaciones: vacs.map(
         (v): CarnetVacuna => ({

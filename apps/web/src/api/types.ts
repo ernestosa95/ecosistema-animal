@@ -35,6 +35,7 @@ export interface Persona {
   celular?: string | null;
   telefono?: string | null;
   email?: string | null;
+  domicilio?: string | null;
 }
 
 export interface Consulta {

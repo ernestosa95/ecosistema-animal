@@ -34,7 +34,7 @@ async function main() {
     CREATE TABLE core.personas (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id), usuario_id uuid, dni text,
       nombre text NOT NULL, apellido text NOT NULL, sexo core.sexo_persona, fecha_nacimiento date,
-      celular text, telefono text, email text,
+      celular text, telefono text, email text, domicilio text,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
     CREATE TABLE core.especies (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), codigo text NOT NULL UNIQUE, nombre text NOT NULL);
     CREATE TABLE core.animales (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

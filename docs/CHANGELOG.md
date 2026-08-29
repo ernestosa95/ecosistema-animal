@@ -2,6 +2,18 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-08-29] — Domicilio en `core.personas`
+
+A pedido del usuario ("modelemos el domicilio"), cierra el pendiente menor que había quedado anotado en la entrada anterior (carnet/ficha) y en el Roadmap. Texto libre (`domicilio: text`), mismo criterio que `tropera.establecimientos.ubicacion` — no se modela por componentes (calle/número/localidad/CP separados) porque nada en el sistema necesita filtrar o geocodificar por esas partes.
+
+- **Schema + migración**: `core.personas.domicilio` (migración `0012_pretty_squadron_supreme.sql`, un solo `ALTER TABLE ADD COLUMN`, generada con `db:generate`).
+- **Backend**: `CreatePersonaDto`/`UpdatePersonaDto` lo suman como opcional; `PersonasService.crear()`/`actualizar()` lo persisten; `CarnetService.buildData()` ahora lo trae del join real en vez del placeholder `'—'` hardcodeado — la ficha A4 (agregada en la entrada anterior) ya lo imprime.
+- **Web**: `Persona` (tipo) + `DuenoForm` en `PersonasPage.tsx` suman el campo; se agregó también a la columna de export de `ExportBar`.
+- **Mobile**: mismo criterio que las extensiones de sync anteriores — `personas` ya estaba en el registry de sync y en el schema WatermelonDB, así que sólo hizo falta sumar la columna ahí también (schema v3→v4, `addColumns` sobre `personas`, campo nuevo en el modelo `Persona.ts`) para que no se pierda offline.
+- **Encontrado y corregido de paso — deuda de testing, mismo patrón recurrente de siempre**: al generar la migración, `test:personas-demo`, `test:turnos-demo` y `test:sync-demo` se rompieron los tres — importan la tabla Drizzle real `core.personas` (no una redefinición propia) y su `.returning()` ahora incluye `domicilio` en la lista de columnas devueltas, que no existía en el DDL hand-rolled de esos tres tests. Corregido agregando la columna a los tres (nullable, sin lógica que la ejercite todavía). Las 14 suites vuelven a estar en verde.
+- **Aplicado contra el `pgdata` real del usuario**: sin backend corriendo en ese momento (verificado con `lsof -i :3000`), se aplicó el `ALTER TABLE` directamente con un script PGlite descartable, verificando `count(*)` de `personas` y `organizaciones` antes/después (sin cambios, sólo se sumó la columna) antes de borrar el script.
+- **Verificado con un backend efímero** (`PORT=3089`, `pgdata` descartable en `/tmp`): alta de persona con domicilio, `PATCH` actualizándolo, y la ficha A4 renderizada mostrando "Av. Siempre Viva 742, Springfield" en el campo Domicilio en vez de `—`.
+
 ## [2026-08-29] — Carnet y ficha del animal: dos PDFs distintos, no uno solo
 
 A pedido del usuario: "el carnet" hasta ahora era un único documento A5 con look de libreta sanitaria (identificación + tabla de vacunas). El pedido separa dos necesidades reales: una **ficha A4** para archivar/imprimir en la clínica con el registro completo (vacunas/desparasitaciones/tratamientos, llena o vacía), y un **carnet** que se pueda imprimir y llevar encima como un DNI del animal (tarjeta chica, no una hoja).

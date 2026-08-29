@@ -41,4 +41,8 @@ export class UpdatePersonaDto {
   @IsOptional()
   @IsEmail()
   email?: string;
+
+  @IsOptional()
+  @IsString()
+  domicilio?: string;
 }

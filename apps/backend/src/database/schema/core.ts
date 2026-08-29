@@ -103,6 +103,12 @@ export const personas = core.table('personas', {
   celular: text('celular'),
   telefono: text('telefono'),
   email: text('email'),
+  // Texto libre (calle, número, localidad...), mismo criterio que
+  // `tropera.establecimientos.ubicacion` — no se modela por componentes
+  // (calle/número/ciudad/CP separados) porque nada en el sistema todavía
+  // necesita filtrar/geocodificar por esas partes; el carnet/ficha del
+  // animal ya lo imprimía como placeholder, esto lo completa.
+  domicilio: text('domicilio'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),

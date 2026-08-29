@@ -15,11 +15,12 @@ import { appSchema, tableSchema } from '@nozbe/watermelondb';
 // Tampoco están Farmacia ni Caja (desk/online por diseño, no pensadas para
 // captura offline en el campo) ni `hce.macros`/indicaciones (ayuda de
 // escritorio, bajo valor offline).
+// v3→v4: `personas.domicilio` (agregado al backend a pedido del usuario).
 // Nombres de columna en snake_case porque así los serializa
 // `serializeRow`/`valoresParaEscribir` (contrato = objeto WatermelonDB, no
 // el camelCase de Drizzle).
 export const schema = appSchema({
-  version: 3,
+  version: 4,
   tables: [
     tableSchema({
       name: 'personas',
@@ -33,6 +34,7 @@ export const schema = appSchema({
         { name: 'celular', type: 'string', isOptional: true },
         { name: 'telefono', type: 'string', isOptional: true },
         { name: 'email', type: 'string', isOptional: true },
+        { name: 'domicilio', type: 'string', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],
