@@ -2,6 +2,17 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-08-29] — Fase 7 (Encargado de Estancia): investigada, no arrancada — no hay subconjunto sin decisiones
+
+Alcance acordado con el usuario antes de codear: avanzar sólo lo que **no** requiera una decisión suya, dado que sigue sin estar disponible para resolverlas ("solo lo que no requiere decisiones"). El framing inicial asumía que el cálculo de GDP (ganancia diaria de peso) podía apoyarse en "pesajes ya existentes" — se investigó el código antes de escribir nada y esa premisa era falsa.
+
+- **No existe ningún registro de peso para hacienda de campo.** `tropera.eventos` no tiene un tipo `pesaje` (el enum `tipo_evento` es vacunacion/desparasitacion/tratamiento/servicio/diagnostico_prenez/destete); "Pesaje" sólo aparece como texto de ejemplo de un ítem de plantilla (`schema/tropera.ts:286`), no como dato estructurado. `hce.consultas.pesoKg` es de la ficha clínica de mascotas, sin relación con `animales_campo`. Sin una fuente de peso, no hay GDP que calcular — y decidir cómo modelarlo (¿tipo de evento nuevo? ¿tabla propia? ¿unidad?) es exactamente el tipo de decisión que se estaba tratando de evitar esta pasada.
+- **El "semáforo de potreros"** tiene un campo ya preparado (`potreros.capacidadCabezas`, cargado en Fase E "para un futuro semáforo, no se usa todavía") pero el conteo real de cabezas por potrero sólo puede salir de `animales_campo.potreroId` — bajo el modelo híbrido, un establecimiento puede tener la mayoría de su hacienda sólo en `existencias` agregadas (sin granularidad de potrero). Un semáforo calculado así subestimaría la ocupación real en cualquier establecimiento no migrado a seguimiento individual, y presentarlo como confiable sería engañoso sin que el usuario decida cómo tratar ese caso.
+- **Planificador de rotación multidía** y **reportes gerenciales** son, directamente, diseño desde cero (algoritmo/UI el primero, qué KPIs importan el segundo) — nunca fueron candidatos a "sin decisiones".
+- **Registro de raciones** tampoco tiene ningún modelo previo (tipos de alimento, unidades, periodicidad) del que partir sin inventar la primera decisión de alcance.
+
+**Conclusión: los 5 puntos de Fase 7 requieren alcance definido con el usuario — no se escribió código de Fase 7 esta pasada** para evitar construir sobre supuestos que probablemente haya que rehacer. Queda anotado para retomar con el mismo patrón usado en Tropera/Caja: una `AskUserQuestion` acotada antes de codear, cuando el usuario esté disponible para resolverla.
+
 ## [2026-08-29] — Mobile: cobertura de sync para Fase E (seguimiento individual de campo)
 
 A pedido del usuario ("los otros últimos puntos"), acotado antes de codear con una pregunta de alcance: **sólo capa de datos** (schema + modelos + registry de sync), sin pantallas — el usuario sigue sin poder verificar visualmente. `apps/mobile` ya traía una app WatermelonDB real (no un scaffold vacío como se pensaba: modelos + pantallas de pacientes/turnos/establecimiento/sync existentes de antes de esta sesión), pero su cobertura de sync se había quedado en F1.1–F1.6 — nada de Fase E.
