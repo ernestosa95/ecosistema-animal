@@ -37,6 +37,7 @@ export function PacienteDetallePage({
   const [mostrarVacuna, setMostrarVacuna] = useState(false);
   const [editando, setEditando] = useState(false);
   const [generandoCarnet, setGenerandoCarnet] = useState(false);
+  const [generandoFicha, setGenerandoFicha] = useState(false);
   const [itemLinea, setItemLinea] = useState<ItemLinea | null>(null);
 
   const especieNombre = useMemo(
@@ -83,12 +84,13 @@ export function PacienteDetallePage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animal.id]);
 
-  // Abre el carnet PDF del animal (GET /animales/:id/carnet.pdf) con la sesión.
-  async function onCarnet() {
-    setGenerandoCarnet(true);
+  // Abre el carnet (tarjeta tipo DNI) o la ficha (hoja A4) del animal con la sesión.
+  async function abrirDocumento(tipo: 'carnet' | 'ficha') {
+    const setGenerando = tipo === 'carnet' ? setGenerandoCarnet : setGenerandoFicha;
+    setGenerando(true);
     try {
       const API = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
-      const res = await fetch(`${API}/animales/${animal.id}/carnet.pdf`, {
+      const res = await fetch(`${API}/animales/${animal.id}/${tipo}.pdf`, {
         headers: {
           ...(sesion.token ? { Authorization: `Bearer ${sesion.token}` } : {}),
           ...(sesion.organizacionId ? { 'X-Organizacion-Id': sesion.organizacionId } : {}),
@@ -100,9 +102,10 @@ export function PacienteDetallePage({
       window.open(url, '_blank');
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) {
-      alert('No se pudo generar el carnet: ' + (e instanceof Error ? e.message : 'error'));
+      const nombre = tipo === 'carnet' ? 'el carnet' : 'la ficha';
+      alert(`No se pudo generar ${nombre}: ` + (e instanceof Error ? e.message : 'error'));
     } finally {
-      setGenerandoCarnet(false);
+      setGenerando(false);
     }
   }
 
@@ -129,7 +132,10 @@ export function PacienteDetallePage({
         <h1>{animal.nombre}</h1>
         <div className="acciones">
           <span className="chip">{animal.estado}</span>
-          <button className="btn-ghost" onClick={onCarnet} disabled={generandoCarnet}>
+          <button className="btn-ghost" onClick={() => abrirDocumento('ficha')} disabled={generandoFicha}>
+            {generandoFicha ? 'Generando…' : 'Descargar ficha (A4)'}
+          </button>
+          <button className="btn-ghost" onClick={() => abrirDocumento('carnet')} disabled={generandoCarnet}>
             {generandoCarnet ? 'Generando…' : 'Descargar carnet'}
           </button>
           <button className="btn-ghost" onClick={() => setEditando((v) => !v)}>

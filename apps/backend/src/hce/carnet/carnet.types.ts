@@ -17,6 +17,7 @@ export interface CarnetPaciente {
   esterilizado: string;
   codigoLegible: string;   // ESP-PAÍS-SECUENCIA-DV
   microchip: string;
+  fotoUrl: string | null; // sin feature de carga todavía en la web; casi siempre null
 }
 
 export interface CarnetDueno {

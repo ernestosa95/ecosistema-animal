@@ -5,6 +5,7 @@ import * as QRCode from 'qrcode';
 import { DRIZZLE, DrizzleDB } from '../../database/drizzle.provider';
 import { animales, especies, personas, vacunaciones } from '../../database/schema';
 import { CarnetDocument } from './carnet.document';
+import { FichaDocument } from './ficha.document';
 import type { CarnetData, CarnetVacuna } from './carnet.types';
 
 // URL base del portal del dueño. El QR apunta acá; el código legible impreso
@@ -15,10 +16,16 @@ const PORTAL_URL = process.env.PORTAL_URL ?? 'https://portal.huella.vet';
 export class CarnetService {
   constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
 
-  /** Genera el PDF del carnet de un animal y lo devuelve como Buffer. */
+  /** Genera el PDF del carnet (tarjeta tipo DNI) de un animal y lo devuelve como Buffer. */
   async generarCarnet(animalId: string, organizacionId: string): Promise<Buffer> {
     const data = await this.buildData(animalId, organizacionId);
     return renderToBuffer(CarnetDocument(data) as any);
+  }
+
+  /** Genera el PDF de la ficha (hoja A4, registro completo) de un animal y lo devuelve como Buffer. */
+  async generarFicha(animalId: string, organizacionId: string): Promise<Buffer> {
+    const data = await this.buildData(animalId, organizacionId);
+    return renderToBuffer(FichaDocument(data) as any);
   }
 
   /** Arma el contrato CarnetData desde la base (aislado por organización). */
@@ -35,6 +42,7 @@ export class CarnetService {
         fechaNacimiento: animales.fechaNacimiento,
         codigoLegible: animales.codigoLegible,
         microchip: animales.microchip,
+        fotoUrl: animales.fotoUrl,
         datosEspecificos: animales.datosEspecificos,
         especieNombre: especies.nombre,
         duenoNombre: personas.nombre,
@@ -98,6 +106,7 @@ export class CarnetService {
         esterilizado: esterilizado(datos),
         codigoLegible: codigo || '—',
         microchip: row.microchip ?? 'Sin microchip',
+        fotoUrl: row.fotoUrl ?? null,
       },
       dueno: {
         nombre: [row.duenoNombre, row.duenoApellido].filter(Boolean).join(' ') || '—',

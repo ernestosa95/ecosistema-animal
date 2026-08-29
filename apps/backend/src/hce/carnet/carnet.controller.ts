@@ -9,7 +9,7 @@ import { CurrentOrg } from '../../common/decorators/current-context.decorator';
 export class CarnetController {
   constructor(private readonly carnet: CarnetService) {}
 
-  // GET /animales/:id/carnet.pdf → devuelve el PDF inline (se abre en el navegador)
+  // GET /animales/:id/carnet.pdf → tarjeta de identificación tipo DNI (inline)
   @Get('carnet.pdf')
   async carnetPdf(
     @Param('id') id: string,
@@ -20,6 +20,19 @@ export class CarnetController {
       type: 'application/pdf',
       // 'inline' abre en pestaña; usá 'attachment' para forzar descarga.
       disposition: `inline; filename="carnet-huella-${id}.pdf"`,
+    });
+  }
+
+  // GET /animales/:id/ficha.pdf → hoja A4 con el registro completo (inline)
+  @Get('ficha.pdf')
+  async fichaPdf(
+    @Param('id') id: string,
+    @CurrentOrg() organizacionId: string,
+  ): Promise<StreamableFile> {
+    const pdf = await this.carnet.generarFicha(id, organizacionId);
+    return new StreamableFile(pdf, {
+      type: 'application/pdf',
+      disposition: `inline; filename="ficha-huella-${id}.pdf"`,
     });
   }
 }
