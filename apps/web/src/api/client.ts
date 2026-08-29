@@ -2,7 +2,8 @@ import type { Sesion, Especie, Animal, Consulta, Persona, Turno,
   EstadoTurno, RecordatorioVacuna, Vacunacion, Establecimiento, Existencia, CategoriaHacienda,
   Movimiento, Evento, Producto, StockItem, MovimientoStock,
   ResumenDashboard, MensajePlataforma, Macro, CategoriaMacro, Indicacion, ConsultaResumen,
-  Caja, Cobro, Egreso, EstadoAuditoriaCaja } from './types';
+  Caja, Cobro, Egreso, EstadoAuditoriaCaja, AnimalCampo, Hallazgo, ToroVirtual, Muestra, EvaluacionAndrologica,
+  Potrero, PlantillaTareas, ProtocoloIatf, Tarea, EstadoTarea } from './types';
 
 const API = (import.meta.env.VITE_API_URL as string) || 'http://localhost:3000';
 
@@ -370,6 +371,124 @@ export const api = {
 
   egresosDeCaja(s: Sesion, cajaId: string): Promise<Egreso[]> {
     return pedir(s, `/caja/egresos?cajaId=${cajaId}`);
+  },
+
+  // --- Fase E: animales individuales de campo ---
+
+  animalesCampo(s: Sesion, establecimientoId?: string, soloTransitorios?: boolean): Promise<AnimalCampo[]> {
+    const q = new URLSearchParams();
+    if (establecimientoId) q.set('establecimientoId', establecimientoId);
+    if (soloTransitorios) q.set('transitorios', 'true');
+    const qs = q.toString();
+    return pedir(s, `/tropera/animales-campo${qs ? `?${qs}` : ''}`);
+  },
+
+  crearAnimalCampo(s: Sesion, data: Record<string, unknown>): Promise<AnimalCampo> {
+    return pedir(s, '/tropera/animales-campo', { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  actualizarAnimalCampo(s: Sesion, id: string, data: Record<string, unknown>): Promise<AnimalCampo> {
+    return pedir(s, `/tropera/animales-campo/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  },
+
+  conciliarAnimalCampo(s: Sesion, id: string, caravana: string): Promise<AnimalCampo> {
+    return pedir(s, `/tropera/animales-campo/${id}/conciliar`, { method: 'PATCH', body: JSON.stringify({ caravana }) });
+  },
+
+  eventosDeAnimalCampo(s: Sesion, id: string): Promise<Evento[]> {
+    return pedir(s, `/tropera/animales-campo/${id}/eventos`);
+  },
+
+  // --- Fase E.2/E.3: hallazgos, toros virtuales, muestreos, evaluación andrológica ---
+
+  hallazgos(s: Sesion): Promise<Hallazgo[]> {
+    return pedir(s, '/tropera/hallazgos');
+  },
+
+  crearHallazgo(s: Sesion, nombre: string): Promise<Hallazgo> {
+    return pedir(s, '/tropera/hallazgos', { method: 'POST', body: JSON.stringify({ nombre }) });
+  },
+
+  torosVirtuales(s: Sesion): Promise<ToroVirtual[]> {
+    return pedir(s, '/tropera/toros-virtuales');
+  },
+
+  crearToroVirtual(s: Sesion, data: Record<string, unknown>): Promise<ToroVirtual> {
+    return pedir(s, '/tropera/toros-virtuales', { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  crearMuestra(s: Sesion, data: Record<string, unknown>): Promise<Muestra> {
+    return pedir(s, '/tropera/muestras', { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  muestras(s: Sesion, establecimientoId: string): Promise<Muestra[]> {
+    return pedir(s, `/tropera/muestras?establecimientoId=${establecimientoId}`);
+  },
+
+  ultimoTubo(s: Sesion, establecimientoId: string): Promise<{ ultimoTubo: number }> {
+    return pedir(s, `/tropera/muestras/ultimo-tubo?establecimientoId=${establecimientoId}`);
+  },
+
+  crearEvaluacionAndrologica(s: Sesion, data: Record<string, unknown>): Promise<EvaluacionAndrologica> {
+    return pedir(s, '/tropera/evaluaciones-andrologicas', { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  evaluacionesAndrologicas(s: Sesion, animalCampoId: string): Promise<EvaluacionAndrologica[]> {
+    return pedir(s, `/tropera/evaluaciones-andrologicas?animalCampoId=${animalCampoId}`);
+  },
+
+  // --- Fase E.4: potreros ---
+
+  potreros(s: Sesion, establecimientoId: string): Promise<Potrero[]> {
+    return pedir(s, `/tropera/potreros?establecimientoId=${establecimientoId}`);
+  },
+
+  crearPotrero(s: Sesion, data: Record<string, unknown>): Promise<Potrero> {
+    return pedir(s, '/tropera/potreros', { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  // --- Fase E.5: plantillas de tareas (modo plantilla, 1-tap) ---
+
+  plantillasTareas(s: Sesion): Promise<PlantillaTareas[]> {
+    return pedir(s, '/tropera/plantillas-tareas');
+  },
+
+  crearPlantillaTareas(s: Sesion, data: Record<string, unknown>): Promise<PlantillaTareas> {
+    return pedir(s, '/tropera/plantillas-tareas', { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  aplicarPlantillaTareas(s: Sesion, id: string, animalCampoId: string, establecimientoId: string): Promise<Evento[]> {
+    return pedir(s, `/tropera/plantillas-tareas/${id}/aplicar`, {
+      method: 'POST',
+      body: JSON.stringify({ animalCampoId, establecimientoId }),
+    });
+  },
+
+  // --- Fase E.6: protocolos IATF + tareas programadas ---
+
+  protocolosIatf(s: Sesion): Promise<ProtocoloIatf[]> {
+    return pedir(s, '/tropera/protocolos-iatf');
+  },
+
+  crearProtocoloIatf(s: Sesion, data: Record<string, unknown>): Promise<ProtocoloIatf> {
+    return pedir(s, '/tropera/protocolos-iatf', { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  aplicarProtocoloIatf(s: Sesion, id: string, data: Record<string, unknown>): Promise<Tarea[]> {
+    return pedir(s, `/tropera/protocolos-iatf/${id}/aplicar`, { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  tareas(s: Sesion, establecimientoId?: string, animalCampoId?: string, estado?: EstadoTarea): Promise<Tarea[]> {
+    const q = new URLSearchParams();
+    if (establecimientoId) q.set('establecimientoId', establecimientoId);
+    if (animalCampoId) q.set('animalCampoId', animalCampoId);
+    if (estado) q.set('estado', estado);
+    const qs = q.toString();
+    return pedir(s, `/tropera/tareas${qs ? `?${qs}` : ''}`);
+  },
+
+  actualizarTarea(s: Sesion, id: string, data: { estado: 'completada' | 'cancelada'; observaciones?: string }): Promise<Tarea> {
+    return pedir(s, `/tropera/tareas/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
   },
 
   macros(s: Sesion, categoria?: CategoriaMacro): Promise<Macro[]> {

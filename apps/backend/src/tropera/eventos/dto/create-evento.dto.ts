@@ -41,4 +41,29 @@ export class CreateEventoDto {
   @IsOptional()
   @IsString()
   observaciones?: string;
+
+  /** Fase E: imputa el evento a un animal individual en vez de (o además de) la categoría agregada. */
+  @IsOptional()
+  @IsUUID()
+  animalCampoId?: string;
+
+  /** Fase E, §5.3: fecha hasta la que rige un retiro sanitario/restricción tras este evento. */
+  @IsOptional()
+  @IsDateString()
+  retiroHasta?: string;
+
+  /** Fase E, §6.1: catálogo normalizado en vez de texto libre. */
+  @IsOptional()
+  @IsUUID()
+  hallazgoId?: string;
+
+  /** Fase E, §6.1: sólo tiene sentido en tipo='diagnostico_prenez'. */
+  @IsOptional()
+  @IsIn(['prenada', 'vacia', 'anestro'])
+  resultadoReproductivo?: 'prenada' | 'vacia' | 'anestro';
+
+  /** Fase E, §6.2: sólo tiene sentido en tipo='servicio'. */
+  @IsOptional()
+  @IsUUID()
+  toroVirtualId?: string;
 }

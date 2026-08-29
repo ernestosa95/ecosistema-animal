@@ -26,7 +26,8 @@ export class EventosController {
   listar(
     @CurrentOrg() organizacionId: string,
     @Query('establecimientoId') establecimientoId?: string,
+    @Query('animalCampoId') animalCampoId?: string,
   ) {
-    return this.eventos.listar(organizacionId, establecimientoId);
+    return this.eventos.listar(organizacionId, establecimientoId, animalCampoId);
   }
 }

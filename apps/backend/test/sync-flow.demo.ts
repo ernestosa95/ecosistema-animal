@@ -110,6 +110,7 @@ async function main() {
       establecimiento_id uuid NOT NULL REFERENCES tropera.establecimientos(id) ON DELETE CASCADE,
       tipo tropera.tipo_evento NOT NULL, categoria tropera.categoria_hacienda, cantidad integer, producto text,
       fecha date NOT NULL DEFAULT current_date, observaciones text, usuario_id uuid REFERENCES core.usuarios(id),
+      animal_campo_id uuid, retiro_hasta date, hallazgo_id uuid, resultado_reproductivo text, toro_virtual_id uuid,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
   `);
 

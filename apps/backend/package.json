@@ -21,6 +21,8 @@
     "test:roles-demo": "tsx test/roles-flow.demo.ts",
     "test:macros-demo": "tsx test/macros-flow.demo.ts",
     "test:indicaciones-demo": "tsx test/indicaciones-flow.demo.ts",
+    "test:tropera-demo": "tsx test/tropera-flow.demo.ts",
+    "test:caja-demo": "tsx test/caja-flow.demo.ts",
     "db:local-init": "node scripts/init-local-db.mjs",
     "db:seed": "node scripts/seed-especies.mjs"
   },

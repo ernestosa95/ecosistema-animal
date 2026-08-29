@@ -2,6 +2,115 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-08-29] — `test:tropera-demo` ampliada a Fase E completa (E.2–E.6)
+
+Continuación directa de la entrada anterior, a pedido del usuario ("avancemos con lo que falte de código"). Se extendió `tropera-flow.demo.ts` (en vez de crear 6 archivos nuevos) para cubrir lo único que quedaba sin regresión automática: E.2–E.6. Un solo archivo tiene sentido acá porque todas estas tablas cuelgan de `establecimientos`/`animales_campo`, ya declarados en el setup existente — separarlas hubiera duplicado ese boilerplate 6 veces.
+
+- **Hallazgos (E.2)**: siembra lazy del catálogo default (8 hallazgos, importados de la fuente real `hallazgos-default.ts` en vez de hardcodearlos de nuevo), idempotencia, catálogos independientes por organización.
+- **Diagnóstico reproductivo (E.2)**: `resultadoReproductivo` + `hallazgoId` guardados juntos en un evento imputado a un animal — de paso, la columna pasó de `text` a un enum real de Postgres en el DDL del test (iguala el comportamiento de producción, que si validaba el valor).
+- **Toros virtuales (E.3)**: creado y referenciado desde un evento `servicio`.
+- **Muestreos caravana-tubo (E.3)**: `ultimoTubo()` en 0 sin muestras, sube a 2 tras cargar dos tubos.
+- **Evaluación andrológica (E.3)**: los mismos umbrales del service real (≥30cm/≥50% → apto) replicados y verificados con un caso apto y uno no apto.
+- **Potreros y Apartados Rápidos (E.4)**: el "apartado" es literalmente el `UPDATE` de `potreroId` — se verificó que el animal aparece filtrando por ese potrero después.
+- **Modo Plantilla (E.5)**: una plantilla de 3 ítems aplicada a un animal crea exactamente 3 eventos, todos imputados a ese animal, en una sola transacción.
+- **Protocolos IATF (E.6)**: un protocolo de 4 pasos (día 0/7/9/11) aplicado con fecha de inicio 2026-09-01 generó tareas en 2026-09-01/08/10/12 — la misma aritmética de fechas ya verificada a mano por API, ahora como regresión; completar una tarea la saca del filtro de pendientes.
+- `tropera-flow.demo.ts` pasó de 19 a **41 checks**. Las 13 suites del backend siguen pasando limpias, **179 checks en total**.
+
+## [2026-08-29] — Deuda de testing: `test:tropera-demo` y `test:caja-demo`
+
+El usuario se iba a ir varias horas y pidió algo de desarrollo para dejar avanzado sin necesitar verificación visual. Se cerró un gap anotado varias veces en esta misma sesión: Tropera y Caja se habían verificado siempre a mano por curl contra un backend efímero, sin ninguna suite automatizada propia (a diferencia de las otras 11 áreas del backend).
+
+- **`test/tropera-flow.demo.ts`** (41 checks, ampliada más tarde el mismo día — ver entrada siguiente): existencias (upsert, completa las 6 categorías en 0), movimientos (alta suma, baja resta, **rechazo de stock negativo sin dejar nada aplicado a medias**, traslado entre establecimientos creando la fila de destino si no existía), eventos (agregado vs. imputado a un animal, con retiro sanitario), animales individuales (E.1: secuencia `TEMP-N` correlativa, conciliación y rechazo de re-conciliar), y aislamiento entre organizaciones. Arrancó cubriendo sólo el núcleo F1.1–F1.6 + E.1 (19 checks) — E.2–E.6 se sumaron después en la misma sesión.
+- **`test/caja-flow.demo.ts`** (16 checks): cobro/egreso rechazados sin caja abierta, apertura y rechazo de doble apertura, cierre con cálculo correcto (`inicial + cobros − egresos`) y decisión automática de auditoría (`aceptado` sin diferencia, `pendiente` con diferencia), auditoría exigiendo observación salvo al aceptar, honorarios y liquidación (con verificación de que liquidar dos veces no vuelve a afectar nada), aislamiento entre organizaciones.
+- Mismo patrón que las 11 suites existentes: `PGlite` en memoria (sin `dataDir`, sin ningún riesgo de tocar `pgdata`), DDL mínimo hand-rolled, lógica de los services replicada inline (no se importa el módulo de Nest).
+- **Encontrado y corregido de paso**: al escribir estas suites, correr la batería completa mostró que `test:sync-demo` se había roto — su DDL hand-rolled de `tropera.eventos` no tenía las 5 columnas que sumó Fase E (`animal_campo_id`, `retiro_hasta`, `hallazgo_id`, `resultado_reproductivo`, `toro_virtual_id`). Mismo gap recurrente de siempre (cada test recrea el schema a mano); corregido agregando las columnas nuevas como nullable sin FK (el test no ejercita esas relaciones). Con este fix, **las 13 suites del backend pasan limpias, 157 checks en total**.
+- `CLAUDE.md` tenía la lista de comandos `test:*-demo` desactualizada (le faltaban 6 de los 13) — corregido de paso, es la única sección tocada de ese archivo (el resto del drift documentado al principio de esta sesión sigue sin resolver, no era parte de este pedido).
+
+## [2026-08-29] — Fase E.4/E.5/E.6 del spec UI/UX: potreros, plantillas 1-tap y protocolos IATF — Fase E cerrada
+
+Cierre de Fase E completa, a pedido explícito del usuario ("terminemos la fase e"). Las tres piezas que quedaban pendientes de los cortes anteriores.
+
+### Backend — 3 conceptos nuevos en `tropera`
+- **`tropera.potreros`** (§5.3/§7.1): subdivisión de un establecimiento — no existía ninguna granularidad más chica que "establecimiento completo" hasta ahora. `animales_campo` suma `potreroId` (opcional); los **Apartados Rápidos** son literalmente el `PATCH` normal de `animales-campo` con un `potreroId` nuevo, no una acción separada. `GET /tropera/animales-campo?potreroId=` para ver quién está en cada potrero.
+- **`tropera.plantillas_tareas` + `plantilla_items`** (§5.1, Modo Plantilla): una plantilla ("Rutina de manga" = Vacuna + Antiparasitario + Pesaje) es una lista de `{tipo, producto}`. `POST .../aplicar` con un animal es el 1-tap: crea un evento por ítem, todos imputados a ese animal, en una transacción.
+- **`tropera.protocolos_iatf` + `protocolo_iatf_pasos` + `tropera.tareas`** (§6.2, la parte que se había diferido en E.3): a diferencia de una plantilla, un protocolo no crea eventos ya sucedidos — genera **tareas programadas a futuro** (`fechaProgramada` = fecha de inicio + `diaOffset` de cada paso). `tropera.tareas` es el primer concepto de "tarea agendada" en todo el sistema (los `turnos` de HCE son citas con un dueño, no esto). Completar/cancelar una tarea es un `PATCH` de estado — no crea un evento automáticamente todavía, eso queda anotado como alcance futuro si hace falta.
+- Migración `0011_messy_spectrum.sql`: diff limpio de una sola pasada (7 tipos/tablas nuevos + la columna en `animales_campo`).
+
+### Web — `TroperaPage.tsx`
+- Sección "Potreros" en el detalle del establecimiento (alta simple); columna "Potrero" en la tabla de animales individuales; el form de edición de la ficha suma el selector de potrero — si el animal tiene un retiro sanitario vigente, cambiar de potrero dispara un `confirm()` ("¿Confirmar y continuar?") antes de guardar, la alerta modal explícita del spec.
+- En la ficha del animal: "Aplicar plantilla (1-tap)" (selector + botón, sólo aparece si hay plantillas cargadas) y "Protocolo IATF" (selector + fecha de inicio + lista de tareas generadas con Completar/Cancelar).
+- Nueva sección "Plantillas y protocolos (catálogos)" en el detalle del establecimiento: gestión org-wide de ambos catálogos (alta con ítems/pasos dinámicos).
+- Nueva sección "Agenda de tareas": todas las tareas del establecimiento (no ligadas a un animal puntual en la vista), con filtro "sólo pendientes".
+
+### Verificado
+- Backend: `nest build` limpio; `test:hce-demo`/`test:macros-demo`/`test:indicaciones-demo`/`test:turnos-demo` siguen en verde. Tropera sigue sin suite propia — verificado por API contra un backend efímero: potrero creado y asignado a un animal vía Apartado Rápido, listado filtrado por potrero; plantilla de 3 ítems aplicada a un animal creando exactamente 3 eventos; protocolo de 4 pasos (día 0/7/9/11) aplicado con fecha de inicio 2026-09-01 generando tareas en las fechas exactas esperadas (09-01/09-08/09-10/09-12); completar una tarea la saca correctamente del filtro de pendientes.
+- Web: `vite build` limpio, `tsc --noEmit` sin errores nuevos de una clase distinta a los ya preexistentes.
+- **Sin verificar en el navegador** — sigue pendiente toda la verificación visual de Fase E (y de B/C/D), para cuando el usuario esté en su compu.
+
+**Fase E completa: E.1 (fichas individuales) → E.2 (diagnóstico reproductivo) → E.3 (muestreos/genética) → E.4 (potreros/apartados) → E.5 (plantillas 1-tap) → E.6 (protocolos IATF/tareas), las 6 sub-fases con backend probado por API. Ninguna tocó el modelo agregado de Tropera (F1.1–F1.6), tal como definía el modelo híbrido acordado al principio.**
+
+## [2026-08-29] — Fase E.2/E.3 del spec UI/UX: diagnóstico reproductivo, muestreos y genética
+
+Continuación de E.1 en la misma sesión, a pedido del usuario ("adelantemos todo lo que podamos" — sin poder verificar visualmente, está fuera de su casa). Se dejó afuera a propósito la parte más grande de §6.2 (Protocolos IATF con tareas programadas a futuro) porque es un concepto nuevo — "tareas agendadas que se disparan solas en fechas futuras" no existe en ningún lado del sistema hoy (los `turnos` de HCE son citas, no tareas de campo) — y merece su propio corte en vez de sumarse apurado a este. Apartados por potrero (§5.3) sigue esperando el modelo de potreros.
+
+### Backend — 4 piezas nuevas en `tropera`, todas opcionales sobre `eventos`
+- **`tropera.hallazgos`** (§6.1): catálogo normalizado de hallazgos patológicos, mismo patrón de siembra lazy que `hce.macros` (8 hallazgos default: Metritis, Endometritis, Quiste ovárico, etc.).
+- **`tropera.toros_virtuales`** (§6.2): catálogo de "toros virtuales / pajuelas" para filiación genética, sin que el toro físico esté cargado como `animales_campo`.
+- **`tropera.eventos`** suma `hallazgoId`, `resultadoReproductivo` (enum `prenada`/`vacia`/`anestro`) y `toroVirtualId` — los tres opcionales y validados contra la organización si vienen cargados; ninguno excluye al otro (un evento puede tener hallazgo sin ser diagnóstico de preñez, por ejemplo).
+- **`tropera.muestras`** (§6.2, interfaz caravana-tubo): `tuboNumero` + caravana (o `animalCampoId` si el animal ya está cargado individualmente). `GET .../muestras/ultimo-tubo` expone el último número registrado para que el frontend sugiera el siguiente y alerte sobre saltos — sin bloquear a nivel de constraint, por si hace falta corregir una muestra puntual.
+- **`tropera.evaluaciones_andrologicas`** (§6.2): circunferencia escrotal + motilidad de un toro (`animal_campo` puntual, no del catálogo de toros virtuales) → `apto` lo calcula el service con un umbral simplificado (≥30cm y ≥50%, documentado como MVP que no reemplaza el criterio clínico), no lo manda el cliente.
+- Migración `0010_stale_sumo.sql`: diff limpio de una sola pasada.
+
+### Web — `TroperaPage.tsx`
+- `NuevoEventoForm` (ya generalizado en E.1) suma: grilla 1-tap de resultado reproductivo cuando `tipo='diagnostico_prenez'`, chips de hallazgos normalizados (diagnóstico de preñez y tratamiento), y selector de toro virtual cuando `tipo='servicio'` — los catálogos se piden sólo cuando el tipo de evento los necesita, no en cada apertura del form.
+- Nueva sección "Muestreos (caravana-tubo)" en el detalle del establecimiento: sugiere el próximo número de tubo y muestra una alerta (no bloqueante) si el número cargado salta el siguiente esperado.
+- Nueva sección "Evaluación andrológica" en la ficha individual, visible sólo si `categoria === 'toro'`: formulario de circunferencia/motilidad + historial con el resultado de aptitud ya calculado.
+
+### Verificado
+- Backend: `nest build` limpio; `test:hce-demo` (10/10), `test:macros-demo` (7/7) e `test:indicaciones-demo` (12/12) siguen pasando (no tocan Tropera, pero confirman que nada del resto se rompió). Tropera sigue sin suite `test:*-demo` propia — verificado por API contra un backend efímero: siembra lazy de hallazgos, diagnóstico de preñez con resultado + hallazgo imputado a un animal, rechazo de un `resultadoReproductivo` inválido, toro virtual creado y referenciado desde un evento de servicio, dos muestras con tubos correlativos y `ultimo-tubo` reflejando el máximo, evaluación andrológica apta (35cm/60%) y no apta (25cm/40%) calculadas correctamente.
+- Web: `vite build` limpio, `tsc --noEmit` sin errores nuevos de una clase distinta a los ya preexistentes.
+- **Sin verificar en el navegador** — pendiente para cuando el usuario esté en su compu.
+
+## [2026-08-29] — Fase E.1 del spec UI/UX: seguimiento individual de campo (modelo híbrido)
+
+Fase E estaba bloqueada desde que se armó Tropera por una decisión de fondo sin tomar: si la hacienda pasa de conteo agregado a seguimiento individual — algo que "contradice la decisión de alcance ya tomada" (ver nota en Fase 1). Se resolvió con el usuario antes de codear (una pregunta, opción recomendada): **modelo híbrido**. El seguimiento individual se suma en paralelo a `existencias`/`movimientos` agregados, sin tocarlos ni migrar nada — un establecimiento puede tener parte de su hacienda contada por categoría y parte identificada animal por animal, y no hay reconciliación automática entre ambas formas (es una decisión, no un olvido).
+
+Alcance de este primer corte (E.1, §5.2 del spec): lo mínimo para identificar y seguir un animal. Diagnóstico reproductivo (§6.1), caravana-tubo (§6.2) y apartados por potrero (§5.3 — necesita modelar potreros, que hoy no existen en Tropera) quedan para próximos cortes.
+
+### Backend — nueva tabla `tropera.animales_campo`
+- Una fila por animal individual: `caravana`, `caravanaDefinitiva` (boolean), `categoria` (mismo enum que existencias), `sexo`, `estado` (activo/vendido/muerto/transferido), `fechaAlta`, `observaciones`.
+- **Alta Express Transitoria**: si `POST /tropera/animales-campo` no manda `caravana`, el service consume `tropera.animales_campo_temp_seq` (mismo patrón que `core.animales_codigo_seq` para el código legible) y asigna `"TEMP-N"` con `caravanaDefinitiva=false`. Si se manda una caravana real, queda definitiva desde el alta.
+- **Bandeja de Conciliación**: `GET /tropera/animales-campo?transitorios=true` lista los pendientes; `PATCH .../conciliar` les asigna la caravana real (rechaza si ya era definitiva).
+- `tropera.eventos` suma `animalCampoId` (opcional, valida pertenencia a la organización) y `retiroHasta` (§5.3: período de retiro sanitario) — un evento puede seguir siendo agregado por categoría (como antes) o imputarse a un animal puntual, ambos caminos conviven en la misma tabla. `GET /tropera/animales-campo/:id/eventos` es la ficha individual (historial filtrado por ese animal).
+- Roles de escritura: mismo criterio que existencias/movimientos (`propietario`/`admin`/`capataz`).
+- Migración `0009_awesome_taskmaster.sql`: `drizzle-kit generate` dio un diff limpio de una sola pasada; se agregó a mano el `CREATE SEQUENCE` (drizzle no tiene un builder declarativo para secuencias en esta versión, mismo criterio ya usado en la migración base).
+
+### Web — `TroperaPage.tsx`
+- Nueva sección "Animales individuales" dentro del detalle de establecimiento, entre Hacienda y Movimientos: alta express (categoría + un clic), alta completa (con caravana/sexo/observaciones), checkbox "Sólo pendientes de conciliar" y una acción inline "Asignar caravana" por fila.
+- Ficha del animal (`FichaAnimalCampo`): datos + historial de eventos propios + alerta visible si hay un retiro sanitario vigente (`retiroHasta` de algún evento ≥ hoy) + alta de evento ya pre-cargado con `animalCampoId` (oculta los campos de categoría/cantidad agregados, que no aplican a un animal puntual).
+- `NuevoEventoForm` (ya existente) se generalizó para aceptar un `animalCampoId` opcional, reusado tanto desde el establecimiento (evento agregado, como antes) como desde la ficha individual.
+
+### Verificado
+- Backend: `nest build` limpio. Sin suite `test:*-demo` propia (mismo gap que Tropera y Caja) — verificado por API contra un backend efímero: alta transitoria (`TEMP-1`, `TEMP-2` correlativos), alta con caravana real, conciliación (y rechazo de conciliar dos veces), bandeja filtrando correctamente, evento con `retiroHasta` imputado al animal apareciendo en su ficha, evento agregado normal (sin animal) sin romperse, `animalCampoId` de otra organización rechazado, y **existencias agregadas sin verse afectadas** por ninguna de las altas individuales — confirma que el modelo híbrido no interfiere consigo mismo.
+- Web: `vite build` limpio, `tsc --noEmit` de `apps/backend` contra `apps/web` sin errores nuevos de una clase distinta a los ya preexistentes.
+- **Sin verificar en el navegador** — el usuario está fuera de su casa, queda pendiente para más tarde.
+
+## [2026-08-29] — Verificación real de Fases B y C (con incidente) + reset de `apps/backend/pgdata`
+
+Antes del incidente de abajo, se verificaron Fases B y C **contra datos reales** (backend real, `pgdata` real, usuario `c@gmail.com`/`celia1967`, roles `propietario`+`veterinario`), no sólo contra bases efímeras de curl como las sesiones anteriores:
+- **Fase B**: siembra lazy de macros confirmada sobre la organización real; una indicación de stock interno con calculadora de dosis (6.2kg × 10mg/kg sobre 50mg/ml → "62.0 mg (~1.24 ml)") descontó stock real (20→18) y apareció correctamente en el portal público por código del animal real (`duki`, código `CAN-AR-00006H-U`).
+- **Fase C**: `GET /dashboard/resumen` devolvía `consultasEsteMes: 3` pero el drill-down (`GET /consultas?desde=`) sólo traía 2 — **bug real encontrado**: `DashboardService.resumenClinica()` contaba consultas soft-borradas (le faltaba `isNull(deletedAt)`; el mismo gap afectaba `pacientesActivos`, `turnosPorEstado` y `movimientosPorTipo`). Corregido en `dashboard.service.ts`, backend reconstruido y reiniciado.
+
+### Incidente: dos procesos contra el mismo PGlite
+
+Mientras el backend real seguía corriendo, se abrió una segunda conexión de diagnóstico contra el mismo `pgdata` (un script suelto, no el backend) — rompiendo el protocolo de un solo proceso por PGlite. Ese script falló al instante, pero el `pgdata` quedó en un estado que aborta al arrancar (`RuntimeError: Aborted()` dentro de `pg_initdb`, bug conocido y sin fix en la build WASM de PGlite tras un corte abrupto — [electric-sql/pglite#327](https://github.com/electric-sql/pglite/issues/327)). Los datos seguían físicamente legibles (`strings` sobre los archivos mostró emails, nombres, hashes intactos) pero el motor no lograba terminar el arranque ni en el original ni en una copia — no había forma de recuperarlo sin instalar Postgres 16 nativo para un WAL replay manual, y el usuario prefirió no hacerlo (era todo dato de prueba).
+
+**Se resolvió reseteando**: `pgdata` viejo descartado, uno nuevo creado con `scripts/init-local-db.mjs` (las 9 migraciones + seed de especies), verificado arrancando limpio y sosteniendo un alta real sin crashear.
+
+**Consecuencia**: la base local de desarrollo quedó vacía — el usuario de prueba `c@gmail.com`, los animales `duki`/`firulai`/`yika`/`tontin`/`pancho` y todo lo demás que hubiera cargado antes de esta fecha ya no existen. Cualquier sesión futura que asuma esos datos está asumiendo mal; hay que recrearlos.
+
+**Lección de proceso**: el protocolo de "nunca dos procesos contra el mismo PGlite" (ya documentado en este archivo antes) no tiene margen de error — ni siquiera un script de diagnóstico de sólo lectura es seguro mientras el backend real está arriba. Antes de correr cualquier query directa contra `pgdata`, confirmar primero que no hay ningún backend real escuchando ese `DATABASE_PATH` (`lsof -i :3000` + chequear `/proc/<pid>/environ`), sin excepciones.
+
 ## [2026-08-29] — Fase D del spec UI/UX: caja chica, auditoría de cierres y honorarios
 
 Última pieza de la sesión, tras cerrar B y C. Antes de codear se acordaron 4 decisiones de alcance con el usuario (todas por la opción recomendada): precio en productos de Farmacia + concepto libre en servicios (sin catálogo de precios completo); una caja diaria **por organización** (no turnos por cajero); honorarios como reporte exportable **sin** cálculo automático de comisión ("liquidar" sólo marca cobros y reinicia el acumulador); egresos con concepto libre, sin categorías. Fuera de alcance a propósito: §2.5 (venta de una *fracción* de una presentación con descuento proporcional de stock) — hoy una venta de mostrador descuenta unidades enteras, igual que el resto de Farmacia; modelar capacidad por presentación queda para otra pasada.

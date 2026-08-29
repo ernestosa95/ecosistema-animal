@@ -34,6 +34,12 @@ pnpm --filter backend test:hce-demo
 pnpm --filter backend test:vacunas-demo
 pnpm --filter backend test:turnos-demo
 pnpm --filter backend test:sync-demo
+pnpm --filter backend test:plataforma-demo
+pnpm --filter backend test:roles-demo
+pnpm --filter backend test:macros-demo
+pnpm --filter backend test:indicaciones-demo
+pnpm --filter backend test:tropera-demo   # covers all of Tropera: F1.1-F1.6 core + Fase E (E.1-E.6) individual tracking
+pnpm --filter backend test:caja-demo
 # each *-demo script runs a self-contained flow against an in-memory PGlite instance
 # (creates its own schema/tables) — no running server or DB needed
 

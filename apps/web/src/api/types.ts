@@ -175,6 +175,123 @@ export interface Evento {
   producto?: string | null;
   fecha: string;               // 'YYYY-MM-DD'
   observaciones?: string | null;
+  // Fase E: imputación a un animal individual + retiro sanitario.
+  animalCampoId?: string | null;
+  retiroHasta?: string | null; // 'YYYY-MM-DD'
+  // Fase E.2/E.3: hallazgo normalizado, resultado del diagnóstico de preñez, toro virtual usado en un servicio.
+  hallazgoId?: string | null;
+  resultadoReproductivo?: ResultadoReproductivo | null;
+  toroVirtualId?: string | null;
+}
+
+export type ResultadoReproductivo = 'prenada' | 'vacia' | 'anestro';
+
+export interface Hallazgo {
+  id: string;
+  nombre: string;
+}
+
+export interface ToroVirtual {
+  id: string;
+  nombre: string;
+  raza?: string | null;
+  proveedor?: string | null;
+  observaciones?: string | null;
+}
+
+export interface Muestra {
+  id: string;
+  establecimientoId: string;
+  animalCampoId?: string | null;
+  caravana?: string | null;
+  tuboNumero: number;
+  tipoMuestra?: string | null;
+  fecha: string;
+  observaciones?: string | null;
+}
+
+export interface EvaluacionAndrologica {
+  id: string;
+  animalCampoId: string;
+  circunferenciaEscrotalCm: string;
+  motilidadPorcentaje: string;
+  apto: boolean;
+  fecha: string;
+  observaciones?: string | null;
+}
+
+// --- Fase E: seguimiento individual de campo (§5.2), convive con existencias agregadas ---
+
+export type EstadoAnimalCampo = 'activo' | 'vendido' | 'muerto' | 'transferido';
+
+export interface AnimalCampo {
+  id: string;
+  establecimientoId: string;
+  caravana: string;             // "TEMP-N" hasta conciliar, o la caravana real
+  caravanaDefinitiva: boolean;
+  categoria: CategoriaHacienda;
+  potreroId?: string | null;
+  sexo?: string | null;
+  estado: EstadoAnimalCampo;
+  fechaAlta: string;             // 'YYYY-MM-DD'
+  observaciones?: string | null;
+}
+
+// --- Fase E.4: potreros (subdivisión del establecimiento) ---
+
+export interface Potrero {
+  id: string;
+  establecimientoId: string;
+  nombre: string;
+  superficieHa?: string | null;
+  capacidadCabezas?: number | null;
+  observaciones?: string | null;
+}
+
+// --- Fase E.5: plantillas de tareas (modo plantilla, 1-tap) ---
+
+export interface PlantillaItem {
+  id: string;
+  tipo: TipoEvento;
+  producto?: string | null;
+  orden: number;
+}
+
+export interface PlantillaTareas {
+  id: string;
+  nombre: string;
+  items: PlantillaItem[];
+}
+
+// --- Fase E.6: protocolos IATF + tareas programadas ---
+
+export interface ProtocoloPaso {
+  id: string;
+  diaOffset: number;
+  descripcion: string;
+  producto?: string | null;
+  orden: number;
+}
+
+export interface ProtocoloIatf {
+  id: string;
+  nombre: string;
+  descripcion?: string | null;
+  pasos: ProtocoloPaso[];
+}
+
+export type EstadoTarea = 'pendiente' | 'completada' | 'cancelada';
+
+export interface Tarea {
+  id: string;
+  establecimientoId: string;
+  animalCampoId?: string | null;
+  protocoloId?: string | null;
+  descripcion: string;
+  producto?: string | null;
+  fechaProgramada: string; // 'YYYY-MM-DD'
+  estado: EstadoTarea;
+  observaciones?: string | null;
 }
 
 // --- Farmacia (vademécum + stock) ---
