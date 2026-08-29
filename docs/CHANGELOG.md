@@ -2,6 +2,14 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-08-29] — `test:farmacia-demo` cierra el último gap de deuda de testing
+
+Continuación directa de la entrada anterior ("si arranca con ese y los otros últimos puntos" — el primero de la lista). Farmacia era el único módulo del backend, junto con Tropera y Caja, verificado siempre a mano por curl y sin suite propia; con esta entrada las 14 áreas del backend tienen su `test:*-demo`.
+
+- **`test/farmacia-flow.demo.ts`** (14 checks): alta de producto con los campos de la calculadora de dosis (`precio`/`concentracion`/`dosisSugeridaMgKg`, F. B) y aislamiento por organización en el listado; stock arrancando en 0 sin fila propia (`LEFT JOIN` + `coalesce`) y `fijar()` como upsert (dos llamadas no duplican fila); movimientos con la misma lógica transaccional que Tropera/Caja (`compra` suma, `venta`/`merma` restan, rechazo de una baja que dejaría stock negativo **sin aplicar nada a medias**); la dispensa ligada a consulta (F4.3: un movimiento `tipo:'uso'` con `consultaId`) verificada tanto en el efecto sobre stock como en el filtro `GET .../movimientos?consultaId=`.
+- Mismo patrón que las 13 suites existentes: `PGlite` en memoria, DDL mínimo hand-rolled (incluyó `core.animales.persona_id` y las columnas clínicas de `hce.consultas` que el `INSERT` de Drizzle necesita aunque el test no las use, mismo gap recurrente de siempre), lógica de `ProductosService`/`StockService`/`MovimientosService` replicada inline.
+- **Las 14 suites del backend pasan limpias, 193 checks en total.** `nest build` limpio. `CLAUDE.md` actualizado con el comando nuevo.
+
 ## [2026-08-29] — `test:tropera-demo` ampliada a Fase E completa (E.2–E.6)
 
 Continuación directa de la entrada anterior, a pedido del usuario ("avancemos con lo que falte de código"). Se extendió `tropera-flow.demo.ts` (en vez de crear 6 archivos nuevos) para cubrir lo único que quedaba sin regresión automática: E.2–E.6. Un solo archivo tiene sentido acá porque todas estas tablas cuelgan de `establecimientos`/`animales_campo`, ya declarados en el setup existente — separarlas hubiera duplicado ese boilerplate 6 veces.
