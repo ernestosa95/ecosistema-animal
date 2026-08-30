@@ -25,14 +25,14 @@ async function main() {
     CREATE TYPE core.tipo_organizacion AS ENUM ('establecimiento','clinica','mixta');
     CREATE TABLE core.organizaciones (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), nombre text NOT NULL,
-      tipo core.tipo_organizacion NOT NULL DEFAULT 'clinica', cuit text,
+      tipo core.tipo_organizacion NOT NULL DEFAULT 'clinica', cuit text, direccion text, localidad text, provincia text, telefono text, email text,
       activo boolean NOT NULL DEFAULT true,
       grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, es_demo boolean NOT NULL DEFAULT false,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz
     );
     CREATE TABLE core.usuarios (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text NOT NULL UNIQUE, password_hash text NOT NULL,
-      nombre text, apellido text, email_verificado boolean NOT NULL DEFAULT false, ultimo_login timestamptz,
+      nombre text, apellido text, dni text, email_verificado boolean NOT NULL DEFAULT false, ultimo_login timestamptz,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz
     );
     CREATE TYPE caja.estado_caja AS ENUM ('abierta','cerrada');

@@ -12,10 +12,16 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
   const [telefono, setTelefono] = useState('');
+  const [dni, setDni] = useState('');
 
   const [tipo, setTipo] = useState<'crear' | 'unirse'>('crear');
   const [nombreOrganizacion, setNombreOrganizacion] = useState('');
   const [tipoOrganizacion, setTipoOrganizacion] = useState('clinica');
+  const [direccionOrganizacion, setDireccionOrganizacion] = useState('');
+  const [localidadOrganizacion, setLocalidadOrganizacion] = useState('');
+  const [provinciaOrganizacion, setProvinciaOrganizacion] = useState('');
+  const [telefonoOrganizacion, setTelefonoOrganizacion] = useState('');
+  const [emailOrganizacion, setEmailOrganizacion] = useState('');
   const [organizacionSolicitada, setOrganizacionSolicitada] = useState('');
 
   const [error, setError] = useState<string | null>(null);
@@ -45,8 +51,16 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
         await crearSolicitud({
           tipo, nombre, apellido, email, password,
           telefono: telefono || undefined,
+          dni: dni || undefined,
           ...(tipo === 'crear'
-            ? { nombreOrganizacion, tipoOrganizacion }
+            ? {
+                nombreOrganizacion, tipoOrganizacion,
+                direccionOrganizacion: direccionOrganizacion || undefined,
+                localidadOrganizacion: localidadOrganizacion || undefined,
+                provinciaOrganizacion: provinciaOrganizacion || undefined,
+                telefonoOrganizacion: telefonoOrganizacion || undefined,
+                emailOrganizacion: emailOrganizacion || undefined,
+              }
             : { organizacionSolicitada }),
         });
         setEnviada(true);
@@ -102,11 +116,15 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
               Teléfono (opcional)
               <input value={telefono} onChange={(e) => setTelefono(e.target.value)} />
             </label>
+            <label>
+              DNI (opcional)
+              <input value={dni} onChange={(e) => setDni(e.target.value)} />
+            </label>
 
             <label>
               ¿Qué querés hacer?
               <select value={tipo} onChange={(e) => setTipo(e.target.value as 'crear' | 'unirse')}>
-                <option value="crear">Crear una veterinaria nueva</option>
+                <option value="crear">Crear una veterinaria o campo nuevo</option>
                 <option value="unirse">Unirme a una veterinaria existente</option>
               </select>
             </label>
@@ -114,7 +132,7 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
             {tipo === 'crear' ? (
               <>
                 <label>
-                  Nombre de la veterinaria
+                  Nombre de la institución / campo
                   <input
                     value={nombreOrganizacion}
                     onChange={(e) => setNombreOrganizacion(e.target.value)}
@@ -128,6 +146,26 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
                     <option value="establecimiento">Establecimiento</option>
                     <option value="mixta">Mixta</option>
                   </select>
+                </label>
+                <label>
+                  Dirección (opcional)
+                  <input value={direccionOrganizacion} onChange={(e) => setDireccionOrganizacion(e.target.value)} placeholder="Calle, número..." />
+                </label>
+                <label>
+                  Localidad (opcional)
+                  <input value={localidadOrganizacion} onChange={(e) => setLocalidadOrganizacion(e.target.value)} />
+                </label>
+                <label>
+                  Provincia (opcional)
+                  <input value={provinciaOrganizacion} onChange={(e) => setProvinciaOrganizacion(e.target.value)} />
+                </label>
+                <label>
+                  Teléfono de la institución (opcional)
+                  <input value={telefonoOrganizacion} onChange={(e) => setTelefonoOrganizacion(e.target.value)} />
+                </label>
+                <label>
+                  Email de contacto de la institución (opcional)
+                  <input type="email" value={emailOrganizacion} onChange={(e) => setEmailOrganizacion(e.target.value)} />
                 </label>
               </>
             ) : (

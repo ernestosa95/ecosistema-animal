@@ -17,7 +17,8 @@
 
 ## 1. Cuenta y sesión
 
-- [ ] **1.1 — Alta de cuenta (solicitud):** en la pantalla de login, "¿No tenés cuenta?" → "Solicitar acceso". Elegí "Crear una veterinaria nueva", completá nombre/apellido/email/contraseña/nombre de la veterinaria. Enviar. Debe aparecer "Solicitud enviada" — **no** te loguea directo (a propósito: pasa por aprobación, ver bloque 8).
+- [ ] **1.1 — Alta de cuenta (solicitud):** en la pantalla de login, "¿No tenés cuenta?" → "Solicitar acceso". Elegí "Crear una veterinaria o campo nuevo", completá nombre/apellido/email/contraseña/DNI (opcional) y los datos de la institución (nombre/tipo/dirección/localidad/provincia/teléfono/email, todos opcionales salvo nombre y tipo). Enviar. Debe aparecer "Solicitud enviada" — **no** te loguea directo (a propósito: pasa por aprobación, ver bloque 8).
+- [ ] **1.1b — Datos completos visibles al aprobar:** en el bloque 8.1, la tarjeta de la solicitud debe mostrar el DNI junto al email/teléfono, y una línea aparte con la dirección/localidad/provincia/teléfono/email de la institución (si se cargaron).
 - [ ] **1.2 — Login sin aprobar:** intentar entrar con ese mismo email/contraseña antes de aprobar la solicitud → debe rechazar (no existe usuario todavía, la solicitud es una tabla aparte hasta que se aprueba).
 - [ ] **1.3 — Aprobar la solicitud:** ir al bloque 8.1 y volver acá.
 - [ ] **1.4 — Login post-aprobación:** ahora sí debería entrar. Fijate qué pantalla de inicio te muestra (Turnos si el rol es propietario/admin/recepción/veterinario; Animales si es capataz).

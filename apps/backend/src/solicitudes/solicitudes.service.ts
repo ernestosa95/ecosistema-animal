@@ -22,10 +22,16 @@ const CAMPOS = {
   estado: solicitudes.estado,
   nombre: solicitudes.nombre,
   apellido: solicitudes.apellido,
+  dni: solicitudes.dni,
   email: solicitudes.email,
   telefono: solicitudes.telefono,
   nombreOrganizacion: solicitudes.nombreOrganizacion,
   tipoOrganizacion: solicitudes.tipoOrganizacion,
+  direccionOrganizacion: solicitudes.direccionOrganizacion,
+  localidadOrganizacion: solicitudes.localidadOrganizacion,
+  provinciaOrganizacion: solicitudes.provinciaOrganizacion,
+  telefonoOrganizacion: solicitudes.telefonoOrganizacion,
+  emailOrganizacion: solicitudes.emailOrganizacion,
   organizacionSolicitada: solicitudes.organizacionSolicitada,
   motivoRechazo: solicitudes.motivoRechazo,
   createdAt: solicitudes.createdAt,
@@ -63,11 +69,17 @@ export class SolicitudesService {
         tipo: dto.tipo,
         nombre: dto.nombre,
         apellido: dto.apellido,
+        dni: dto.dni,
         email: dto.email,
         passwordHash,
         telefono: dto.telefono,
         nombreOrganizacion: dto.tipo === 'crear' ? dto.nombreOrganizacion : null,
         tipoOrganizacion: dto.tipo === 'crear' ? (dto.tipoOrganizacion ?? 'clinica') : null,
+        direccionOrganizacion: dto.tipo === 'crear' ? dto.direccionOrganizacion : null,
+        localidadOrganizacion: dto.tipo === 'crear' ? dto.localidadOrganizacion : null,
+        provinciaOrganizacion: dto.tipo === 'crear' ? dto.provinciaOrganizacion : null,
+        telefonoOrganizacion: dto.tipo === 'crear' ? dto.telefonoOrganizacion : null,
+        emailOrganizacion: dto.tipo === 'crear' ? dto.emailOrganizacion : null,
         organizacionSolicitada: dto.tipo === 'unirse' ? dto.organizacionSolicitada : null,
       })
       .returning({ id: solicitudes.id });
@@ -107,6 +119,7 @@ export class SolicitudesService {
             passwordHash: sol.passwordHash,
             nombre: sol.nombre,
             apellido: sol.apellido,
+            dni: sol.dni,
           })
           .returning();
       }
@@ -117,6 +130,11 @@ export class SolicitudesService {
           .values({
             nombre: sol.nombreOrganizacion ?? `${sol.nombre} ${sol.apellido}`,
             tipo: (sol.tipoOrganizacion ?? 'clinica') as TipoOrg,
+            direccion: sol.direccionOrganizacion,
+            localidad: sol.localidadOrganizacion,
+            provincia: sol.provinciaOrganizacion,
+            telefono: sol.telefonoOrganizacion,
+            email: sol.emailOrganizacion,
           })
           .returning();
         await tx.insert(membresias).values({

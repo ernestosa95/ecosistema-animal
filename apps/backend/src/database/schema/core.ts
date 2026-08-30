@@ -41,6 +41,14 @@ export const organizaciones = core.table('organizaciones', {
   nombre: text('nombre').notNull(),
   tipo: tipoOrganizacion('tipo').notNull().default('clinica'),
   cuit: text('cuit'),
+  // Datos de contacto/ubicación de la institución/campo — capturados desde
+  // el alta (form de solicitud de cuenta), texto libre igual que
+  // personas.domicilio (no hay necesidad de geocodificar/filtrar todavía).
+  direccion: text('direccion'),
+  localidad: text('localidad'),
+  provincia: text('provincia'),
+  telefono: text('telefono'),
+  email: text('email'),
   activo: boolean('activo').notNull().default(true),
   // grupoId/planId son referencias lógicas a plataforma.grupos_organizaciones/
   // plataforma.planes, sin FK real a nivel DB — plataforma.ts ya importa de
@@ -63,6 +71,7 @@ export const usuarios = core.table('usuarios', {
   passwordHash: text('password_hash').notNull(),
   nombre: text('nombre'),
   apellido: text('apellido'),
+  dni: text('dni'),
   emailVerificado: boolean('email_verificado').notNull().default(false),
   ultimoLogin: timestamp('ultimo_login', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -150,11 +159,19 @@ export const solicitudes = core.table('solicitudes', {
   estado: text('estado').notNull().default('pendiente'), // 'pendiente' | 'aprobada' | 'rechazada'
   nombre: text('nombre').notNull(),
   apellido: text('apellido').notNull(),
+  dni: text('dni'),
   email: text('email').notNull(),
   passwordHash: text('password_hash').notNull(),
   telefono: text('telefono'),
   nombreOrganizacion: text('nombre_organizacion'),
   tipoOrganizacion: text('tipo_organizacion'),
+  // Datos de la institución/campo, sólo relevantes si tipo = 'crear' — se
+  // trasladan tal cual a core.organizaciones al aprobar la solicitud.
+  direccionOrganizacion: text('direccion_organizacion'),
+  localidadOrganizacion: text('localidad_organizacion'),
+  provinciaOrganizacion: text('provincia_organizacion'),
+  telefonoOrganizacion: text('telefono_organizacion'),
+  emailOrganizacion: text('email_organizacion'),
   organizacionSolicitada: text('organizacion_solicitada'),
   motivoRechazo: text('motivo_rechazo'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

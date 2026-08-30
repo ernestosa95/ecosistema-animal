@@ -9,10 +9,16 @@ export interface Solicitud {
   estado: string;
   nombre: string;
   apellido: string;
+  dni?: string;
   email: string;
   telefono?: string;
   nombreOrganizacion?: string;
   tipoOrganizacion?: string;
+  direccionOrganizacion?: string;
+  localidadOrganizacion?: string;
+  provinciaOrganizacion?: string;
+  telefonoOrganizacion?: string;
+  emailOrganizacion?: string;
   organizacionSolicitada?: string;
   createdAt?: string;
 }
@@ -21,8 +27,10 @@ export interface Solicitud {
 export async function crearSolicitud(d: {
   tipo: 'crear' | 'unirse';
   nombre: string; apellido: string; email: string; password: string;
-  telefono?: string;
+  telefono?: string; dni?: string;
   nombreOrganizacion?: string; tipoOrganizacion?: string;
+  direccionOrganizacion?: string; localidadOrganizacion?: string; provinciaOrganizacion?: string;
+  telefonoOrganizacion?: string; emailOrganizacion?: string;
   organizacionSolicitada?: string;
 }): Promise<{ ok: boolean; id: string }> {
   const res = await fetch(`${BASE}/solicitudes`, {

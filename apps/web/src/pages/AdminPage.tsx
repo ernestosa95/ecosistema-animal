@@ -790,7 +790,7 @@ function SolicitudCard({ s, orgs, onResuelta }: { s: Solicitud; orgs: Organizaci
       <div className="adm-solhead">
         <div>
           <b>{s.nombre} {s.apellido}</b>
-          <span>{s.email}{s.telefono ? ` · ${s.telefono}` : ''}</span>
+          <span>{s.email}{s.telefono ? ` · ${s.telefono}` : ''}{s.dni ? ` · DNI ${s.dni}` : ''}</span>
         </div>
         <span className="adm-rol">{s.tipo === 'crear' ? 'Crear' : 'Unirse'}</span>
       </div>
@@ -799,6 +799,13 @@ function SolicitudCard({ s, orgs, onResuelta }: { s: Solicitud; orgs: Organizaci
           ? <>Quiere crear <b>{s.nombreOrganizacion}</b> ({s.tipoOrganizacion})</>
           : <>Quiere unirse a <b>{s.organizacionSolicitada}</b></>}
       </div>
+      {s.tipo === 'crear' && (s.direccionOrganizacion || s.localidadOrganizacion || s.provinciaOrganizacion || s.telefonoOrganizacion || s.emailOrganizacion) && (
+        <div className="adm-soldesc" style={{ color: '#6b7280' }}>
+          {[s.direccionOrganizacion, s.localidadOrganizacion, s.provinciaOrganizacion].filter(Boolean).join(', ')}
+          {s.telefonoOrganizacion ? ` · Tel: ${s.telefonoOrganizacion}` : ''}
+          {s.emailOrganizacion ? ` · ${s.emailOrganizacion}` : ''}
+        </div>
+      )}
 
       {s.tipo === 'unirse' && (
         <div className="adm-row2" style={{ marginTop: 8 }}>

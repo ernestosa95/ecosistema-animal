@@ -19,6 +19,9 @@ export class CrearSolicitudDto {
   @IsOptional() @IsString()
   telefono?: string;
 
+  @IsOptional() @IsString()
+  dni?: string;
+
   // Requerido solo si tipo = 'crear'
   @ValidateIf((o) => o.tipo === 'crear')
   @IsString() @MinLength(2)
@@ -26,6 +29,23 @@ export class CrearSolicitudDto {
 
   @IsOptional() @IsIn(['clinica', 'establecimiento', 'mixta'])
   tipoOrganizacion?: string;
+
+  // Datos de la institución/campo — sólo tienen sentido si tipo = 'crear',
+  // todos opcionales (no todas las instituciones tienen los cinco datos a mano).
+  @IsOptional() @IsString()
+  direccionOrganizacion?: string;
+
+  @IsOptional() @IsString()
+  localidadOrganizacion?: string;
+
+  @IsOptional() @IsString()
+  provinciaOrganizacion?: string;
+
+  @IsOptional() @IsString()
+  telefonoOrganizacion?: string;
+
+  @IsOptional() @IsEmail()
+  emailOrganizacion?: string;
 
   // Requerido solo si tipo = 'unirse' (nombre de la veterinaria a la que se quiere unir)
   @ValidateIf((o) => o.tipo === 'unirse')
