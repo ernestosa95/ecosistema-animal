@@ -2,6 +2,15 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-08-29] — Fix: `nest build`/`nest start` roto por un conflicto de `@types/react` duplicado
+
+Encontrado al intentar levantar el backend real para el usuario (pidió el emulador + un usuario admin para probar al llegar a su casa): `nest start --watch` tiró 57 errores TS2769 al arrancar. `nest build` — que no se había vuelto a correr desde que se instaló `react-joyride` para el tutorial guiado, sólo `vite build` del lado web — también fallaba, así que esto llevaba un rato roto sin que se notara (`vite build` transpila con esbuild y no tipa de verdad, por eso no lo agarró).
+
+- **Causa**: instalar `react-joyride` corrió de nuevo el arbitraje de pnpm sobre qué versión de `@types/react` ocupa el hoist ambiental compartido (`node_modules/.pnpm/node_modules/@types/react`, el "último recurso" que usa la resolución de Node cuando un paquete no declara su propio `@types/react`) — pasó de `18.3.31` a `19.2.18` (ya coexistían ambas versiones en el lockfile desde antes por `apps/mobile`, que sí necesita React 19 de verdad; lo nuevo es cuál de las dos "ganaba" ese slot ambiental). `@react-pdf/renderer` no declara `@types/react` como dependencia propia — su `.d.ts` resuelve `react` caminando hacia arriba desde su propia carpeta hasta pegarle a ese hoist ambiental. Resultado: los `h(Text, ...)`/`h(View, ...)` de `carnet.document.ts`/`ficha.document.ts` quedaban tipados contra una copia de `React.Context` distinta a la que backend usa en el resto del código → "no assignable" en cada llamada.
+- **Fix**: `pnpm.packageExtensions` en el `package.json` raíz, dándole a `@react-pdf/renderer` una dependencia propia `@types/react@18.3.31` — la resolución la encuentra ahí antes de llegar al hoist ambiental, sin tocar la resolución real de `apps/mobile` (que sigue con 19.x, verificado con `tsc --noEmit` después del fix) ni la de `apps/web`.
+- **Verificado**: `nest build` limpio, `tsc --noEmit` de `apps/mobile` limpio, las 14 suites `test:*-demo` del backend siguen en verde (196 checks).
+- **Lección anotada**: instalar una dependencia en un workspace de un monorepo pnpm puede romper silenciosamente el *type-checking* de otro workspace sin tocarle una sola línea de código — `vite build`/`esbuild` no lo detectan porque no tipan de verdad. De acá en más, tras instalar cualquier dependencia nueva en cualquier workspace, correr `nest build` (no sólo `vite build`) antes de dar por buena la sesión.
+
 ## [2026-08-29] — Tutorial guiado (tour interactivo por rol)
 
 A pedido del usuario ("agregar una opción de tutorial/guía de cómo hacer los procesos ante un primer ingreso"). Alcance acordado antes de codear (dos preguntas, `AskUserQuestion`): formato **tour interactivo con tooltips sobre la pantalla real** (no una página de ayuda estática ni sólo un modal — el usuario prefirió esto explícitamente, aunque implica más trabajo y una librería nueva) y **una guía por rol** con los flujos principales de cada uno.
