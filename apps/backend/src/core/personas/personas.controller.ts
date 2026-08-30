@@ -32,6 +32,23 @@ export class PersonasController {
     return this.personas.listar(organizacionId);
   }
 
+  // Rutas literales (`veterinarios`, `:id/animales`) van ANTES que `:id` a
+  // secas — Nest/Express registra en orden de declaración y matchea la
+  // primera que calce, así que `:id` colgado primero se comía
+  // "veterinarios" como si fuera un id, y Postgres lo rechazaba como
+  // "invalid input syntax for type uuid" (traducido a 404 genérico por
+  // DbErrorFilter) en vez de listar los veterinarios.
+  @Get('veterinarios')
+  @Roles('propietario', 'admin', 'veterinario', 'recepcion')
+  veterinarios(@CurrentOrg() organizacionId: string) {
+    return this.personas.listarVeterinarios(organizacionId);
+  }
+
+  @Get(':id/animales')
+  animales(@CurrentOrg() organizacionId: string, @Param('id') id: string) {
+    return this.personas.listarAnimales(organizacionId, id);
+  }
+
   @Get(':id')
   obtener(@CurrentOrg() organizacionId: string, @Param('id') id: string) {
     return this.personas.obtener(organizacionId, id);
@@ -45,16 +62,5 @@ export class PersonasController {
     @Body() dto: UpdatePersonaDto,
   ) {
     return this.personas.actualizar(organizacionId, id, dto);
-  }
-
-  @Get(':id/animales')
-  animales(@CurrentOrg() organizacionId: string, @Param('id') id: string) {
-    return this.personas.listarAnimales(organizacionId, id);
-  }
-
-  @Get('veterinarios')
-  @Roles('propietario', 'admin', 'veterinario', 'recepcion')
-  veterinarios(@CurrentOrg() organizacionId: string) {
-    return this.personas.listarVeterinarios(organizacionId);
   }
 }

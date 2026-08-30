@@ -2,6 +2,16 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-08-30] — Fix: `GET /personas/veterinarios` devolvía 404 (orden de rutas)
+
+Encontrado por el usuario probando la app real en el navegador (pestaña "Caja" tirando "Recurso no encontrado" apenas se abría, antes de tocar nada). `Mostrador` en `CajaPage.tsx` pide `cajaActual`/`productos`/`veterinarios` en paralelo — el que fallaba era `api.veterinarios()`.
+
+- **Causa**: en `personas.controller.ts`, `@Get(':id')` estaba declarado *antes* que `@Get('veterinarios')`. Nest/Express registra las rutas en orden de declaración y usa la primera que matchea — `:id` matchea cualquier segmento, así que `GET /personas/veterinarios` se enrutaba a `obtener(id='veterinarios')`, que hace `eq(personas.id, 'veterinarios')`. Postgres rechaza eso como `invalid input syntax for type uuid`, y `DbErrorFilter` (pensado para convertir ESE error puntual en un 404 limpio en vez de un 500) lo traduce a `{"message":"Recurso no encontrado"}` — por eso el síntoma era un 404 y no un error de sintaxis SQL visible.
+- **Por qué no lo agarró ningún test**: `test:personas-demo` replica la lógica de `PersonasService` directamente contra Drizzle, sin pasar por el enrutador HTTP de Nest — este tipo de bug (orden de rutas literal-vs-`:id`) sólo se manifiesta a través del enrutador real, algo que ninguna de las 14 suites `test:*-demo` ejercita (todas evitan levantar Nest a propósito, para no necesitar un servidor corriendo). Gap real, anotado para si alguna vez se justifica un puñado de tests de integración HTTP.
+- **Fix**: reordené `personas.controller.ts` — las rutas literales (`veterinarios`, `:id/animales`) van antes que `:id` a secas.
+- **Auditoría de paso**: repasé los ~35 controllers del backend buscando el mismo patrón (una ruta literal declarada después de un `:id`/`:algo` en el mismo controller) — este era el único caso.
+- **Verificado**: `GET /personas/veterinarios` devuelve `[]` (antes 404) contra el backend real; `nest build` limpio; las 14 suites `test:*-demo` siguen en verde.
+
 ## [2026-08-29] — Fix: `nest build`/`nest start` roto por un conflicto de `@types/react` duplicado
 
 Encontrado al intentar levantar el backend real para el usuario (pidió el emulador + un usuario admin para probar al llegar a su casa): `nest start --watch` tiró 57 errores TS2769 al arrancar. `nest build` — que no se había vuelto a correr desde que se instaló `react-joyride` para el tutorial guiado, sólo `vite build` del lado web — también fallaba, así que esto llevaba un rato roto sin que se notara (`vite build` transpila con esbuild y no tipa de verdad, por eso no lo agarró).
