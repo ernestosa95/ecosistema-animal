@@ -2,6 +2,15 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-08-30] — Fix: `res.json()` sobre respuestas 200 con cuerpo vacío rompía el front (los tres clientes)
+
+Siguiente síntoma en la misma pestaña de Caja, ya con el fix de `/personas/veterinarios` puesto: "JSON.parse: unexpected end of data at line 1 column 1 of the JSON data" apenas se abría (antes de tocar nada).
+
+- **Causa**: `GET /caja/cajas/actual` devuelve `null` cuando no hay caja abierta (comportamiento correcto y esperado — así lo interpreta `Mostrador` en `CajaPage.tsx` para mostrar el form de apertura). Pero Nest, cuando un controller devuelve `null`/`undefined`, no manda `res.json(null)` — manda una respuesta **200 con cuerpo vacío y sin `Content-Type`** (confirmado con `curl -I`: sin `Content-Length` ni `Content-Type`). Los tres clientes HTTP del proyecto (`apps/web/src/api/client.ts`, `apps/web/src/api/turnos.ts`, `apps/mobile/src/api/client.ts`) sólo tenían el caso especial `res.status === 204 → null`, y llamaban `res.json()` directo para cualquier otro 2xx — sobre un cuerpo vacío eso tira exactamente el error que se vio.
+- **Por qué no aparecía en otros lados todavía**: es el primer endpoint del proyecto pensado para devolver "nada" (`null`) con status 200 en vez de 204 — todos los demás GET devuelven una lista (`[]` si está vacía) o lanzan 404 si no existe. `cajaActual` es conceptualmente distinto: "no hay caja abierta" es un estado válido, no un error ni una lista vacía.
+- **Fix** (mismo patrón en los tres archivos): en vez de `res.status === 204 ? null : res.json()`, se lee `res.text()` primero y sólo se parsea si no está vacío — `res.status === 204 ? null : (texto ? JSON.parse(texto) : null)`. Cubre 204 explícito y 200 con cuerpo vacío por igual, sin cambiar el comportamiento para respuestas con contenido real.
+- **Verificado**: `vite build` y `tsc --noEmit` de `apps/mobile` limpios. La pestaña de Caja ya carga bien contra el backend real (confirmado por el usuario).
+
 ## [2026-08-30] — Fix: `GET /personas/veterinarios` devolvía 404 (orden de rutas)
 
 Encontrado por el usuario probando la app real en el navegador (pestaña "Caja" tirando "Recurso no encontrado" apenas se abría, antes de tocar nada). `Mostrador` en `CajaPage.tsx` pide `cajaActual`/`productos`/`veterinarios` en paralelo — el que fallaba era `api.veterinarios()`.

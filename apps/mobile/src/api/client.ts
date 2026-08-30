@@ -23,8 +23,12 @@ async function handle(res: Response) {
     }
     throw new Error(msg);
   }
+  // ver la nota equivalente en apps/web/src/api/client.ts: un 200 con
+  // cuerpo vacío (null/undefined devuelto por el controller de Nest) rompe
+  // res.json() directo.
   if (res.status === 204) return null;
-  return res.json();
+  const texto = await res.text();
+  return texto ? JSON.parse(texto) : null;
 }
 
 let _onRefresco: ((tokens: { accessToken: string; refreshToken: string }) => void) | null = null;

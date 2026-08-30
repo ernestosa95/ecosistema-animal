@@ -73,7 +73,11 @@ async function manejarRespuesta(res: Response): Promise<any> {
     }
     throw new Error(msg);
   }
-  return res.status === 204 ? null : res.json();
+  // ver la nota en api/client.ts: un 200 con cuerpo vacío (null/undefined
+  // devuelto por el controller) rompe res.json() directo.
+  if (res.status === 204) return null;
+  const texto = await res.text();
+  return texto ? JSON.parse(texto) : null;
 }
 
 async function request(path: string, options: RequestInit = {}): Promise<any> {

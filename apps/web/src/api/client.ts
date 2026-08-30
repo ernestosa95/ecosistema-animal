@@ -25,8 +25,14 @@ async function handle(res: Response) {
     }
     throw new Error(msg);
   }
+  // 204 explícito o un 200 con cuerpo vacío (Nest no manda body ni
+  // Content-Type cuando el controller devuelve null/undefined — pasa en
+  // endpoints tipo "actual" que representan "no hay nada" con null, ej.
+  // GET /caja/cajas/actual). res.json() sobre texto vacío tira
+  // "unexpected end of data", así que se lee como texto primero.
   if (res.status === 204) return null;
-  return res.json();
+  const texto = await res.text();
+  return texto ? JSON.parse(texto) : null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
