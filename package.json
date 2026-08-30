@@ -8,5 +8,14 @@
     "backend:build": "pnpm --filter backend build",
     "db:generate": "pnpm --filter backend db:generate",
     "db:migrate": "pnpm --filter backend db:migrate"
+  },
+  "pnpm": {
+    "packageExtensions": {
+      "@react-pdf/renderer": {
+        "dependencies": {
+          "@types/react": "18.3.31"
+        }
+      }
+    }
   }
 }

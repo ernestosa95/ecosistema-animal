@@ -4,6 +4,8 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+packageExtensionsChecksum: 4b9cc17eac37444c0f747aa9baa8957a
+
 importers:
 
   .: {}
@@ -8995,6 +8997,7 @@ snapshots:
       '@react-pdf/primitives': 3.1.1
       '@react-pdf/render': 3.5.0
       '@react-pdf/types': 2.11.1
+      '@types/react': 18.3.31
       events: 3.3.0
       object-assign: 4.1.1
       prop-types: 15.8.1
