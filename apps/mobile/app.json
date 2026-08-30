@@ -29,8 +29,7 @@
       "expo-router",
       "expo-dev-client",
       "expo-secure-store",
-      "./plugins/withWatermelonJsiFix",
-      "@morrowdigital/watermelondb-expo-plugin",
+      ["@morrowdigital/watermelondb-expo-plugin", { "disableJsi": true }],
       [
         "expo-splash-screen",
         {
