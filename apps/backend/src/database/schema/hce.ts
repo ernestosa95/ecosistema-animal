@@ -2,7 +2,7 @@
  * Definición Drizzle del schema `hce` (Historia Clínica Electrónica).
  * Espejo de db/schema/esquema_ecosistema.sql — mantener en sincronía.
  */
-import { pgSchema, uuid, text, timestamp, numeric, date, integer, boolean } from 'drizzle-orm/pg-core';
+import { pgSchema, uuid, text, timestamp, numeric, date, integer, boolean, time } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { organizaciones, animales, usuarios, personas } from './core';
 // Referencia circular con farmacia.ts (que a su vez importa `consultas` de
@@ -123,6 +123,62 @@ export const indicaciones = hce.table('indicaciones', {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
 });
 
+// Agendas (una por profesional, o sin profesional — ej. "Peluquería canina" en
+// una veterinaria que también ofrece ese servicio) con horarios de atención
+// recurrentes (agendaBloques) y excepciones puntuales (agendaExcepciones,
+// feriados/licencias o aperturas extra). Reemplaza a turnos.veterinarioId:
+// el turno pasa a apuntar a una agenda, que puede o no tener un profesional
+// asociado — sin duplicar el dato en dos columnas.
+export const agendas = hce.table('agendas', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizacionId: uuid('organizacion_id')
+    .notNull()
+    .references(() => organizaciones.id, { onDelete: 'cascade' }),
+  nombre: text('nombre').notNull(),
+  // null = agenda sin profesional (recurso/servicio, ej. peluquería).
+  usuarioId: uuid('usuario_id').references(() => usuarios.id),
+  duracionTurnoMinutos: integer('duracion_turno_minutos').notNull().default(30),
+  color: text('color'), // hex opcional, para diferenciar agendas en la UI
+  activa: boolean('activa').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+});
+
+// Horario recurrente semanal de una agenda (ej. "Lunes a Viernes 9 a 13").
+export const agendaBloques = hce.table('agenda_bloques', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  agendaId: uuid('agenda_id')
+    .notNull()
+    .references(() => agendas.id, { onDelete: 'cascade' }),
+  diaSemana: integer('dia_semana').notNull(), // 0=domingo .. 6=sábado (Date#getDay())
+  horaInicio: time('hora_inicio').notNull(),
+  horaFin: time('hora_fin').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+});
+
+export const tipoExcepcionAgenda = hce.enum('tipo_excepcion_agenda', ['cierre', 'apertura_extra']);
+
+// Excepción puntual a una fecha concreta: cierra la agenda entera o una
+// franja (feriado, licencia) o abre una ventana extra fuera del horario
+// recurrente. `horaInicio`/`horaFin` nulos + tipo='cierre' = día completo.
+export const agendaExcepciones = hce.table('agenda_excepciones', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  agendaId: uuid('agenda_id')
+    .notNull()
+    .references(() => agendas.id, { onDelete: 'cascade' }),
+  fecha: date('fecha').notNull(),
+  tipo: tipoExcepcionAgenda('tipo').notNull(),
+  horaInicio: time('hora_inicio'),
+  horaFin: time('hora_fin'),
+  motivo: text('motivo'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+});
+
 export const turnos = hce.table('turnos', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizacionId: uuid('organizacion_id')
@@ -130,7 +186,9 @@ export const turnos = hce.table('turnos', {
     .references(() => organizaciones.id, { onDelete: 'cascade' }),
   animalId: uuid('animal_id').references(() => animales.id),
   personaId: uuid('persona_id').references(() => personas.id), // solicitante
-  veterinarioId: uuid('veterinario_id').references(() => usuarios.id),
+  // Nullable a propósito: un turno sin agenda sigue siendo 100% libre (sin
+  // validación de horario/solapamiento), igual que todos los turnos hoy.
+  agendaId: uuid('agenda_id').references(() => agendas.id),
   fechaHora: timestamp('fecha_hora', { withTimezone: true }).notNull(),
   estado: estadoTurno('estado').notNull().default('solicitado'),
   motivo: text('motivo'),

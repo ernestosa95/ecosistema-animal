@@ -24,6 +24,7 @@
     "test:tropera-demo": "tsx test/tropera-flow.demo.ts",
     "test:caja-demo": "tsx test/caja-flow.demo.ts",
     "test:farmacia-demo": "tsx test/farmacia-flow.demo.ts",
+    "test:agendas-demo": "tsx test/agendas-flow.demo.ts",
     "db:local-init": "node scripts/init-local-db.mjs",
     "db:seed": "node scripts/seed-especies.mjs"
   },

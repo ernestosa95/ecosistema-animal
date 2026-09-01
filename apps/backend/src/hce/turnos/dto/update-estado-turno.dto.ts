@@ -14,8 +14,8 @@ export class UpdateEstadoTurnoDto {
   @IsDateString()
   fechaHora?: string;
 
-  /** Opcional: asignar/veterinario responsable. */
+  /** Opcional: reasignar la agenda del turno. */
   @IsOptional()
   @IsUUID()
-  veterinarioId?: string;
+  agendaId?: string;
 }

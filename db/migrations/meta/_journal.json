@@ -99,6 +99,20 @@
       "when": 1788057593011,
       "tag": "0013_purple_makkari",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1788135617637,
+      "tag": "0017_giant_deadpool",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788135649709,
+      "tag": "0018_heavy_sabretooth",
+      "breakpoints": true
     }
   ]
 }

@@ -122,7 +122,9 @@ export interface Turno {
   paciente: string;
   especie: string;
   dueno: string;
-  veterinarioId?: string;
+  agendaId?: string;
+  agendaNombre?: string;
+  agendaUsuarioId?: string;
 }
 
 export interface AnimalOpcion {
@@ -142,11 +144,41 @@ export interface DuenoOpcion {
   nombre: string;
 }
 
-export interface Profesional {
+export interface MiembroOpcion {
   id: string;
   nombre: string;
-  roles: string[];
-  rol: string; // roles.join(' + ') — para mostrar en un solo lugar sin repetir el join en cada consumidor
+  rol: string; // roles.join(' + ')
+}
+
+export interface Agenda {
+  id: string;
+  nombre: string;
+  usuarioId?: string | null;
+  usuarioNombre?: string | null;
+  duracionTurnoMinutos: number;
+  color?: string | null;
+  activa: boolean;
+}
+
+export interface AgendaBloque {
+  id: string;
+  diaSemana: number; // 0=domingo .. 6=sábado
+  horaInicio: string; // 'HH:MM'
+  horaFin: string;
+}
+
+export interface AgendaExcepcion {
+  id: string;
+  fecha: string; // YYYY-MM-DD
+  tipo: 'cierre' | 'apertura_extra';
+  horaInicio?: string | null;
+  horaFin?: string | null;
+  motivo?: string | null;
+}
+
+export interface Slot {
+  hora: string; // 'HH:MM'
+  disponible: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -201,7 +233,9 @@ function mapTurno(r: any, cat: Awaited<ReturnType<typeof catalogos>>): Turno {
         : animal?.personaId
         ? cat.perById.get(animal.personaId) ?? '—'
         : '—',
-    veterinarioId: r.veterinarioId ?? r.veterinario_id ?? undefined,
+    agendaId: r.agendaId ?? r.agenda_id ?? undefined,
+    agendaNombre: r.agendaNombre ?? r.agenda_nombre ?? undefined,
+    agendaUsuarioId: r.agendaUsuarioId ?? r.agenda_usuario_id ?? undefined,
   };
 }
 
@@ -237,7 +271,7 @@ export async function crearTurno(data: {
   fecha: string;
   hora: string;
   canal?: string;
-  veterinarioId?: string;
+  agendaId?: string;
   estado?: 'solicitado' | 'confirmado';
 }): Promise<Turno> {
   const r = await request('/turnos', {
@@ -248,7 +282,7 @@ export async function crearTurno(data: {
       motivo: data.motivo,
       canal: data.canal ?? 'mostrador',
       estado: data.estado ?? 'confirmado',
-      ...(data.veterinarioId ? { veterinarioId: data.veterinarioId } : {}),
+      ...(data.agendaId ? { agendaId: data.agendaId } : {}),
     }),
   });
   const cat = await catalogos();
@@ -258,7 +292,7 @@ export async function crearTurno(data: {
 async function cambiarEstado(
   id: string,
   estado: EstadoTurno,
-  extra: { fechaHora?: string; veterinarioId?: string } = {},
+  extra: { fechaHora?: string; agendaId?: string } = {},
 ): Promise<Turno> {
   const r = await request(`/turnos/${id}/estado`, {
     method: 'PATCH',
@@ -306,25 +340,87 @@ export async function listarDuenos(): Promise<DuenoOpcion[]> {
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
 }
 
-export async function listarProfesionales(): Promise<Profesional[]> {
-  // No se cazan errores acá a propósito: si /usuarios falla (p. ej. módulo sin
-  // registrar), el modal muestra el motivo en vez de un dropdown vacío y mudo.
+/** Miembros de la organización, para elegir a quién asignarle una agenda. */
+export async function listarMiembros(): Promise<MiembroOpcion[]> {
   const rows: any[] = await request('/usuarios');
-  const norm: Profesional[] = (rows || [])
+  return (rows || [])
     .map((u) => {
       const id = String(u.usuarioId ?? u.id ?? u.usuario_id ?? '');
       const nombre = `${u.nombre ?? ''} ${u.apellido ?? ''}`.trim();
       const roles: string[] = u.roles ?? u.roles_membresia ?? [];
-      const rol = roles.join(' + ');
-      return { id, nombre: nombre || rol || 'Profesional', roles, rol };
+      return { id, nombre: nombre || roles.join(' + ') || 'Miembro', rol: roles.join(' + ') };
     })
-    .filter((p) => p.id);
+    .filter((m) => m.id);
+}
 
-  // Preferimos quienes atienden (veterinario / propietario). Pero si el filtro
-  // deja la lista vacía y sí hay miembros, devolvemos todos: mejor poder elegir.
-  const ATIENDEN = new Set(['veterinario', 'propietario']);
-  const soloAtienden = norm.filter((p) => p.roles.some((r) => ATIENDEN.has(r)));
-  return soloAtienden.length ? soloAtienden : norm;
+// ─────────────────────────────────────────────────────────────────────────
+// Agendas (por profesional, o sin profesional — ej. peluquería) y sus
+// bloques de horario recurrentes / excepciones puntuales.
+// ─────────────────────────────────────────────────────────────────────────
+export async function listarAgendas(): Promise<Agenda[]> {
+  const rows: any[] = await request('/agendas');
+  return (rows || []).map((a) => ({
+    id: String(a.id),
+    nombre: a.nombre,
+    usuarioId: a.usuarioId ?? a.usuario_id ?? null,
+    usuarioNombre: a.usuarioNombre ?? a.usuario_nombre ?? null,
+    duracionTurnoMinutos: a.duracionTurnoMinutos ?? a.duracion_turno_minutos ?? 30,
+    color: a.color ?? null,
+    activa: a.activa !== false,
+  }));
+}
+
+export const crearAgenda = (
+  d: { nombre: string; usuarioId?: string | null; duracionTurnoMinutos?: number; color?: string },
+) => request('/agendas', { method: 'POST', body: JSON.stringify(d) });
+
+export const actualizarAgenda = (
+  id: string,
+  d: { nombre?: string; usuarioId?: string | null; duracionTurnoMinutos?: number; color?: string; activa?: boolean },
+) => request(`/agendas/${id}`, { method: 'PATCH', body: JSON.stringify(d) });
+
+export const eliminarAgenda = (id: string) => request(`/agendas/${id}`, { method: 'DELETE' });
+
+export async function listarBloques(agendaId: string): Promise<AgendaBloque[]> {
+  const rows: any[] = await request(`/agendas/${agendaId}/bloques`);
+  return (rows || []).map((b) => ({
+    id: String(b.id),
+    diaSemana: b.diaSemana ?? b.dia_semana,
+    horaInicio: (b.horaInicio ?? b.hora_inicio ?? '').slice(0, 5),
+    horaFin: (b.horaFin ?? b.hora_fin ?? '').slice(0, 5),
+  }));
+}
+
+export const crearBloque = (agendaId: string, d: { diaSemana: number; horaInicio: string; horaFin: string }) =>
+  request(`/agendas/${agendaId}/bloques`, { method: 'POST', body: JSON.stringify(d) });
+
+export const eliminarBloque = (agendaId: string, bloqueId: string) =>
+  request(`/agendas/${agendaId}/bloques/${bloqueId}`, { method: 'DELETE' });
+
+export async function listarExcepciones(agendaId: string): Promise<AgendaExcepcion[]> {
+  const rows: any[] = await request(`/agendas/${agendaId}/excepciones`);
+  return (rows || []).map((e) => ({
+    id: String(e.id),
+    fecha: e.fecha,
+    tipo: e.tipo,
+    horaInicio: e.horaInicio ? String(e.horaInicio).slice(0, 5) : e.hora_inicio ? String(e.hora_inicio).slice(0, 5) : null,
+    horaFin: e.horaFin ? String(e.horaFin).slice(0, 5) : e.hora_fin ? String(e.hora_fin).slice(0, 5) : null,
+    motivo: e.motivo ?? null,
+  }));
+}
+
+export const crearExcepcion = (
+  agendaId: string,
+  d: { fecha: string; tipo: 'cierre' | 'apertura_extra'; horaInicio?: string; horaFin?: string; motivo?: string },
+) => request(`/agendas/${agendaId}/excepciones`, { method: 'POST', body: JSON.stringify(d) });
+
+export const eliminarExcepcion = (agendaId: string, excepcionId: string) =>
+  request(`/agendas/${agendaId}/excepciones/${excepcionId}`, { method: 'DELETE' });
+
+export async function slotsDisponibles(agendaId: string, fecha: string, excluirTurnoId?: string): Promise<Slot[]> {
+  const qs = new URLSearchParams({ fecha, ...(excluirTurnoId ? { excluirTurnoId } : {}) });
+  const rows: any[] = await request(`/agendas/${agendaId}/slots?${qs.toString()}`);
+  return (rows || []).map((s) => ({ hora: s.hora, disponible: !!s.disponible }));
 }
 
 // ─────────────────────────────────────────────────────────────────────────

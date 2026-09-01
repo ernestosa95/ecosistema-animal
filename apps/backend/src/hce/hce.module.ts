@@ -16,15 +16,17 @@ import { MacrosService } from './macros/macros.service';
 import { MacrosController } from './macros/macros.controller';
 import { IndicacionesService } from './indicaciones/indicaciones.service';
 import { IndicacionesController } from './indicaciones/indicaciones.controller';
+import { AgendasService } from './agendas/agendas.service';
+import { AgendasController } from './agendas/agendas.controller';
 
 /**
  * Módulo de la Historia Clínica Electrónica. Agrupa las features de la HCE:
- * consultas, vacunaciones, turnos y el carnet PDF.
+ * consultas, vacunaciones, turnos, agendas y el carnet PDF.
  */
 @Module({
   imports: [AuthModule, CarnetModule, PortalModule],
-  controllers: [ConsultasController, VacunacionesController, TurnosController, CarnetController, MacrosController, IndicacionesController],
-  providers: [ConsultasService, VacunacionesService, TurnosService, TenantGuard, RolesGuard, CarnetService, MacrosService, IndicacionesService],
+  controllers: [ConsultasController, VacunacionesController, TurnosController, CarnetController, MacrosController, IndicacionesController, AgendasController],
+  providers: [ConsultasService, VacunacionesService, TurnosService, TenantGuard, RolesGuard, CarnetService, MacrosService, IndicacionesService, AgendasService],
   exports: [VacunacionesService],
 })
 export class HceModule {}

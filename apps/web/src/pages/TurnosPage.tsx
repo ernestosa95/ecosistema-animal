@@ -5,11 +5,12 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   listarTurnos, crearTurno, confirmarTurno, reprogramarTurno,
   cancelarTurno, atenderTurno, buscarAnimales, contarTurnosPorDia,
-  listarEspecies, listarDuenos, listarProfesionales, crearPacienteRapido,
+  listarEspecies, listarDuenos, listarAgendas, slotsDisponibles, crearPacienteRapido,
   type Turno, type EstadoTurno, type AnimalOpcion,
-  type EspecieOpcion, type DuenoOpcion, type Profesional,
+  type EspecieOpcion, type DuenoOpcion, type Agenda, type Slot,
 } from '../api/turnos';
-import { ExportBar } from '../components/ExportBar';
+import { GestionAgendas } from './turnos/GestionAgendas';
+import { Overlay, Field } from './turnos/ui';
 
 // ── Config visual ────────────────────────────────────────────────────────────
 const ESPECIES: Record<string, string> = {
@@ -69,6 +70,7 @@ export default function TurnosPage({ onAtender, miVeterinarioId, soloMiosInicial
   const [filtro, setFiltro] = useState<'todos' | EstadoTurno>('todos');
   const [soloMios, setSoloMios] = useState<boolean>(soloMiosInicial);
   const [modal, setModal] = useState<Modal>(null);
+  const [mostrarAgendas, setMostrarAgendas] = useState(false);
   const [ocupado, setOcupado] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   // Calendario del mes: mes visible + conteo de turnos por día.
@@ -114,7 +116,7 @@ export default function TurnosPage({ onAtender, miVeterinarioId, soloMiosInicial
 
   const delDia = useMemo(() => {
     let list = turnos;
-    if (soloMios && miVeterinarioId) list = list.filter(t => t.veterinarioId === miVeterinarioId);
+    if (soloMios && miVeterinarioId) list = list.filter(t => t.agendaUsuarioId === miVeterinarioId);
     if (filtro !== 'todos') list = list.filter(t => t.estado === filtro);
     return list;
   }, [turnos, filtro, soloMios, miVeterinarioId]);
@@ -124,82 +126,88 @@ export default function TurnosPage({ onAtender, miVeterinarioId, soloMiosInicial
     <div className="hu-agenda">
       <style>{CSS}</style>
 
-      {/* Cabecera: controles (izq) + calendario del mes (der) */}
-      <div className="hu-header2">
-        <div className="hu-hcol">
-          <div className="hu-daterow">
-            <button className="hu-nav" onClick={() => setFecha(addDays(fecha, -1))} aria-label="Día anterior">‹</button>
-            <div className="hu-datelabel">{fechaLarga(fecha)}</div>
-            <button className="hu-nav" onClick={() => setFecha(addDays(fecha, 1))} aria-label="Día siguiente">›</button>
-            <button className="hu-btn ghost" onClick={() => { const d = new Date(); d.setHours(0, 0, 0, 0); setFecha(d); }}>Hoy</button>
+      <div className="hu-layout">
+        {/* Columna principal (¾) */}
+        <div className="hu-col-main">
+          {/* Filtros de fecha */}
+          <div className="hu-card-block">
+            <div className="hu-daterow">
+              <button className="hu-nav" onClick={() => setFecha(addDays(fecha, -1))} aria-label="Día anterior">‹</button>
+              <div className="hu-datelabel">{fechaLarga(fecha)}</div>
+              <button className="hu-nav" onClick={() => setFecha(addDays(fecha, 1))} aria-label="Día siguiente">›</button>
+              <button className="hu-btn ghost" onClick={() => { const d = new Date(); d.setHours(0, 0, 0, 0); setFecha(d); }}>Hoy</button>
+              <input
+                type="date"
+                value={iso(fecha)}
+                onChange={e => e.target.value && setFecha(new Date(e.target.value + 'T00:00:00'))}
+              />
+            </div>
           </div>
-          <input
-            type="date"
-            value={iso(fecha)}
-            onChange={e => e.target.value && setFecha(new Date(e.target.value + 'T00:00:00'))}
+
+          {/* KPIs 2x2 + acciones */}
+          <div className="hu-card-block">
+            <div className="hu-kpigrid">
+              <div className="hu-stat hu-kpi-a"><b>{turnos.length}</b><span>turnos</span></div>
+              <div className="hu-stat hu-kpi-b"><b style={{ color: ESTADOS.solicitado.color }}>{cuenta('solicitado')}</b><span>a confirmar</span></div>
+              <div className="hu-stat hu-kpi-c"><b style={{ color: ESTADOS.confirmado.color }}>{cuenta('confirmado') + cuenta('reprogramado')}</b><span>en agenda</span></div>
+              <div className="hu-stat hu-kpi-d"><b style={{ color: ESTADOS.atendido.color }}>{cuenta('atendido')}</b><span>atendidos</span></div>
+              <div className="hu-kpi-actions">
+                <button className="hu-btn primary hu-btn-full" data-tour="turnos-nuevo" onClick={() => setModal({ tipo: 'nuevo' })}>＋ Nuevo turno</button>
+                <button className="hu-btn ghost" onClick={() => setMostrarAgendas(true)}>⚙ Agendas</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Filtros + tabla de turnos */}
+          <div className="hu-card-block hu-tablecard">
+            <div className="hu-filters">
+              {miVeterinarioId && (
+                <div className={`hu-chip ${soloMios ? 'active' : ''}`} onClick={() => setSoloMios(v => !v)}>
+                  {soloMios ? '★ Mis turnos' : 'Mis turnos'}
+                </div>
+              )}
+              {([['todos', 'Todos'], ['solicitado', 'Solicitados'], ['confirmado', 'Confirmados'],
+                ['reprogramado', 'Reprogramados'], ['atendido', 'Atendidos'], ['cancelado', 'Cancelados']] as const)
+                .map(([k, l]) => (
+                  <div key={k} className={`hu-chip ${filtro === k ? 'active' : ''}`} onClick={() => setFiltro(k as any)}>{l}</div>
+                ))}
+            </div>
+
+            <div className="hu-tablebody">
+              {cargando ? (
+                <div className="hu-empty">Cargando agenda…</div>
+              ) : error ? (
+                <div className="hu-empty hu-error">{error}</div>
+              ) : delDia.length === 0 ? (
+                <div className="hu-empty">No hay turnos para este día{filtro !== 'todos' ? ' con ese filtro' : ''}.</div>
+              ) : (
+                <div className="hu-list">
+                  {delDia.map(t => (
+                    <TurnoCard key={t.id} t={t} disabled={ocupado} onAccion={onAccion} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Columna accesoria (¼) */}
+        <div className="hu-col-side">
+          <MesCalendario
+            mesView={mesView}
+            selected={fecha}
+            counts={mesCounts}
+            onMes={setMesView}
+            onPick={(d) => { d.setHours(0, 0, 0, 0); setFecha(d); }}
           />
-          <button className="hu-btn primary" data-tour="turnos-nuevo" onClick={() => setModal({ tipo: 'nuevo' })}>＋ Nuevo turno</button>
-
-          {/* Contadores del día */}
-          <div className="hu-summary">
-            <div className="hu-stat"><b>{turnos.length}</b><span>turnos</span></div>
-            <div className="hu-stat"><b style={{ color: ESTADOS.solicitado.color }}>{cuenta('solicitado')}</b><span>a confirmar</span></div>
-            <div className="hu-stat"><b style={{ color: ESTADOS.confirmado.color }}>{cuenta('confirmado') + cuenta('reprogramado')}</b><span>en agenda</span></div>
-            <div className="hu-stat"><b style={{ color: ESTADOS.atendido.color }}>{cuenta('atendido')}</b><span>atendidos</span></div>
+          <div className="hu-card-block hu-dispcard">
+            <h3 className="hu-disp-titulo">Disponibilidad del día</h3>
+            <div className="hu-dispbody">
+              <GraficoDisponibilidad fecha={iso(fecha)} />
+            </div>
           </div>
         </div>
-
-        <MesCalendario
-          mesView={mesView}
-          selected={fecha}
-          counts={mesCounts}
-          onMes={setMesView}
-          onPick={(d) => { d.setHours(0, 0, 0, 0); setFecha(d); }}
-        />
       </div>
-
-      {/* Filtros */}
-      <div className="hu-filters">
-        {miVeterinarioId && (
-          <div className={`hu-chip ${soloMios ? 'active' : ''}`} onClick={() => setSoloMios(v => !v)}>
-            {soloMios ? '★ Mis turnos' : 'Mis turnos'}
-          </div>
-        )}
-        {([['todos', 'Todos'], ['solicitado', 'Solicitados'], ['confirmado', 'Confirmados'],
-          ['reprogramado', 'Reprogramados'], ['atendido', 'Atendidos'], ['cancelado', 'Cancelados']] as const)
-          .map(([k, l]) => (
-            <div key={k} className={`hu-chip ${filtro === k ? 'active' : ''}`} onClick={() => setFiltro(k as any)}>{l}</div>
-          ))}
-      </div>
-
-      {/* Lista */}
-      {!cargando && delDia.length > 0 && (
-        <ExportBar
-          nombreArchivo={`turnos-${iso(fecha)}`}
-          titulo={`Turnos — ${fechaLarga(fecha)}`}
-          columnas={[
-            { clave: 'hora', etiqueta: 'Hora' },
-            { clave: 'paciente', etiqueta: 'Paciente' },
-            { clave: 'dueno', etiqueta: 'Dueño' },
-            { clave: 'estado', etiqueta: 'Estado', valor: (t: Turno) => ESTADOS[t.estado]?.label ?? t.estado },
-            { clave: 'motivo', etiqueta: 'Motivo' },
-          ]}
-          filas={delDia}
-        />
-      )}
-      {cargando ? (
-        <div className="hu-empty">Cargando agenda…</div>
-      ) : error ? (
-        <div className="hu-empty hu-error">{error}</div>
-      ) : delDia.length === 0 ? (
-        <div className="hu-empty">No hay turnos para este día{filtro !== 'todos' ? ' con ese filtro' : ''}.</div>
-      ) : (
-        <div className="hu-list">
-          {delDia.map(t => (
-            <TurnoCard key={t.id} t={t} disabled={ocupado} onAccion={onAccion} />
-          ))}
-        </div>
-      )}
 
       {/* Modales */}
       {modal?.tipo === 'reprogramar' && (
@@ -225,6 +233,8 @@ export default function TurnosPage({ onAtender, miVeterinarioId, soloMiosInicial
             setFecha(new Date(data.fecha + 'T00:00:00'));
           }} />
       )}
+
+      {mostrarAgendas && <GestionAgendas onClose={() => setMostrarAgendas(false)} />}
 
       {toast && <div className="hu-toast">{toast}</div>}
     </div>
@@ -294,7 +304,7 @@ function TurnoCard({ t, disabled, onAccion }: {
           {t.dueno && t.dueno !== '—' ? <span className="hu-tdueno"> · {t.dueno}</span> : null}
         </div>
         <div className="hu-tmeta">
-          {t.motivo || 'Consulta'}{t.canal ? ` · ${t.canal}` : ''}
+          {t.motivo || 'Consulta'}{t.canal ? ` · ${t.canal}` : ''}{t.agendaNombre ? ` · ${t.agendaNombre}` : ''}
         </div>
       </div>
       <span className="hu-badge" style={{ color: est.color, background: est.color + '1a' }}>{est.label}</span>
@@ -314,6 +324,72 @@ function TurnoCard({ t, disabled, onAccion }: {
   );
 }
 
+// ── Disponibilidad del día por agenda (columna accesoria) ─────────────────────
+/**
+ * Para cada agenda activa, una tira de segmentos (uno por slot del día):
+ * verde = disponible, gris = ocupado. Da un pantallazo rápido de qué agendas
+ * tienen lugar sin abrir el modal de "Nuevo turno".
+ */
+function GraficoDisponibilidad({ fecha }: { fecha: string }) {
+  const [agendas, setAgendas] = useState<Agenda[]>([]);
+  const [porAgenda, setPorAgenda] = useState<Record<string, Slot[]>>({});
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    let vivo = true;
+    setCargando(true);
+    listarAgendas()
+      .then(async (ags) => {
+        const activas = ags.filter((a) => a.activa);
+        const entradas = await Promise.all(
+          activas.map(async (a) => [a.id, await slotsDisponibles(a.id, fecha).catch(() => [])] as const),
+        );
+        if (!vivo) return;
+        setAgendas(activas);
+        setPorAgenda(Object.fromEntries(entradas));
+      })
+      .finally(() => { if (vivo) setCargando(false); });
+    return () => { vivo = false; };
+  }, [fecha]);
+
+  if (cargando) return <p className="hu-sub">Cargando…</p>;
+  if (agendas.length === 0) return <p className="hu-sub">Todavía no hay agendas configuradas.</p>;
+
+  return (
+    <div className="hu-disp">
+      <div className="hu-disp-legend">
+        <span><i className="hu-disp-dot libre" /> Disponible</span>
+        <span><i className="hu-disp-dot ocupado" /> Ocupado</span>
+      </div>
+      {agendas.map((a) => {
+        const slots = porAgenda[a.id] ?? [];
+        const ocupados = slots.filter((s) => !s.disponible).length;
+        return (
+          <div key={a.id} className="hu-disp-fila">
+            <div className="hu-disp-nombre">{a.nombre}</div>
+            {slots.length === 0 ? (
+              <p className="hu-sub" style={{ margin: 0 }}>Sin horario ese día</p>
+            ) : (
+              <>
+                <div className="hu-disp-barra">
+                  {slots.map((s) => (
+                    <span
+                      key={s.hora}
+                      className={`hu-disp-seg ${s.disponible ? 'libre' : 'ocupado'}`}
+                      title={`${s.hora} — ${s.disponible ? 'disponible' : 'ocupado'}`}
+                    />
+                  ))}
+                </div>
+                <div className="hu-disp-caption">{ocupados}/{slots.length} ocupados</div>
+              </>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Modal: reprogramar ────────────────────────────────────────────────────────
 function ModalReprogramar({ turno, onClose, onOk }: {
   turno: Turno; onClose: () => void; onOk: (f: string, h: string) => void;
@@ -324,15 +400,66 @@ function ModalReprogramar({ turno, onClose, onOk }: {
     <Overlay onClose={onClose}>
       <h2>Reprogramar turno</h2>
       <p className="hu-sub">{turno.paciente} · {turno.dueno}</p>
-      <div className="hu-row2">
-        <Field label="Nueva fecha"><input type="date" value={f} onChange={e => setF(e.target.value)} /></Field>
+      <Field label="Nueva fecha"><input type="date" value={f} onChange={e => { setF(e.target.value); setH(''); }} /></Field>
+      {turno.agendaId ? (
+        <SelectorHorarioAgenda agendaId={turno.agendaId} fecha={f} hora={h} onHora={setH} turnoIdActual={turno.id} />
+      ) : (
         <Field label="Nueva hora"><input type="time" value={h} onChange={e => setH(e.target.value)} /></Field>
-      </div>
+      )}
       <div className="hu-mactions">
         <button className="hu-btn ghost" onClick={onClose}>Cancelar</button>
-        <button className="hu-btn primary" onClick={() => onOk(f, h)}>Reprogramar</button>
+        <button className="hu-btn primary" disabled={!h} onClick={() => onOk(f, h)}>Reprogramar</button>
       </div>
     </Overlay>
+  );
+}
+
+/**
+ * Grilla de horarios disponibles de una agenda para una fecha dada (slots
+ * fijos según la duración configurada de la agenda, deshabilitados si ya
+ * están ocupados). `turnoIdActual`: al reprogramar, excluye al propio turno
+ * de los horarios "ocupados" (si no, se vería a sí mismo como ocupando su
+ * horario actual y no podría re-elegirlo).
+ */
+function SelectorHorarioAgenda({ agendaId, fecha, hora, onHora, turnoIdActual }: {
+  agendaId: string; fecha: string; hora: string; onHora: (h: string) => void; turnoIdActual?: string;
+}) {
+  const [slots, setSlots] = useState<Slot[] | null>(null);
+  const [cargando, setCargando] = useState(false);
+
+  useEffect(() => {
+    if (!agendaId || !fecha) { setSlots(null); return; }
+    let vivo = true;
+    setCargando(true);
+    slotsDisponibles(agendaId, fecha, turnoIdActual)
+      .then((s) => { if (vivo) setSlots(s); })
+      .catch(() => { if (vivo) setSlots([]); })
+      .finally(() => { if (vivo) setCargando(false); });
+    return () => { vivo = false; };
+  }, [agendaId, fecha, turnoIdActual]);
+
+  return (
+    <Field label="Horario">
+      {cargando ? (
+        <p className="hu-sub">Cargando horarios…</p>
+      ) : !slots || slots.length === 0 ? (
+        <p className="hu-err">Esta agenda no tiene horarios configurados para ese día.</p>
+      ) : (
+        <div className="hu-slots">
+          {slots.map((s) => (
+            <button
+              type="button"
+              key={s.hora}
+              className={`hu-slot${hora === s.hora ? ' sel' : ''}`}
+              disabled={!s.disponible}
+              onClick={() => onHora(s.hora)}
+            >
+              {s.hora}
+            </button>
+          ))}
+        </div>
+      )}
+    </Field>
   );
 }
 
@@ -361,7 +488,7 @@ function ModalNuevo({ fechaDefault, onClose, onOk }: {
   fechaDefault: string; onClose: () => void;
   onOk: (d: {
     animalId: string; motivo: string; fecha: string; hora: string;
-    veterinarioId?: string; estado?: 'solicitado' | 'confirmado';
+    agendaId?: string; estado?: 'solicitado' | 'confirmado';
     paciente?: string; especie?: string; dueno?: string;
   }) => void;
 }) {
@@ -375,9 +502,8 @@ function ModalNuevo({ fechaDefault, onClose, onOk }: {
   // Catálogos
   const [especies, setEspecies] = useState<EspecieOpcion[]>([]);
   const [duenos, setDuenos] = useState<DuenoOpcion[]>([]);
-  const [profesionales, setProfesionales] = useState<Profesional[]>([]);
-  const [profError, setProfError] = useState<string | null>(null);
-  const [veterinarioId, setVeterinarioId] = useState('');
+  const [agendas, setAgendas] = useState<Agenda[]>([]);
+  const [agendaId, setAgendaId] = useState('');
 
   // Alta inline de paciente
   const [modoCrear, setModoCrear] = useState(false);
@@ -394,9 +520,7 @@ function ModalNuevo({ fechaDefault, onClose, onOk }: {
   useEffect(() => {
     listarEspecies().then(setEspecies).catch(() => setEspecies([]));
     listarDuenos().then(setDuenos).catch(() => setDuenos([]));
-    listarProfesionales()
-      .then((p) => { setProfesionales(p); setProfError(null); })
-      .catch((e) => { setProfesionales([]); setProfError(e?.message ?? 'No se pudo cargar /usuarios'); });
+    listarAgendas().then(setAgendas).catch(() => setAgendas([]));
   }, []);
 
   useEffect(() => {
@@ -514,34 +638,40 @@ function ModalNuevo({ fechaDefault, onClose, onOk }: {
         )}
       </Field>
 
-      <Field label="Profesional">
-        <select value={veterinarioId} onChange={e => setVeterinarioId(e.target.value)} disabled={!profesionales.length}>
-          <option value="">{profesionales.length ? 'Sin asignar' : 'No hay profesionales'}</option>
-          {profesionales.map(p => <option key={p.id} value={p.id}>{p.nombre} · {p.rol}</option>)}
+      <Field label="Agenda">
+        <select value={agendaId} onChange={e => { setAgendaId(e.target.value); setHora(''); }}>
+          <option value="">Sin agenda (horario libre)</option>
+          {agendas.filter(a => a.activa).map(a => (
+            <option key={a.id} value={a.id}>{a.nombre}{a.usuarioNombre ? ` · ${a.usuarioNombre}` : ''}</option>
+          ))}
         </select>
-        {!profesionales.length && (
-          <div className="hu-err">
-            {profError
-              ? `No se pudieron cargar los profesionales: ${profError}. Verificá que GET /usuarios exista (registrar UsuariosModule en app.module.ts).`
-              : 'No hay veterinarios en esta clínica. Agregá un miembro con rol Veterinario desde Administración.'}
-          </div>
+        {agendas.length === 0 && (
+          <p className="hu-sub">Todavía no hay agendas configuradas — el turno queda con horario libre. Se crean desde "⚙ Agendas".</p>
         )}
       </Field>
 
       <Field label="Motivo">
         <input type="text" value={motivo} onChange={e => setMotivo(e.target.value)} placeholder="Motivo de la consulta" />
       </Field>
-      <div className="hu-row2">
-        <Field label="Fecha"><input type="date" value={fecha} onChange={e => setFecha(e.target.value)} /></Field>
-        <Field label="Hora"><input type="time" value={hora} onChange={e => setHora(e.target.value)} /></Field>
-      </div>
+
+      {agendaId ? (
+        <>
+          <Field label="Fecha"><input type="date" value={fecha} onChange={e => { setFecha(e.target.value); setHora(''); }} /></Field>
+          <SelectorHorarioAgenda agendaId={agendaId} fecha={fecha} hora={hora} onHora={setHora} />
+        </>
+      ) : (
+        <div className="hu-row2">
+          <Field label="Fecha"><input type="date" value={fecha} onChange={e => setFecha(e.target.value)} /></Field>
+          <Field label="Hora"><input type="time" value={hora} onChange={e => setHora(e.target.value)} /></Field>
+        </div>
+      )}
 
       <div className="hu-mactions">
         <button className="hu-btn ghost" onClick={onClose}>Cancelar</button>
-        <button className="hu-btn primary" disabled={!sel}
+        <button className="hu-btn primary" disabled={!sel || !hora}
           onClick={() => sel && onOk({
             animalId: sel.id, motivo: motivo || 'Consulta', fecha, hora,
-            veterinarioId: veterinarioId || undefined, estado: 'confirmado',
+            agendaId: agendaId || undefined, estado: 'confirmado',
             paciente: sel.nombre, especie: sel.especie, dueno: sel.dueno,
           })}>
           Crear turno
@@ -551,49 +681,42 @@ function ModalNuevo({ fechaDefault, onClose, onOk }: {
   );
 }
 
-// ── Piezas compartidas ────────────────────────────────────────────────────────
-function Overlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
-  return (
-    <div className="hu-overlay" onClick={onClose}>
-      <div className="hu-modal" onClick={e => e.stopPropagation()}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="hu-field">
-      <span>{label}</span>
-      {children}
-    </div>
-  );
-}
 
 // ── Estilos (CSS propio, autocontenido) ───────────────────────────────────────
 const CSS = `
-.hu-agenda { --hu-teal:#0E7C6B; --hu-teal-d:#0a5f52; --hu-bg:#f6f8f7; --hu-card:#fff;
-  --hu-border:#e2e8e5; --hu-text:#1f2a27; --hu-muted:#6b7c77;
-  max-width: 860px; margin: 0 auto; padding: 8px 4px 48px; color: var(--hu-text); }
+.hu-agenda { /* Paleta de la solución Huella (verde), no la del teal genérico de antes. */
+  --hu-teal:#5c8a4e; --hu-teal-d:#4a7340; --hu-bg:#f4f7f9; --hu-card:#fff;
+  --hu-border:#e2e8f0; --hu-text:#1e293b; --hu-muted:#64748b;
+  width: 100%; color: var(--hu-text);
+  flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
 .hu-agenda h2 { margin: 0 0 2px; font-size: 1.15rem; }
 
-/* Cabecera en dos columnas */
-.hu-header2 { display:grid; grid-template-columns:1fr auto; gap:20px; align-items:start; margin-bottom:16px; }
-.hu-hcol { display:flex; flex-direction:column; gap:10px; max-width:420px; }
+/* Layout de contenido: columna principal (¾) + columna accesoria (¼). Las dos
+   columnas estiran a la misma altura (la del espacio disponible) y la última
+   tarjeta de cada una crece para llegar hasta el borde inferior, aunque su
+   contenido no la llene. */
+.hu-layout { display:grid; grid-template-columns: 3fr 1fr; gap:16px; align-items:stretch; flex:1; min-height:0; }
+.hu-col-main { display:flex; flex-direction:column; gap:16px; min-width:0; min-height:0; }
+.hu-col-side { display:flex; flex-direction:column; gap:16px; min-height:0; }
+.hu-card-block { background:var(--hu-card); border:1px solid var(--hu-border); border-radius:12px; padding:14px 16px; }
+.hu-tablecard { display:flex; flex-direction:column; flex:1; min-height:280px; }
+.hu-tablebody { flex:1; min-height:0; overflow-y:auto; }
+.hu-dispcard { display:flex; flex-direction:column; flex:1; min-height:220px; }
+.hu-dispbody { flex:1; min-height:0; overflow-y:auto; }
+
+/* Filtros de fecha */
 .hu-daterow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-.hu-hcol input[type=date] { padding:.5rem .6rem; border:1px solid var(--hu-border);
-  border-radius:8px; background:#fff; color:var(--hu-text); width:100%; }
-.hu-hcol .hu-btn.primary { align-self:flex-start; }
+.hu-daterow input[type=date] { width:auto; padding:.5rem .6rem; border:1px solid var(--hu-border);
+  border-radius:8px; background:#fff; color:var(--hu-text); margin-left:auto; }
 .hu-nav { width:34px; height:34px; border-radius:8px; border:1px solid var(--hu-border);
   background:#fff; font-size:1.2rem; line-height:1; cursor:pointer; color:var(--hu-text); flex:0 0 auto; }
 .hu-nav:hover { background:#f0f3f2; }
 .hu-datelabel { font-weight:600; text-transform:capitalize; min-width:150px; }
 
-/* Calendario del mes */
+/* Calendario del mes (ocupa todo el ancho de la columna accesoria) */
 .hu-cal { background:var(--hu-card); border:1px solid var(--hu-border); border-radius:12px;
-  padding:10px 12px; width:288px; }
+  padding:10px 12px; width:100%; }
 .hu-calhead { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
 .hu-calmes { font-weight:600; text-transform:capitalize; font-size:.95rem; }
 .hu-caldow { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; margin-bottom:4px; }
@@ -618,14 +741,35 @@ const CSS = `
 .hu-btn.primary:disabled { opacity:.5; cursor:default; }
 .hu-btn.ghost { background:#fff; border-color:var(--hu-border); color:var(--hu-text); }
 .hu-btn.ghost:hover { background:#f0f3f2; }
+.hu-btn-full { flex:1; }
 
-/* Resumen (dentro de la columna izquierda, 2x2) */
-.hu-summary { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
-.hu-hcol .hu-summary { flex:1 1 auto; }
-.hu-stat { background:var(--hu-card); border:1px solid var(--hu-border); border-radius:10px;
+/* KPIs 2x2 + columna de acciones (misma tarjeta) */
+.hu-kpigrid { display:grid; grid-template-columns:1fr 1fr auto; grid-template-rows:1fr 1fr; gap:10px; }
+.hu-kpi-a { grid-column:1; grid-row:1; }
+.hu-kpi-b { grid-column:2; grid-row:1; }
+.hu-kpi-c { grid-column:1; grid-row:2; }
+.hu-kpi-d { grid-column:2; grid-row:2; }
+.hu-kpi-actions { grid-column:3; grid-row:1 / 3; display:flex; flex-direction:column; gap:8px;
+  justify-content:center; min-width:160px; }
+.hu-stat { background:var(--hu-bg); border:1px solid var(--hu-border); border-radius:10px;
   padding:12px 14px; display:flex; flex-direction:column; justify-content:center; gap:2px; }
 .hu-stat b { font-size:1.6rem; line-height:1; }
 .hu-stat span { font-size:.75rem; color:var(--hu-muted); text-transform:uppercase; letter-spacing:.03em; }
+
+/* Disponibilidad del día por agenda (columna accesoria) */
+.hu-disp-titulo { margin:0 0 10px; font-size:.85rem; font-weight:700; }
+.hu-disp { display:flex; flex-direction:column; gap:14px; }
+.hu-disp-legend { display:flex; gap:12px; font-size:.7rem; color:var(--hu-muted); }
+.hu-disp-legend span { display:flex; align-items:center; gap:4px; }
+.hu-disp-dot { width:8px; height:8px; border-radius:2px; display:inline-block; }
+.hu-disp-dot.libre { background:var(--hu-teal); }
+.hu-disp-dot.ocupado { background:#c7cdd0; }
+.hu-disp-fila { display:flex; flex-direction:column; gap:4px; }
+.hu-disp-nombre { font-size:.8rem; font-weight:600; }
+.hu-disp-barra { display:flex; flex-wrap:wrap; gap:2px; }
+.hu-disp-seg { width:10px; height:16px; border-radius:3px; background:#c7cdd0; }
+.hu-disp-seg.libre { background:var(--hu-teal); }
+.hu-disp-caption { font-size:.7rem; color:var(--hu-muted); }
 
 /* Filtros */
 .hu-filters { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
@@ -665,8 +809,12 @@ const CSS = `
   display:flex; align-items:flex-start; justify-content:center; padding:6vh 16px; z-index:50; }
 .hu-modal { background:#fff; border-radius:14px; padding:20px; width:100%; max-width:460px;
   box-shadow:0 20px 50px rgba(0,0,0,.25); max-height:88vh; overflow:auto; }
+.hu-modal-ancho { max-width:640px; }
 .hu-modal h2 { margin:0 0 2px; }
 .hu-sub { color:var(--hu-muted); font-size:.85rem; margin:0 0 12px; }
+.hu-card { background:#fbfcfb; border:1px solid var(--hu-border); border-radius:10px; padding:12px; }
+.hu-check { font-size:.85rem; color:var(--hu-text); }
+.hu-check input { width:auto; }
 
 /* Campos */
 .hu-field { display:block; font-size:.8rem; color:var(--hu-muted); margin-bottom:12px; }
@@ -674,7 +822,7 @@ const CSS = `
 .hu-field input, .hu-field select { display:block; width:100%; padding:.55rem .65rem; font-size:.95rem;
   color:var(--hu-text); background:#fff; border:1px solid var(--hu-border); border-radius:8px; }
 .hu-field input:focus, .hu-field select:focus { outline:none; border-color:var(--hu-teal);
-  box-shadow:0 0 0 3px rgba(14,124,107,.15); }
+  box-shadow:0 0 0 3px rgba(92,138,78,.15); }
 .hu-row2 { display:grid; grid-template-columns:1fr 1fr; gap:0 10px; }
 .hu-mactions { display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
 
@@ -687,19 +835,24 @@ const CSS = `
 .hu-sug:hover { background:#f0f3f2; }
 .hu-altapaciente { border:1px dashed var(--hu-border); border-radius:10px; padding:10px; margin-top:4px; }
 .hu-err { color:#C0492F; font-size:.85rem; margin:4px 0 8px; }
+.hu-slots { display:flex; flex-wrap:wrap; gap:6px; }
+.hu-slot { padding:.4rem .7rem; font-size:.85rem; border:1px solid var(--hu-border); border-radius:8px;
+  background:#fff; color:var(--hu-text); cursor:pointer; }
+.hu-slot:hover:not(:disabled) { border-color:var(--hu-teal); }
+.hu-slot.sel { background:var(--hu-teal); border-color:var(--hu-teal); color:#fff; font-weight:600; }
+.hu-slot:disabled { opacity:.35; text-decoration:line-through; cursor:not-allowed; }
 
 /* Toast */
 .hu-toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
-  background:#1f2a27; color:#fff; padding:.6rem 1rem; border-radius:10px; font-size:.9rem;
+  background:var(--hu-text); color:#fff; padding:.6rem 1rem; border-radius:10px; font-size:.9rem;
   box-shadow:0 10px 30px rgba(0,0,0,.3); z-index:60; }
 
-@media (max-width:720px) {
-  .hu-header2 { grid-template-columns:1fr; }
-  .hu-hcol { max-width:none; }
-  .hu-cal { width:100%; }
+@media (max-width:900px) {
+  .hu-layout { grid-template-columns:1fr; }
 }
 @media (max-width:560px) {
-  .hu-summary { grid-template-columns:repeat(2,1fr); }
+  .hu-kpigrid { grid-template-columns:1fr 1fr; grid-template-rows:auto auto auto; }
+  .hu-kpi-actions { grid-column:1 / 3; grid-row:3; flex-direction:row; min-width:0; }
   .hu-turno { flex-wrap:wrap; }
   .hu-tacts { width:100%; }
 }
