@@ -21,11 +21,10 @@ async function main() {
   await client.exec(`
     CREATE SCHEMA core;
     CREATE SCHEMA hce;
-    CREATE TYPE core.tipo_organizacion AS ENUM ('establecimiento','clinica','mixta');
     CREATE TYPE hce.categoria_macro AS ENUM ('anamnesis','examenFisico','diagnostico','tratamiento');
     CREATE TABLE core.organizaciones (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), nombre text NOT NULL,
-      tipo core.tipo_organizacion NOT NULL DEFAULT 'clinica', cuit text, direccion text, localidad text, provincia text, telefono text, email text,
+      huella_activa boolean NOT NULL DEFAULT true, tropera_activa boolean NOT NULL DEFAULT false, cuit text, direccion text, localidad text, provincia text, telefono text, email text,
       activo boolean NOT NULL DEFAULT true,
       grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, es_demo boolean NOT NULL DEFAULT false,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz
