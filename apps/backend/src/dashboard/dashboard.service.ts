@@ -20,18 +20,17 @@ export class DashboardService {
 
   async resumen(organizacionId: string) {
     const [org] = await this.db
-      .select({ tipo: organizaciones.tipo })
+      .select({ huellaActiva: organizaciones.huellaActiva, troperaActiva: organizaciones.troperaActiva })
       .from(organizaciones)
       .where(eq(organizaciones.id, organizacionId))
       .limit(1);
-    const tipo = org?.tipo ?? 'clinica';
 
-    const resultado: Record<string, unknown> = { tipo };
+    const resultado: Record<string, unknown> = {};
 
-    if (tipo === 'clinica' || tipo === 'mixta') {
+    if (org?.huellaActiva) {
       resultado.clinica = await this.resumenClinica(organizacionId);
     }
-    if (tipo === 'establecimiento' || tipo === 'mixta') {
+    if (org?.troperaActiva) {
       resultado.tropera = await this.resumenTropera(organizacionId);
     }
     return resultado;

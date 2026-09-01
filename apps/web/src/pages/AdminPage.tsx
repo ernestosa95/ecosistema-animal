@@ -4,7 +4,7 @@ import {
   login, getToken, clearToken,
   listarOrganizaciones, crearOrganizacion, listarMiembros, agregarMiembro,
   setOrgActivo, eliminarOrg, exportarOrg, quitarMiembro, setMiembroActivo, setMiembroRoles,
-  setAcceso,
+  setAcceso, setSoluciones,
   listarGrupos, crearGrupo, actualizarGrupo, eliminarGrupo,
   listarPlanes, crearPlan, actualizarPlan, eliminarPlan,
   listarMensajesAdmin, crearMensaje, eliminarMensaje,
@@ -20,6 +20,14 @@ const ROLES: Array<{ v: string; label: string }> = [
   { v: 'propietario', label: 'Propietario' },
 ];
 const rolLabel = (v: string) => ROLES.find((r) => r.v === v)?.label ?? v;
+
+/** Etiqueta corta de qué soluciones tiene habilitadas una organización, para la lista. */
+function etiquetaSoluciones(o: { huellaActiva: boolean; troperaActiva: boolean }): string {
+  if (o.huellaActiva && o.troperaActiva) return 'Huella + Tropera';
+  if (o.huellaActiva) return 'Huella';
+  if (o.troperaActiva) return 'Tropera';
+  return 'sin soluciones';
+}
 
 export default function AdminPage() {
   const [logueado, setLogueado] = useState(!!getToken());
@@ -62,10 +70,10 @@ function Login({ onOk }: { onOk: () => void }) {
 }
 
 // ── Panel principal ───────────────────────────────────────────────────────
-type Seccion = 'veterinarias' | 'planes' | 'grupos' | 'mensajes';
+type Seccion = 'organizaciones' | 'planes' | 'grupos' | 'mensajes';
 
 function Panel({ onSalir }: { onSalir: () => void }) {
-  const [seccion, setSeccion] = useState<Seccion>('veterinarias');
+  const [seccion, setSeccion] = useState<Seccion>('organizaciones');
   const [orgs, setOrgs] = useState<Organizacion[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [planes, setPlanes] = useState<Plan[]>([]);
@@ -91,32 +99,32 @@ function Panel({ onSalir }: { onSalir: () => void }) {
   return (
     <Shell onSalir={onSalir}>
       <div className="adm-secnav">
-        {(['veterinarias', 'planes', 'grupos', 'mensajes'] as const).map((s) => (
+        {(['organizaciones', 'planes', 'grupos', 'mensajes'] as const).map((s) => (
           <button
             key={s}
             className={`adm-secbtn ${seccion === s ? 'active' : ''}`}
             onClick={() => setSeccion(s)}
           >
-            {s === 'veterinarias' ? 'Veterinarias' : s === 'planes' ? 'Planes' : s === 'grupos' ? 'Grupos' : 'Mensajes'}
+            {s === 'organizaciones' ? 'Organizaciones' : s === 'planes' ? 'Planes' : s === 'grupos' ? 'Grupos' : 'Mensajes'}
           </button>
         ))}
       </div>
 
       {error && <div className="adm-error" style={{ marginBottom: 12 }}>{error}</div>}
 
-      {seccion === 'veterinarias' && (
+      {seccion === 'organizaciones' && (
         <>
           <Solicitudes orgs={orgs} />
           <div className="adm-cols">
             <div className="adm-col">
-              <h3>Veterinarias</h3>
+              <h3>Organizaciones</h3>
               {cargando ? <p className="adm-muted">Cargando…</p> : (
                 <>
                   <div className="adm-list">
-                    {orgs.length === 0 && <p className="adm-muted">Todavía no hay veterinarias.</p>}
+                    {orgs.length === 0 && <p className="adm-muted">Todavía no hay organizaciones.</p>}
                     {orgs.map((o) => (
                       <button key={o.id} className={`adm-item ${sel?.id === o.id ? 'active' : ''}`} onClick={() => setSel(o)}>
-                        <b>{o.nombre}</b><span>{o.activo === false ? 'inactiva' : o.tipo}</span>
+                        <b>{o.nombre}</b><span>{o.activo === false ? 'inactiva' : etiquetaSoluciones(o)}</span>
                       </button>
                     ))}
                   </div>
@@ -134,7 +142,7 @@ function Panel({ onSalir }: { onSalir: () => void }) {
                   onOrgActualizada={cargarOrgs}
                   onOrgEliminada={() => { cargarOrgs(); setSel(null); }}
                 />
-              ) : <p className="adm-muted">Elegí una veterinaria para ver y agregar sus miembros.</p>}
+              ) : <p className="adm-muted">Elegí una organización para ver y agregar sus miembros.</p>}
             </div>
           </div>
         </>
@@ -147,19 +155,21 @@ function Panel({ onSalir }: { onSalir: () => void }) {
   );
 }
 
-// ── Nueva veterinaria ─────────────────────────────────────────────────────
+// ── Nueva organización ────────────────────────────────────────────────────
 function NuevaOrg({ onCreada }: { onCreada: (o: Organizacion) => void }) {
   const [nombre, setNombre] = useState('');
-  const [tipo, setTipo] = useState('clinica');
+  const [huellaActiva, setHuellaActiva] = useState(true);
+  const [troperaActiva, setTroperaActiva] = useState(false);
   const [cuit, setCuit] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
 
   async function crear() {
     if (nombre.trim().length < 2) { setError('Poné un nombre'); return; }
+    if (!huellaActiva && !troperaActiva) { setError('Elegí al menos una solución'); return; }
     setCargando(true); setError(null);
     try {
-      const o = await crearOrganizacion({ nombre: nombre.trim(), tipo, cuit: cuit.trim() || undefined });
+      const o = await crearOrganizacion({ nombre: nombre.trim(), huellaActiva, troperaActiva, cuit: cuit.trim() || undefined });
       setNombre(''); setCuit(''); onCreada(o);
     } catch (e: any) { setError(e.message ?? 'No se pudo crear'); }
     finally { setCargando(false); }
@@ -167,28 +177,33 @@ function NuevaOrg({ onCreada }: { onCreada: (o: Organizacion) => void }) {
 
   return (
     <div className="adm-formcard">
-      <h4>Nueva veterinaria</h4>
+      <h4>Nueva organización</h4>
       <div className="adm-field"><label>Nombre</label>
         <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Veterinaria San Roque" /></div>
-      <div className="adm-row2">
-        <div className="adm-field"><label>Tipo</label>
-          <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
-            <option value="clinica">Clínica</option>
-            <option value="establecimiento">Establecimiento</option>
-            <option value="mixta">Mixta</option>
-          </select></div>
-        <div className="adm-field"><label>CUIT (opcional)</label>
-          <input value={cuit} onChange={(e) => setCuit(e.target.value)} /></div>
+      <div className="adm-field">
+        <label>Soluciones habilitadas</label>
+        <div className="adm-roles-checks">
+          <label className="adm-check">
+            <input type="checkbox" checked={huellaActiva} onChange={(e) => setHuellaActiva(e.target.checked)} />
+            Huella
+          </label>
+          <label className="adm-check">
+            <input type="checkbox" checked={troperaActiva} onChange={(e) => setTroperaActiva(e.target.checked)} />
+            Tropera
+          </label>
+        </div>
       </div>
+      <div className="adm-field"><label>CUIT (opcional)</label>
+        <input value={cuit} onChange={(e) => setCuit(e.target.value)} /></div>
       {error && <div className="adm-error">{error}</div>}
       <button className="adm-btn primary" disabled={cargando} onClick={crear}>
-        {cargando ? 'Creando…' : 'Crear veterinaria'}
+        {cargando ? 'Creando…' : 'Crear organización'}
       </button>
     </div>
   );
 }
 
-// ── Miembros de una veterinaria ───────────────────────────────────────────
+// ── Miembros de una organización ───────────────────────────────────────────
 function Miembros({ org, grupos, planes, onOrgActualizada, onOrgEliminada }: {
   org: Organizacion;
   grupos: Grupo[];
@@ -257,6 +272,8 @@ function Miembros({ org, grupos, planes, onOrgActualizada, onOrgEliminada }: {
 
       {error && <div className="adm-error">{error}</div>}
 
+      <SolucionesOrg org={org} onActualizada={onOrgActualizada} />
+
       <AccesoOrg org={org} grupos={grupos} planes={planes} onActualizada={onOrgActualizada} />
 
       <h4 className="adm-h4">Miembros</h4>
@@ -321,7 +338,7 @@ function EliminarModal({ org, onClose, onEliminada }: {
   return (
     <div className="adm-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="adm-modal">
-        <h2>Eliminar veterinaria</h2>
+        <h2>Eliminar organización</h2>
         <p className="adm-sub">
           Esto borra <b>{org.nombre}</b> y <b>todos</b> sus registros (dueños, animales,
           historia, turnos). No se puede deshacer. Exportá los datos antes si los necesitás.
@@ -426,7 +443,57 @@ function AgregarMiembroForm({ org, onAgregado }: { org: Organizacion; onAgregado
       {error && <div className="adm-error">{error}</div>}
       {msg && <div className="adm-ok">{msg}</div>}
       <button className="adm-btn primary" disabled={cargando || !email} onClick={agregar}>
-        {cargando ? 'Agregando…' : 'Agregar a la veterinaria'}
+        {cargando ? 'Agregando…' : 'Agregar a la organización'}
+      </button>
+    </div>
+  );
+}
+
+// ── Soluciones habilitadas (Tropera / Huella) ───────────────────────────────
+function SolucionesOrg({ org, onActualizada }: { org: Organizacion; onActualizada: () => void }) {
+  const [huellaActiva, setHuellaActiva] = useState(org.huellaActiva);
+  const [troperaActiva, setTroperaActiva] = useState(org.troperaActiva);
+  const [error, setError] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const [ok, setOk] = useState(false);
+
+  // Si se selecciona otra organización, resetear el formulario a sus valores.
+  useEffect(() => {
+    setHuellaActiva(org.huellaActiva);
+    setTroperaActiva(org.troperaActiva);
+    setOk(false);
+  }, [org.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const huboCambio = huellaActiva !== org.huellaActiva || troperaActiva !== org.troperaActiva;
+
+  async function guardar() {
+    if (!huellaActiva && !troperaActiva) { setError('Elegí al menos una solución, o desactivá la organización entera desde arriba'); return; }
+    setGuardando(true); setError(null); setOk(false);
+    try {
+      await setSoluciones(org.id, { huellaActiva, troperaActiva });
+      setOk(true);
+      onActualizada();
+    } catch (e: any) { setError(e.message ?? 'No se pudo guardar'); }
+    finally { setGuardando(false); }
+  }
+
+  return (
+    <div className="adm-formcard">
+      <h4>Soluciones</h4>
+      <div className="adm-roles-checks">
+        <label className="adm-check">
+          <input type="checkbox" checked={huellaActiva} onChange={(e) => setHuellaActiva(e.target.checked)} />
+          Huella
+        </label>
+        <label className="adm-check">
+          <input type="checkbox" checked={troperaActiva} onChange={(e) => setTroperaActiva(e.target.checked)} />
+          Tropera
+        </label>
+      </div>
+      {error && <div className="adm-error">{error}</div>}
+      {ok && <div className="adm-ok">Soluciones actualizadas ✓</div>}
+      <button className="adm-btn primary" disabled={guardando || !huboCambio} onClick={guardar}>
+        {guardando ? 'Guardando…' : 'Guardar soluciones'}
       </button>
     </div>
   );
@@ -772,7 +839,7 @@ function SolicitudCard({ s, orgs, onResuelta }: { s: Solicitud; orgs: Organizaci
   const [trabajando, setTrabajando] = useState(false);
 
   async function aprobar() {
-    if (s.tipo === 'unirse' && !orgId) { setError('Elegí la veterinaria destino'); return; }
+    if (s.tipo === 'unirse' && !orgId) { setError('Elegí la organización destino'); return; }
     setTrabajando(true); setError(null);
     try {
       await aprobarSolicitud(s.id, s.tipo === 'unirse' ? { organizacionId: orgId, rol } : {});
@@ -810,7 +877,7 @@ function SolicitudCard({ s, orgs, onResuelta }: { s: Solicitud; orgs: Organizaci
       {s.tipo === 'unirse' && (
         <div className="adm-row2" style={{ marginTop: 8 }}>
           <div className="adm-field" style={{ margin: 0 }}>
-            <label>Veterinaria destino</label>
+            <label>Organización destino</label>
             <select value={orgId} onChange={(e) => setOrgId(e.target.value)}>
               <option value="">Elegir…</option>
               {orgs.map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
@@ -846,7 +913,7 @@ function Shell({ children, onSalir }: { children: React.ReactNode; onSalir?: () 
           <ellipse cx="50" cy="66" rx="22" ry="18" /><ellipse cx="24" cy="44" rx="8.5" ry="11" />
           <ellipse cx="41" cy="30" rx="8.5" ry="12" /><ellipse cx="59" cy="30" rx="8.5" ry="12" />
           <ellipse cx="76" cy="44" rx="8.5" ry="11" /></g></svg>
-        <span>Huella · Administración</span>
+        <span>Ecosistema · Administración</span>
         {onSalir && <button className="adm-salir" onClick={onSalir}>Salir</button>}
       </div>
       <div className="adm-wrap">{children}</div>

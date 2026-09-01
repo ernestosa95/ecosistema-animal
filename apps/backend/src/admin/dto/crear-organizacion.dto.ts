@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CrearOrganizacionDto {
   @IsString()
@@ -6,8 +6,12 @@ export class CrearOrganizacionDto {
   nombre!: string;
 
   @IsOptional()
-  @IsIn(['establecimiento', 'clinica', 'mixta'])
-  tipo?: 'establecimiento' | 'clinica' | 'mixta';
+  @IsBoolean()
+  huellaActiva?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  troperaActiva?: boolean;
 
   @IsOptional()
   @IsString()

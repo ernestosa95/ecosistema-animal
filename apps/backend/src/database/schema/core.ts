@@ -16,11 +16,6 @@ import {
 export const core = pgSchema('core');
 
 // --- Enumerados ---
-export const tipoOrganizacion = core.enum('tipo_organizacion', [
-  'establecimiento',
-  'clinica',
-  'mixta',
-]);
 export const rolMembresia = core.enum('rol_membresia', [
   'propietario',
   'admin',
@@ -39,7 +34,12 @@ export const animalesCodigoSeq = core.sequence('animales_codigo_seq', { startWit
 export const organizaciones = core.table('organizaciones', {
   id: uuid('id').primaryKey().defaultRandom(),
   nombre: text('nombre').notNull(),
-  tipo: tipoOrganizacion('tipo').notNull().default('clinica'),
+  // Reemplaza al viejo enum `tipo` (clinica/establecimiento/mixta): dos
+  // booleans independientes por solución, para poder activar/desactivar
+  // Huella y Tropera por separado (incluso ninguna, ej. una org suspendida)
+  // desde /admin — ver ADMIN/CHANGELOG 2026-08-30.
+  huellaActiva: boolean('huella_activa').notNull().default(true),
+  troperaActiva: boolean('tropera_activa').notNull().default(false),
   cuit: text('cuit'),
   // Datos de contacto/ubicación de la institución/campo — capturados desde
   // el alta (form de solicitud de cuenta), texto libre igual que

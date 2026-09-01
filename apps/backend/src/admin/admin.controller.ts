@@ -15,6 +15,7 @@ import { CrearOrganizacionDto } from './dto/crear-organizacion.dto';
 import { AgregarMiembroDto } from './dto/agregar-miembro.dto';
 import { SetRolesDto } from './dto/set-roles.dto';
 import { SetAccesoDto } from './dto/set-acceso.dto';
+import { SetSolucionesDto } from './dto/set-soluciones.dto';
 
 /** Todas las rutas requieren usuario autenticado + super-admin de plataforma. */
 @Controller('admin')
@@ -40,6 +41,11 @@ export class AdminController {
   @Patch('organizaciones/:id/acceso')
   setAcceso(@Param('id') id: string, @Body() dto: SetAccesoDto) {
     return this.admin.setAcceso(id, dto);
+  }
+
+  @Patch('organizaciones/:id/soluciones')
+  setSoluciones(@Param('id') id: string, @Body() dto: SetSolucionesDto) {
+    return this.admin.setSoluciones(id, dto);
   }
 
   @Delete('organizaciones/:id')

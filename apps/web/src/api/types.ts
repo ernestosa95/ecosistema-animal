@@ -3,7 +3,10 @@ export interface Sesion {
   refreshToken: string;
   organizacionId: string;
   roles: string[]; // roles apilables — un usuario puede tener más de uno en la misma organización
-  tipo?: string; // tipo de organización ('clinica'|'establecimiento'|'mixta'), para elegir el dashboard
+  // Soluciones habilitadas para la organización (activables por separado desde /admin) —
+  // deciden qué botones del switcher del rail se muestran (ver nav/config.ts).
+  huellaActiva: boolean;
+  troperaActiva: boolean;
 }
 
 export interface Especie {
@@ -346,7 +349,6 @@ export interface ResumenTropera {
 }
 
 export interface ResumenDashboard {
-  tipo: string;
   clinica?: ResumenClinica;
   tropera?: ResumenTropera;
 }

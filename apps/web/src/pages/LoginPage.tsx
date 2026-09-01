@@ -36,7 +36,8 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
       refreshToken: login.refreshToken,
       organizacionId: org.organizacionId,
       roles: org.roles,
-      tipo: org.tipo,
+      huellaActiva: org.huellaActiva,
+      troperaActiva: org.troperaActiva,
     });
   }
 

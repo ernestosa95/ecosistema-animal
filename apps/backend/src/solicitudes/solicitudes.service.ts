@@ -13,7 +13,21 @@ import { CrearSolicitudDto } from './dto/crear-solicitud.dto';
 import { AprobarSolicitudDto, RechazarSolicitudDto } from './dto/aprobar-solicitud.dto';
 
 type Rol = 'propietario' | 'admin' | 'capataz' | 'veterinario' | 'recepcion';
-type TipoOrg = 'clinica' | 'establecimiento' | 'mixta';
+
+/**
+ * El form público de alta sigue pidiendo un único "tipo" (clínica/
+ * establecimiento/mixta, texto libre en `solicitudes.tipoOrganizacion`) — más
+ * simple para quien se da de alta por primera vez. Se traduce a los dos
+ * booleans de `organizaciones` recién acá, al aprobar (el super-admin puede
+ * ajustarlos después desde /admin si hace falta).
+ */
+function solucionesDeTipoOrg(tipo: string | null): { huellaActiva: boolean; troperaActiva: boolean } {
+  const t = tipo ?? 'clinica';
+  return {
+    huellaActiva: t === 'clinica' || t === 'mixta',
+    troperaActiva: t === 'establecimiento' || t === 'mixta',
+  };
+}
 
 // Campos que se exponen (sin passwordHash).
 const CAMPOS = {
@@ -101,7 +115,7 @@ export class SolicitudesService {
     if (sol.estado !== 'pendiente') throw new BadRequestException('La solicitud ya fue resuelta');
 
     if (sol.tipo === 'unirse' && !dto.organizacionId) {
-      throw new BadRequestException('Elegí la veterinaria destino para aprobar el "unirse"');
+      throw new BadRequestException('Elegí la organización destino para aprobar el "unirse"');
     }
 
     let [usuario] = await this.db
@@ -129,7 +143,7 @@ export class SolicitudesService {
           .insert(organizaciones)
           .values({
             nombre: sol.nombreOrganizacion ?? `${sol.nombre} ${sol.apellido}`,
-            tipo: (sol.tipoOrganizacion ?? 'clinica') as TipoOrg,
+            ...solucionesDeTipoOrg(sol.tipoOrganizacion),
             direccion: sol.direccionOrganizacion,
             localidad: sol.localidadOrganizacion,
             provincia: sol.provinciaOrganizacion,
@@ -148,7 +162,7 @@ export class SolicitudesService {
           .from(organizaciones)
           .where(eq(organizaciones.id, dto.organizacionId!))
           .limit(1);
-        if (!org) throw new NotFoundException('Veterinaria destino no encontrada');
+        if (!org) throw new NotFoundException('Organización destino no encontrada');
 
         const [ya] = await tx
           .select({ id: membresias.id })

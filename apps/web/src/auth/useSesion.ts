@@ -8,9 +8,10 @@ function cargar(): Sesion | null {
     const raw = localStorage.getItem(CLAVE);
     if (!raw) return null;
     const sesion = JSON.parse(raw) as Sesion;
-    // Sesiones guardadas antes de que `rol` pasara a `roles` (arreglo) no
-    // tienen esta propiedad — descartarlas en vez de romper el arranque.
-    if (!Array.isArray(sesion.roles)) {
+    // Sesiones guardadas antes de que `rol` pasara a `roles` (arreglo), o
+    // antes de `tipo` pasar a `huellaActiva`/`troperaActiva`, no tienen estas
+    // propiedades — descartarlas en vez de romper el arranque.
+    if (!Array.isArray(sesion.roles) || typeof sesion.huellaActiva !== 'boolean' || typeof sesion.troperaActiva !== 'boolean') {
       localStorage.removeItem(CLAVE);
       return null;
     }

@@ -21,13 +21,14 @@ type Rol = 'propietario' | 'admin' | 'capataz' | 'veterinario' | 'recepcion';
 export class AdminService {
   constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
 
-  /** Lista todas las organizaciones (veterinarias) de la plataforma. */
+  /** Lista todas las organizaciones de la plataforma. */
   listarOrganizaciones() {
     return this.db
       .select({
         id: organizaciones.id,
         nombre: organizaciones.nombre,
-        tipo: organizaciones.tipo,
+        huellaActiva: organizaciones.huellaActiva,
+        troperaActiva: organizaciones.troperaActiva,
         cuit: organizaciones.cuit,
         activo: organizaciones.activo,
         grupoId: organizaciones.grupoId,
@@ -62,16 +63,32 @@ export class AdminService {
     return org;
   }
 
-  /** Crea una organización (veterinaria) vacía. */
+  /** Crea una organización vacía. */
   async crearOrganizacion(dto: CrearOrganizacionDto) {
     const [org] = await this.db
       .insert(organizaciones)
-      .values({ nombre: dto.nombre, tipo: dto.tipo ?? 'clinica', cuit: dto.cuit })
+      .values({
+        nombre: dto.nombre,
+        huellaActiva: dto.huellaActiva ?? true,
+        troperaActiva: dto.troperaActiva ?? false,
+        cuit: dto.cuit,
+      })
       .returning();
     return org;
   }
 
-  /** Activa o desactiva una veterinaria (reversible; los datos quedan intactos). */
+  /** Activa o desactiva por separado Huella y/o Tropera para una organización. */
+  async setSoluciones(organizacionId: string, dto: { huellaActiva: boolean; troperaActiva: boolean }) {
+    await this.verificarOrg(organizacionId);
+    const [org] = await this.db
+      .update(organizaciones)
+      .set({ huellaActiva: dto.huellaActiva, troperaActiva: dto.troperaActiva, updatedAt: new Date() })
+      .where(eq(organizaciones.id, organizacionId))
+      .returning();
+    return org;
+  }
+
+  /** Activa o desactiva una organización (reversible; los datos quedan intactos). */
   async setActivo(organizacionId: string, activo: boolean) {
     await this.verificarOrg(organizacionId);
     await this.db
@@ -81,14 +98,14 @@ export class AdminService {
     return { ok: true, activo };
   }
 
-  /** Elimina la veterinaria y TODOS sus registros (cascada por claves foráneas). */
+  /** Elimina la organización y TODOS sus registros (cascada por claves foráneas). */
   async eliminar(organizacionId: string) {
     await this.verificarOrg(organizacionId);
     await this.db.delete(organizaciones).where(eq(organizaciones.id, organizacionId));
     return { ok: true };
   }
 
-  /** Exporta todos los datos de una veterinaria (para portabilidad/respaldo). */
+  /** Exporta todos los datos de una organización (para portabilidad/respaldo). */
   async exportar(organizacionId: string) {
     const [org] = await this.db
       .select()
@@ -245,7 +262,7 @@ export class AdminService {
     return m;
   }
 
-  /** Evita dejar la veterinaria sin ningún propietario activo. */
+  /** Evita dejar la organización sin ningún propietario activo. */
   private async protegerUltimoPropietario(
     organizacionId: string,
     m: { roles: string[]; activo: boolean },
@@ -262,7 +279,7 @@ export class AdminService {
         ),
       );
     if (propietariosActivos.length <= 1) {
-      throw new BadRequestException('No podés dejar la veterinaria sin propietario activo');
+      throw new BadRequestException('No podés dejar la organización sin propietario activo');
     }
   }
 

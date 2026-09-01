@@ -6,7 +6,7 @@ import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
 
 /**
- * Administración de plataforma (super-admin): alta de veterinarias y de sus
+ * Administración de plataforma (super-admin): alta de organizaciones y de sus
  * miembros. Vive fuera del tenant de cualquier organización.
  */
 @Module({

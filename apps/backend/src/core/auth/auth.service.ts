@@ -40,7 +40,7 @@ export class AuthService {
     const { user } = await this.db.transaction(async (tx) => {
       const [org] = await tx
         .insert(organizaciones)
-        .values({ nombre: dto.nombreOrganizacion, tipo: 'clinica' })
+        .values({ nombre: dto.nombreOrganizacion })
         .returning();
       const [usuario] = await tx
         .insert(usuarios)
@@ -78,7 +78,12 @@ export class AuthService {
     if (!ok) throw new UnauthorizedException('Credenciales inválidas');
 
     const orgs = await this.db
-      .select({ organizacionId: membresias.organizacionId, roles: membresias.roles, tipo: organizaciones.tipo })
+      .select({
+        organizacionId: membresias.organizacionId,
+        roles: membresias.roles,
+        huellaActiva: organizaciones.huellaActiva,
+        troperaActiva: organizaciones.troperaActiva,
+      })
       .from(membresias)
       .innerJoin(organizaciones, eq(organizaciones.id, membresias.organizacionId))
       .where(eq(membresias.usuarioId, user.id));
