@@ -99,7 +99,7 @@ export const api = {
   ): Promise<{
     accessToken: string;
     refreshToken: string;
-    organizaciones: { organizacionId: string; roles: string[]; tipo: string }[];
+    organizaciones: { organizacionId: string; roles: string[]; huellaActiva: boolean; troperaActiva: boolean }[];
   }> {
     return fetch(`${API}/auth/login`, {
       method: 'POST',
