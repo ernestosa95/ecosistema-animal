@@ -1,23 +1,51 @@
 :root {
+  /* Identidad de marca (Tropera/Identidad_Visual_Tropera.pdf): Verde Monte y
+     Marrón Tierra son los colores de las dos soluciones; Azul Río/Cielo es
+     de apoyo (gráficos, alertas informativas, estado de conexión), nunca de
+     acción. */
   --verde: #5c8a4e;
   --verde-dark: #4a7340;
   --tierra: #8b5a2b;
-  --text: #1f2933;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --bg: #f6f7f4;
+  --celeste: #4f8fc0;
+  --tropera-bg: #fdf4eb;
+  --huella-bg: #ecfdf5;
+  /* Paleta neutra unificada con la del nav rail (slate) — antes el rail usaba
+     grises fríos (#e2e8f0/#64748b) y el resto de la app grises más cálidos
+     (#e5e7eb/#6b7280); quedaban ligeramente descoordinados uno al lado del otro. */
+  --text: #1e293b;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --bg: #f4f7f9;
   --card: #ffffff;
+  --hover-bg: #f1f5f9;
   --danger: #b91c1c;
   --danger-bg: #fef2f2;
+  /* Advertencia (ej. vacuna próxima a vencer, todavía no vencida) — no había
+     un tercer estado semántico además de éxito/verde y peligro/rojo hasta
+     que Recordatorios lo necesitó. */
+  --advertencia: #b45309;
+  --advertencia-bg: #fef3c7;
+  --sombra-suave: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+  --sombra-flotante: 0 10px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.08);
 }
 
 * {
   box-sizing: border-box;
 }
 
+/* html/body/#root fijados a la altura del viewport — base para que .app
+   (el shell autenticado, ver más abajo) pueda fijarse a esa misma altura
+   sin scrollear como documento. Login/Admin/Portal no usan .app, así que no
+   les afecta: siguen scrolleando como página normal si su contenido no
+   entra. */
+html,
+body,
+#root {
+  height: 100%;
+}
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
   color: var(--text);
   background: var(--bg);
   line-height: 1.5;
@@ -25,10 +53,13 @@ body {
 
 h1 {
   font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   margin: 0;
 }
 h2 {
   font-size: 1.15rem;
+  font-weight: 600;
   margin: 0;
 }
 
@@ -51,35 +82,296 @@ h2 {
   box-shadow: 0 0 0 3px rgba(92, 138, 78, 0.2);
 }
 
-/* --- Layout app --- */
+/* --- Layout app ---
+   Fijado a la altura del viewport y sin overflow propio: el documento
+   (html/body) nunca scrollea acá — el rail de navegación y la cabecera de
+   sección quedan siempre a la vista, y .contenido (más abajo) es el único
+   que scrollea, con lo que ya tiene el resto de contenido de la página
+   dentro. */
 .app {
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;
 }
-.topbar {
+.app-rail {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.85rem 1.5rem;
+  height: 100%;
+}
+
+/* --- Nav rail (switcher de soluciones + opciones dinámicas + usuario) --- */
+.nav-rail {
+  width: 80px;
+  flex-shrink: 0;
   background: var(--card);
-  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  box-shadow: 1px 0 3px rgba(15, 23, 42, 0.02);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.1rem 0;
+  height: 100vh;
+  position: sticky;
+  top: 0;
 }
-.topbar-right {
+.solutions-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  width: 100%;
+  align-items: center;
+  padding-bottom: 1.1rem;
+  margin-bottom: 1.1rem;
+  border-bottom: 2px solid var(--border);
+}
+.solution-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: none;
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  opacity: 0.4;
+  transition: opacity 0.15s, box-shadow 0.15s;
+}
+.solution-btn.tropera {
+  background: var(--tierra);
+}
+.solution-btn.huella {
+  background: var(--verde);
+}
+.solution-btn.active {
+  opacity: 1;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+}
+.options-group {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+}
+.option-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  justify-content: center;
+  position: relative;
 }
-.rol {
-  font-size: 0.8rem;
+.option-btn:hover,
+.option-btn.active {
+  background: var(--hover-bg);
+  color: var(--text);
+}
+.option-btn::after {
+  content: attr(data-title);
+  position: absolute;
+  left: 60px;
+  top: 50%;
+  background: var(--text);
+  color: #fff;
+  padding: 0.4rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-6px, -50%);
+  transition: all 0.15s;
+  z-index: 999;
+}
+.option-btn:hover::after {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+.user-group {
+  position: relative;
+  width: 100%;
+  padding-top: 1.1rem;
+  border-top: 2px solid var(--border);
+  display: flex;
+  justify-content: center;
+}
+.user-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: none;
+  background: var(--border);
   color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.user-btn:hover {
+  background: #cbd5e1;
+  color: var(--text);
+}
+.overlay-transparente {
+  position: fixed;
+  inset: 0;
+  z-index: 998;
+}
+.user-dropdown {
+  position: absolute;
+  bottom: 0;
+  left: 62px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--sombra-flotante);
+  display: flex;
+  flex-direction: column;
+  min-width: 190px;
+  padding: 0.5rem;
+  z-index: 999;
+}
+.dropdown-rol {
+  font-size: 0.72rem;
   text-transform: capitalize;
-  background: #eef2ee;
-  padding: 0.15rem 0.6rem;
-  border-radius: 999px;
+  color: var(--muted);
+  padding: 0.3rem 0.6rem 0.5rem;
+}
+.dropdown-item {
+  text-align: left;
+  background: none;
+  border: none;
+  font: inherit;
+  color: var(--text);
+  padding: 0.55rem 0.6rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.dropdown-item:hover {
+  background: var(--hover-bg);
+}
+.dropdown-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0.35rem 0;
+}
+
+/* --- Área de contenido --- */
+.contenido-shell {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  padding: 1.75rem 2rem;
+  display: flex;
+  flex-direction: column;
+}
+.content-header {
+  margin-bottom: 1rem;
+}
+.badge-tropera,
+.badge-huella {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  padding: 0.4rem 0.85rem;
+  border-radius: 10px;
+}
+.badge-tropera {
+  background: var(--tropera-bg);
+  color: var(--tierra);
+}
+.badge-huella {
+  background: var(--huella-bg);
+  color: var(--verde-dark);
+}
+.content-header .separator {
+  opacity: 0.4;
 }
 .contenido {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 1.75rem 1.5rem;
+  /* Ampliado de 900px para dar lugar al layout de dos columnas (¾ principal +
+     ¼ accesoria) que se va a ir aplicando página por página — arranca en
+     Turnos. Las páginas que todavía no lo adoptan sólo ganan más aire a los
+     costados, no se rompen por tener más ancho disponible. */
+  max-width: 1600px;
+  /* flex:1 + min-height:0, dentro de .app ya fijado a la altura del viewport
+     (ver más arriba), le dan a esta caja una altura real y acotada — por
+     eso overflow-y:auto acá scrollea de verdad en vez de ser un no-op. Este
+     es el único scroll "de página" de toda la app autenticada: el rail de
+     navegación y la cabecera de sección (fuera de .contenido) nunca se
+     mueven. Una página que ya administra su propio scroll interno (ej. la
+     ficha del paciente, con su columna angosta con scroll propio) no nota
+     la diferencia; el resto simplemente deja de recortarse contra el borde
+     inferior de la ventana. */
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Layout de dos columnas (¾ principal + ¼ accesoria), reusable por cualquier
+   página — mismo patrón que ya usa Turnos, generalizado acá para no
+   reinventarlo cada vez que otra pantalla lo adopte. */
+.layout-2col {
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+  gap: 1rem;
+  align-items: stretch;
+}
+.layout-main {
+  min-width: 0;
+}
+/* Estirada por el grid a la altura de .layout-main (align-items: stretch),
+   y dividida 3/4 - 1/4 entre sus dos tarjetas. Cada tarjeta resuelve su
+   propio exceso de contenido puertas adentro (scroll interno o paginación,
+   según corresponda) en vez de crecer y forzar scroll de toda la página. */
+.layout-side {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.card-timeline-side {
+  flex: 3 1 0;
+  min-height: 15rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.card-vacunas-side {
+  flex: 1 1 0;
+  /* Piso absoluto: cabecera + 2 filas + paginación, para que la lista nunca
+     quede recortada por el `overflow: hidden` cuando la columna principal
+     (y por lo tanto esta, estirada a su altura) es más baja que esto. */
+  min-height: 12rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+@media (max-width: 900px) {
+  .layout-2col {
+    grid-template-columns: 1fr;
+  }
+  /* Apiladas en una sola columna, .layout-side ya no comparte fila con
+     .layout-main (align-items: stretch no tiene nada contra qué estirarla),
+     así que su alto pasa a ser el intrínseco de sus hijos. flex-basis: 0 +
+     overflow: hidden dependen de que el padre tenga un alto ya fijado por
+     afuera (el truco del desktop) — sin eso colapsan a 0. Volver a un alto
+     natural acá, con scroll de página normal como el resto de la app en mobile. */
+  .card-timeline-side,
+  .card-vacunas-side {
+    flex: none;
+    min-height: 0;
+    max-height: 22rem;
+    overflow-y: auto;
+  }
 }
 
 .page-head {
@@ -94,9 +386,9 @@ h2 {
 .card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 1.1rem 1.25rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--sombra-suave);
 }
 
 /* --- Login --- */
@@ -130,15 +422,16 @@ textarea {
   margin-top: 0.25rem;
   padding: 0.55rem 0.65rem;
   font-size: 0.95rem;
+  font-family: inherit;
   color: var(--text);
   background: #fff;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 9px;
   outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 textarea {
   resize: vertical;
-  font-family: inherit;
 }
 input:focus,
 select:focus,
@@ -156,6 +449,17 @@ textarea:focus {
 .span-2 {
   grid-column: 1 / -1;
 }
+/* Formulario de consulta (ficha del paciente): campos más apretados, para
+   que quepa junto con los datos del paciente y la tabla de historia sin
+   forzar scroll de página. Motivo/Observaciones y Anamnesis/Examen físico
+   van de a pares en la misma fila (ver PacienteDetallePage.tsx) en vez de
+   ocupar el ancho completo cada uno. */
+.consulta-form label {
+  margin-bottom: 0.4rem;
+}
+.consulta-form textarea {
+  min-height: 2.6rem;
+}
 
 /* --- Botones --- */
 .btn {
@@ -166,27 +470,46 @@ textarea:focus {
   color: #fff;
   background: var(--verde);
   border: none;
-  border-radius: 8px;
+  border-radius: 9px;
   cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  transition: background-color 0.15s, box-shadow 0.15s, transform 0.1s;
 }
 .btn:hover {
   background: var(--verde-dark);
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.08);
+}
+.btn:active {
+  transform: translateY(1px);
 }
 .btn:disabled {
   opacity: 0.6;
   cursor: default;
+  box-shadow: none;
+  transform: none;
 }
 .btn-ghost {
   padding: 0.4rem 0.85rem;
   font-size: 0.85rem;
+  font-weight: 500;
   color: var(--text);
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 9px;
   cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
 }
 .btn-ghost:hover {
-  background: #f3f4f6;
+  background: var(--hover-bg);
+  border-color: #cbd5e1;
+}
+.btn-ghost:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.btn-ghost:disabled:hover {
+  background: transparent;
+  border-color: var(--border);
 }
 .link {
   background: none;
@@ -214,19 +537,29 @@ textarea:focus {
 }
 .tabla th {
   text-align: left;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   color: var(--muted);
-  padding: 0.4rem 0.6rem;
+  padding: 0.5rem 0.6rem;
   border-bottom: 1px solid var(--border);
 }
 .tabla td {
-  padding: 0.6rem;
-  border-bottom: 1px solid #f0f1ee;
+  padding: 0.65rem 0.6rem;
+  border-bottom: 1px solid var(--border);
 }
 .tabla tr:last-child td {
   border-bottom: none;
+}
+.tabla tbody tr {
+  transition: background-color 0.1s;
+}
+.tabla tbody tr:hover {
+  background: var(--hover-bg);
+}
+.tabla tbody tr.fila-clickable {
+  cursor: pointer;
 }
 
 /* --- Ficha --- */
@@ -246,14 +579,26 @@ textarea:focus {
   color: var(--muted);
   margin-bottom: 0.15rem;
 }
+/* Variante compacta (ficha del paciente): mismos datos, menos alto — 4
+   columnas en vez de 3 y padding/gap más chicos, para dejarle más lugar
+   vertical al formulario de consulta que va debajo sin scroll de página. */
+.ficha-datos-compacta {
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 1.1rem;
+}
+.ficha-datos-compacta .dato-label {
+  margin-bottom: 0.05rem;
+}
 
 /* --- Varios --- */
 .chip {
   display: inline-block;
   font-size: 0.75rem;
-  padding: 0.15rem 0.55rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
   border-radius: 999px;
-  background: #eef2ee;
+  background: var(--huella-bg);
   color: var(--verde-dark);
   text-transform: capitalize;
 }
@@ -268,8 +613,8 @@ textarea:focus {
   background: var(--danger-bg);
   color: var(--danger);
   border: 1px solid #fca5a5;
-  border-radius: 8px;
-  padding: 0.55rem 0.75rem;
+  border-radius: 9px;
+  padding: 0.6rem 0.8rem;
   font-size: 0.88rem;
   margin: 0.5rem 0 1rem;
 }
@@ -279,32 +624,6 @@ textarea:focus {
   .ficha-datos {
     grid-template-columns: 1fr;
   }
-}
-
-/* --- Navegación de secciones --- */
-.nav {
-  display: flex;
-  gap: 0.25rem;
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 0 1.5rem;
-}
-.nav-item {
-  padding: 0.7rem 1rem;
-  font-size: 0.92rem;
-  font-weight: 600;
-  color: var(--muted);
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-}
-.nav-item:hover {
-  color: var(--text);
-}
-.nav-item.activo {
-  color: var(--verde-dark);
-  border-bottom-color: var(--verde);
 }
 
 /* --- Mascotas del dueño --- */
@@ -324,6 +643,24 @@ textarea:focus {
   font-weight: 600;
   font-size: 1rem;
   margin-bottom: 0.5rem;
+}
+
+/* Sub-formulario enmarcado dentro de un .form-grid (ej. alta rápida de un
+   dueño nuevo en medio del alta de un animal) — separa visualmente sus
+   campos de los del formulario que lo contiene, para que no se confundan
+   entre sí (ej. "Sexo" del animal vs. datos del dueño). */
+.subform {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 1rem;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 0.9rem 1rem 0.15rem;
+  background: var(--bg);
+  margin-bottom: 1rem;
+}
+.subform .form-titulo {
+  grid-column: 1 / -1;
 }
 
 /* --- Omnibox (Ctrl+K) --- */
@@ -373,7 +710,7 @@ textarea:focus {
   text-align: left;
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 9px;
   background: #fff;
   cursor: pointer;
 }
@@ -414,7 +751,7 @@ textarea:focus {
 .calculadora-dosis {
   background: #f6f9f6;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 9px;
   padding: 0.6rem 0.75rem;
   margin-bottom: 1rem;
 }
@@ -423,46 +760,291 @@ textarea:focus {
   font-size: 0.85rem;
 }
 
-/* --- Línea del tiempo médica --- */
-.timeline {
-  display: flex;
-  gap: 0.5rem;
+/* --- Línea del tiempo médica ---
+   Eje horizontal con las tarjetas alternadas arriba/abajo (una por evento),
+   conectadas al eje por un tallo corto y un punto — mismo lenguaje visual
+   en toda la app: verde para consultas, celeste (azul río/cielo, el color de
+   apoyo de la identidad) para vacunas, para distinguir el tipo de evento sin
+   agregar una leyenda aparte. */
+.timeline-wrap {
   overflow-x: auto;
+  padding: 0.5rem 0.25rem 0.75rem;
   margin-bottom: 1rem;
 }
+.timeline {
+  position: relative;
+  display: flex;
+  width: max-content;
+  min-width: 100%;
+}
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  background: var(--border);
+  transform: translateY(-1px);
+}
 .timeline-item {
+  position: relative;
+  flex: 0 0 auto;
+  width: 11rem;
+  height: 14.5rem;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+}
+.timeline-half {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 0.4rem;
+}
+.timeline-half.top {
+  justify-content: flex-end;
+}
+.timeline-half.bottom {
+  justify-content: flex-start;
+}
+.timeline-item.abajo .timeline-half.top,
+.timeline-item.arriba .timeline-half.bottom {
+  visibility: hidden;
+}
+.timeline-stem {
+  width: 2px;
+  height: 1.4rem;
+  background: var(--border);
+}
+.timeline-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--verde);
+  border: 2px solid var(--card);
+  box-shadow: 0 0 0 2px var(--verde);
+  z-index: 1;
+}
+.timeline-dot.vacuna {
+  background: var(--celeste);
+  box-shadow: 0 0 0 2px var(--celeste);
+}
+.timeline-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 0.15rem;
-  flex-shrink: 0;
-  min-width: 8rem;
-  max-width: 11rem;
-  text-align: left;
-  padding: 0.55rem 0.7rem;
+  width: 100%;
+  text-align: center;
+  padding: 0.5rem 0.6rem;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #fff;
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: var(--sombra-suave);
   cursor: pointer;
   font: inherit;
 }
-.timeline-item:hover {
+.timeline-card:hover {
   border-color: var(--verde);
 }
 .timeline-icono {
   font-size: 1.1rem;
 }
 .timeline-fecha {
-  font-size: 0.72rem;
-  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--verde-dark);
 }
 .timeline-titulo {
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* --- Línea del tiempo médica, variante vertical ---
+   Mismo lenguaje visual (eje + puntos + tallos + tarjetas alternadas, verde
+   consulta / celeste vacuna) que la horizontal, girado 90° para la columna
+   accesoria angosta de la ficha del paciente. Reusa .timeline-card/
+   -icono/-fecha/-titulo — sólo cambia cómo se ubican alrededor del eje. */
+.timeline-wrap-v {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.25rem 0.25rem 0.5rem;
+}
+.timeline-v {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.timeline-v::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  background: var(--border);
+  transform: translateX(-1px);
+}
+.timeline-v-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 5.5rem;
+}
+.timeline-v-half {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+}
+.timeline-v-half.left {
+  justify-content: flex-end;
+  padding-right: 0.4rem;
+}
+.timeline-v-half.right {
+  justify-content: flex-start;
+  padding-left: 0.4rem;
+}
+.timeline-v-item.izquierda .timeline-v-half.right,
+.timeline-v-item.derecha .timeline-v-half.left {
+  visibility: hidden;
+}
+.timeline-v-stem {
+  flex-shrink: 0;
+  height: 2px;
+  width: 1.1rem;
+  background: var(--border);
+}
+.timeline-v-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--verde);
+  border: 2px solid var(--card);
+  box-shadow: 0 0 0 2px var(--verde);
+  z-index: 1;
+}
+.timeline-v-dot.vacuna {
+  background: var(--celeste);
+  box-shadow: 0 0 0 2px var(--celeste);
+}
+.timeline-v-card {
+  width: auto;
+  max-width: 8rem;
+}
+
+/* --- Tarjeta compacta de vacunas (¼ inferior de la columna accesoria) ---
+   Lista angosta, sin la tabla completa (no entra FECHA/PRODUCTO/PRÓXIMA
+   DOSIS/LOTE en este ancho) — paginada en vez de scrolleable, como el resto
+   de las tarjetas de esta columna, para no forzar scroll de toda la página
+   cuando hay más vacunas de las que entran en el espacio disponible. */
+.card-vacunas-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+.card-vacunas-head .form-titulo {
+  margin-bottom: 0;
+}
+.btn-compacto {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.78rem;
+}
+.vacunas-lista-compacta {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.vacunas-lista-compacta button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.35rem 0.55rem;
+}
+.vacunas-lista-compacta button:hover {
+  border-color: var(--celeste);
+}
+.vacuna-fecha {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--verde-dark);
   white-space: nowrap;
+}
+.vacuna-producto {
+  font-size: 0.78rem;
+  color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 100%;
+  white-space: nowrap;
+}
+.paginacion-compacta {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.paginacion-compacta button {
+  font-size: 0.9rem;
+}
+.paginacion-compacta button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+/* Paginación de tamaño normal, para tablas completas (ej. historia clínica
+   de la ficha del paciente) — mismo propósito que .paginacion-compacta pero
+   sin achicar los controles, ya que acá no comparte una columna angosta. */
+.paginacion {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+@media (max-width: 900px) {
+  /* .timeline-wrap-v y .vacunas-lista-compacta son flex: 1 1 0, pensados
+     para un padre (.card-timeline-side/.card-vacunas-side) de alto ya
+     fijado desde afuera por el grid de escritorio — en la columna única de
+     mobile ese padre pasa a ser auto-height, y flex-basis: 0 sin espacio
+     extra que repartir los colapsaría a 0. Alto de contenido natural acá. */
+  .timeline-wrap-v,
+  .vacunas-lista-compacta {
+    flex: none;
+  }
 }
 
 /* --- Drawer lateral (detalle de la línea del tiempo) --- */
@@ -504,11 +1086,40 @@ textarea:focus {
   max-width: 720px;
 }
 
-/* --- Centro de exportación (§4.5) --- */
-.export-bar {
+/* --- Modal centrado genérico (términos y condiciones, selección/alta rápida
+   de paciente, venta de mostrador, ...) --- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(23, 30, 27, 0.45);
   display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 120;
+}
+.modal-panel {
+  background: var(--card);
+  width: 100%;
+  max-width: 620px;
+  max-height: 80vh;
+  border-radius: 14px;
+  padding: 1.25rem;
+  overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+.terminos-cuerpo h3 {
+  font-size: 0.95rem;
+  margin: 1rem 0 0.35rem;
+}
+.terminos-cuerpo h3:first-child {
+  margin-top: 0;
+}
+.terminos-cuerpo p {
+  font-size: 0.88rem;
+  color: var(--text);
+  line-height: 1.5;
+  margin: 0 0 0.5rem;
 }
 
 /* --- Tarjetas KPI clickeables (drill-down del dashboard, §4.2) --- */
@@ -531,4 +1142,247 @@ textarea:focus {
 }
 .chip-clickable:hover {
   outline: 2px solid var(--verde);
+}
+
+/* --- Centro de operaciones (Home): accesos rápidos a flujos comunes --- */
+.centro-operaciones {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+.operacion-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  text-align: left;
+  padding: 1.4rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--sombra-suave);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.15s;
+}
+.operacion-btn:hover {
+  border-color: var(--verde);
+}
+.operacion-btn-icono {
+  font-size: 1.6rem;
+}
+.operacion-btn-titulo {
+  font-weight: 700;
+  font-size: 1rem;
+}
+.operacion-btn-sub {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+/* --- Recordatorios --- */
+.recordatorios-ventana {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.recordatorios-seccion-titulo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.recordatorios-seccion-titulo .form-titulo {
+  margin-bottom: 0;
+}
+.recordatorios-seccion + .recordatorios-seccion {
+  margin-top: 1rem;
+}
+.rc-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.rc-row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+.rc-row:last-child {
+  padding-bottom: 0;
+}
+.rc-pac {
+  flex: 1;
+  min-width: 12rem;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  color: var(--text);
+  font-weight: 600;
+}
+.rc-due {
+  color: var(--muted);
+  font-weight: 400;
+}
+.rc-motivo {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-weight: 400;
+  margin-top: 0.15rem;
+}
+.rc-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0.12rem 0.55rem;
+  white-space: nowrap;
+  border: 1px solid;
+}
+.rc-badge.venc {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--danger-bg);
+}
+.rc-badge.prox {
+  color: var(--advertencia);
+  border-color: var(--advertencia);
+  background: var(--advertencia-bg);
+}
+.rc-badge.estado {
+  color: var(--verde-dark);
+  border-color: var(--huella-bg);
+  background: var(--huella-bg);
+  text-transform: capitalize;
+}
+.rc-contacto {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+.rc-btn {
+  border-radius: 9px;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-block;
+}
+.rc-btn.wa {
+  background: #25d366;
+  color: #fff;
+}
+.rc-btn.wa:hover {
+  background: #1ebe5a;
+}
+.rc-btn.ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.rc-btn.ghost:hover {
+  background: var(--hover-bg);
+}
+.rc-sincontacto {
+  font-size: 0.78rem;
+}
+
+/* --- Farmacia y stock: filtro por categoría --- */
+.filtro-categoria {
+  display: inline-block;
+  max-width: 16rem;
+  margin: 0 0 0.85rem;
+}
+
+/* --- Selector de búsqueda (combobox de lista cerrada) --- */
+.selector-busqueda {
+  position: relative;
+}
+.selector-busqueda-resultados {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  right: 0;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  box-shadow: var(--sombra-flotante);
+  max-height: 12rem;
+  overflow-y: auto;
+  z-index: 5;
+}
+.selector-busqueda-resultados button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.65rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+.selector-busqueda-resultados button:hover {
+  background: var(--hover-bg);
+}
+
+/* --- Farmacia y stock: checks de tipo de insumo (medicamento / fraccionable) --- */
+.check-fila {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+}
+.check-fila label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0;
+  cursor: pointer;
+}
+.check-fila input[type='checkbox'] {
+  display: inline-block;
+  width: auto;
+  margin-top: 0;
+}
+
+/* --- Slots de horario (disponibilidad de agenda) ---
+   Mismo lenguaje visual que .hu-slots/.hu-slot de TurnosPage.tsx, con las
+   variables globales — para usarse fuera de esa página (ver
+   NuevoTurnoRapidoModal.tsx) sin depender de su CSS autocontenido. */
+.slots-horario {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
+}
+.slot-horario {
+  padding: 0.4rem 0.7rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+}
+.slot-horario:hover:not(:disabled) {
+  border-color: var(--verde);
+}
+.slot-horario.seleccionado {
+  background: var(--verde);
+  border-color: var(--verde);
+  color: #fff;
+  font-weight: 600;
+}
+.slot-horario:disabled {
+  opacity: 0.35;
+  text-decoration: line-through;
+  cursor: not-allowed;
 }

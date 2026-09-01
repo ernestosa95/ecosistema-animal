@@ -9,8 +9,8 @@ import type { Step } from 'react-joyride';
 // Subconjunto de los `nombre` de `Vista` (App.tsx) a los que un paso puede
 // necesitar navegar antes de poder resaltar su `target`.
 export type SeccionTour =
-  | 'dashboard' | 'turnos' | 'animales' | 'duenos' | 'recordatorios'
-  | 'tropera' | 'usuarios' | 'farmacia' | 'caja';
+  | 'dashboard' | 'turnos' | 'animales' | 'duenos' | 'recordatorios' | 'usuarios' | 'farmacia' | 'caja'
+  | 'tropera-home' | 'tropera-animales' | 'tropera-potreros' | 'tropera-individuales' | 'tropera-plantillas';
 
 export interface TourStep extends Step {
   // Sección a la que hay que navegar (vía setVista) antes de mostrar este
@@ -24,7 +24,7 @@ const CIERRE: TourStep = {
   placement: 'center',
   title: '¡Listo!',
   content:
-    'Podés volver a ver esta guía cuando quieras con el botón "Ayuda" de arriba a la derecha.',
+    'Podés volver a ver esta guía cuando quieras desde el menú de usuario (abajo a la izquierda) con "❓ Ayuda".',
 };
 
 function bienvenida(texto: string): TourStep {
@@ -33,12 +33,12 @@ function bienvenida(texto: string): TourStep {
 
 export const tourAdministrativo: TourStep[] = [
   bienvenida(
-    'Esta es una guía rápida de las secciones principales. Podés saltarla o cerrarla en cualquier momento — siempre vas a poder volver a abrirla desde "Ayuda".',
+    'Esta es una guía rápida de las secciones principales. Podés saltarla o cerrarla en cualquier momento — siempre vas a poder volver a abrirla desde el menú de usuario.',
   ),
   {
     seccion: 'dashboard',
     target: '[data-tour="nav-dashboard"]',
-    title: 'Resumen',
+    title: 'Home',
     content: 'El estado general de la organización: pacientes activos, consultas y turnos del mes, con detalle al hacer click en cada número.',
   },
   {
@@ -72,12 +72,6 @@ export const tourAdministrativo: TourStep[] = [
     content: 'La lista de dueños. Desde cada uno se pueden ver sus mascotas y generarle un acceso al portal (para que consulte el historial desde su celular).',
   },
   {
-    seccion: 'usuarios',
-    target: '[data-tour="nav-usuarios"]',
-    title: 'Usuarios',
-    content: 'Los miembros de tu organización. Desde acá se les puede resetear la contraseña.',
-  },
-  {
     seccion: 'farmacia',
     target: '[data-tour="nav-farmacia"]',
     title: 'Farmacia',
@@ -90,17 +84,17 @@ export const tourAdministrativo: TourStep[] = [
     content: 'La caja del mostrador: se abre al empezar el día, se cargan cobros y egresos, y se cierra al final comparando lo calculado contra lo contado.',
   },
   {
-    seccion: 'tropera',
-    target: '[data-tour="nav-tropera"]',
-    title: 'Tropera',
-    content: 'Si además manejás hacienda: establecimientos, existencias por categoría, movimientos y seguimiento individual de animales.',
+    seccion: null,
+    target: '[data-tour="nav-usuario-menu"]',
+    title: 'Usuarios y Ayuda',
+    content: 'Desde este menú, arriba a la derecha de tu avatar, se gestionan los usuarios de tu organización y se puede volver a abrir esta guía.',
   },
   CIERRE,
 ];
 
 export const tourVeterinario: TourStep[] = [
   bienvenida(
-    'Esta es una guía rápida de lo que más vas a usar. Podés saltarla o cerrarla en cualquier momento — siempre vas a poder volver a abrirla desde "Ayuda".',
+    'Esta es una guía rápida de lo que más vas a usar. Podés saltarla o cerrarla en cualquier momento — siempre vas a poder volver a abrirla desde el menú de usuario.',
   ),
   {
     seccion: 'turnos',
@@ -125,7 +119,7 @@ export const tourVeterinario: TourStep[] = [
 
 export const tourRecepcion: TourStep[] = [
   bienvenida(
-    'Esta es una guía rápida de lo que más vas a usar en el mostrador. Podés saltarla o cerrarla en cualquier momento — siempre vas a poder volver a abrirla desde "Ayuda".',
+    'Esta es una guía rápida de lo que más vas a usar en el mostrador. Podés saltarla o cerrarla en cualquier momento — siempre vas a poder volver a abrirla desde el menú de usuario.',
   ),
   {
     seccion: 'turnos',
@@ -156,19 +150,31 @@ export const tourRecepcion: TourStep[] = [
 
 export const tourCapataz: TourStep[] = [
   bienvenida(
-    'Esta es una guía rápida de Tropera. Podés saltarla o cerrarla en cualquier momento — siempre vas a poder volver a abrirla desde "Ayuda".',
+    'Esta es una guía rápida de Tropera. Podés saltarla o cerrarla en cualquier momento — siempre vas a poder volver a abrirla desde el menú de usuario.',
   ),
   {
-    seccion: 'tropera',
-    target: '[data-tour="nav-tropera"]',
-    title: 'Tropera',
-    content: 'Acá se gestiona la hacienda: un establecimiento agrupa existencias por categoría, movimientos, eventos sanitarios y (si hace falta) animales identificados individualmente.',
+    seccion: 'tropera-home',
+    target: '[data-tour="nav-tropera-home"]',
+    title: 'Home',
+    content: 'Acá se dan de alta los establecimientos y se ve el stock consolidado si manejás más de uno.',
   },
   {
-    seccion: 'tropera',
+    seccion: 'tropera-home',
     target: '[data-tour="tropera-nuevo"]',
     title: 'Dar de alta un establecimiento',
-    content: 'El primer paso es cargar el establecimiento. Entrando a uno se accede a existencias, movimientos, potreros y animales.',
+    content: 'El primer paso es cargar el establecimiento. Con eso hecho, ya podés usar Animales, Potreros y Animales individuales.',
+  },
+  {
+    seccion: 'tropera-animales',
+    target: '[data-tour="nav-tropera-animales"]',
+    title: 'Animales',
+    content: 'La hacienda por categoría de un establecimiento: existencias, movimientos (altas/bajas/traslados) y eventos sanitarios.',
+  },
+  {
+    seccion: 'tropera-individuales',
+    target: '[data-tour="nav-tropera-individuales"]',
+    title: 'Animales individuales',
+    content: 'Seguimiento por caravana: fichas individuales, muestreos y evaluación andrológica, además de los conteos agregados de Animales.',
   },
   CIERRE,
 ];

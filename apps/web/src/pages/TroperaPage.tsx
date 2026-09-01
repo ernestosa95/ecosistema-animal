@@ -5,7 +5,7 @@ import type {
   AnimalCampo, EstadoAnimalCampo, Hallazgo, ToroVirtual, ResultadoReproductivo, Muestra, EvaluacionAndrologica,
   Potrero, PlantillaTareas, ProtocoloIatf, Tarea,
 } from '../api/types';
-import { ExportBar } from '../components/ExportBar';
+import { DrawerTabla } from '../components/DrawerTabla';
 
 const ETIQUETAS_CATEGORIA: Record<CategoriaHacienda, string> = {
   vaca: 'Vacas',
@@ -106,12 +106,84 @@ function ResumenConsolidado({
   );
 }
 
-export function TroperaPage({ sesion }: { sesion: Sesion }) {
+/**
+ * Selector reusable de establecimiento, para las secciones que ya no dependen
+ * de la navegación anidada "lista → detalle" de antes (Animales, Potreros,
+ * Animales individuales). Se oculta si hay 0 o 1 (nada que elegir).
+ */
+function EstablecimientoSelector({
+  establecimientos,
+  seleccionadoId,
+  onSeleccionar,
+}: {
+  establecimientos: Establecimiento[];
+  seleccionadoId: string | null;
+  onSeleccionar: (id: string) => void;
+}) {
+  if (establecimientos.length <= 1) return null;
+  return (
+    <label style={{ display: 'block', maxWidth: '20rem', marginBottom: '1rem' }}>
+      Establecimiento
+      <select value={seleccionadoId ?? ''} onChange={(e) => onSeleccionar(e.target.value)}>
+        {establecimientos.map((e) => (
+          <option key={e.id} value={e.id}>
+            {e.nombre}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+/** Carga los establecimientos de la org y mantiene cuál está seleccionado (por defecto, el primero). */
+function useEstablecimientos(sesion: Sesion) {
+  const [establecimientos, setEstablecimientos] = useState<Establecimiento[]>([]);
+  const [seleccionadoId, setSeleccionadoId] = useState<string | null>(null);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    api
+      .establecimientos(sesion)
+      .then((ests) => {
+        setEstablecimientos(ests);
+        setSeleccionadoId((actual) => actual ?? ests[0]?.id ?? null);
+      })
+      .finally(() => setCargando(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return {
+    establecimientos,
+    seleccionado: establecimientos.find((e) => e.id === seleccionadoId) ?? null,
+    seleccionadoId,
+    setSeleccionadoId,
+    cargando,
+  };
+}
+
+function SinEstablecimientos() {
+  return <p className="muted">Todavía no hay establecimientos. Creá el primero desde "Home".</p>;
+}
+
+/** Home de Tropera: alta/edición de establecimientos + panel consolidado de stock. */
+function inicioDeMesISO(): string {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
+}
+
+interface DrillMovimientos {
+  titulo: string;
+  filas: Movimiento[];
+}
+
+export function TroperaHomeSection({ sesion }: { sesion: Sesion }) {
   const [establecimientos, setEstablecimientos] = useState<Establecimiento[]>([]);
   const [existenciasTodas, setExistenciasTodas] = useState<
     { establecimientoId: string; categoria: CategoriaHacienda; cantidad: number }[]
   >([]);
-  const [seleccionado, setSeleccionado] = useState<Establecimiento | null>(null);
+  const [movimientosPorTipo, setMovimientosPorTipo] = useState<Record<string, number> | null>(null);
+  const [drill, setDrill] = useState<DrillMovimientos | null>(null);
+  const [cargandoDrill, setCargandoDrill] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -120,12 +192,16 @@ export function TroperaPage({ sesion }: { sesion: Sesion }) {
     setCargando(true);
     setError(null);
     try {
-      const [ests, ex] = await Promise.all([
+      const [ests, ex, movMes] = await Promise.all([
         api.establecimientos(sesion),
         api.existenciasConsolidadas(sesion),
+        api.movimientos(sesion, undefined, inicioDeMesISO()),
       ]);
       setEstablecimientos(ests);
       setExistenciasTodas(ex);
+      const porTipo: Record<string, number> = {};
+      for (const m of movMes) porTipo[m.tipo] = (porTipo[m.tipo] ?? 0) + 1;
+      setMovimientosPorTipo(porTipo);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cargar');
     } finally {
@@ -138,25 +214,22 @@ export function TroperaPage({ sesion }: { sesion: Sesion }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (seleccionado) {
-    return (
-      <EstablecimientoDetalle
-        sesion={sesion}
-        establecimiento={seleccionado}
-        establecimientos={establecimientos}
-        onVolver={() => {
-          setSeleccionado(null);
-          cargar();
-        }}
-        onActualizado={(actualizado) => setSeleccionado(actualizado)}
-      />
-    );
+  async function abrirMovimientosPorTipo(tipo: TipoMovimiento) {
+    const titulo = `Movimientos ${ETIQUETAS_TIPO_MOVIMIENTO[tipo]} (este mes)`;
+    setCargandoDrill(true);
+    setDrill({ titulo, filas: [] });
+    try {
+      const todos = await api.movimientos(sesion, undefined, inicioDeMesISO());
+      setDrill({ titulo, filas: todos.filter((m) => m.tipo === tipo) });
+    } finally {
+      setCargandoDrill(false);
+    }
   }
 
   return (
     <div>
       <div className="page-head">
-        <h1>Tropera</h1>
+        <h1>Home</h1>
         <button className="btn" data-tour="tropera-nuevo" onClick={() => setMostrarForm((v) => !v)}>
           {mostrarForm ? 'Cerrar' : '+ Nuevo establecimiento'}
         </button>
@@ -174,25 +247,43 @@ export function TroperaPage({ sesion }: { sesion: Sesion }) {
 
       {error && <div className="alerta">{error}</div>}
 
-      {!cargando && establecimientos.length > 1 && (
-        <ResumenConsolidado establecimientos={establecimientos} existencias={existenciasTodas} />
+      {!cargando && movimientosPorTipo && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <span className="dato-label">Movimientos este mes por tipo</span>
+          {Object.keys(movimientosPorTipo).length === 0 ? (
+            <p className="muted">Sin movimientos este mes todavía.</p>
+          ) : (
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+              {Object.entries(movimientosPorTipo).map(([tipo, cantidad]) => (
+                <button
+                  key={tipo}
+                  className="chip chip-clickable"
+                  onClick={() => abrirMovimientosPorTipo(tipo as TipoMovimiento)}
+                >
+                  {ETIQUETAS_TIPO_MOVIMIENTO[tipo as TipoMovimiento]}: {cantidad}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
-      {!cargando && establecimientos.length > 0 && (
-        <ExportBar
-          nombreArchivo="establecimientos"
-          titulo="Establecimientos"
+      {drill && (
+        <DrawerTabla
+          titulo={drill.titulo}
           columnas={[
-            { clave: 'nombre', etiqueta: 'Nombre' },
-            { clave: 'ubicacion', etiqueta: 'Ubicación', valor: (e: Establecimiento) => e.ubicacion ?? '—' },
-            {
-              clave: 'superficie',
-              etiqueta: 'Superficie',
-              valor: (e: Establecimiento) => (e.superficieHa ? `${e.superficieHa} ha` : '—'),
-            },
+            { clave: 'fecha', etiqueta: 'Fecha' },
+            { clave: 'categoria', etiqueta: 'Categoría', valor: (m: Movimiento) => ETIQUETAS_CATEGORIA[m.categoria] },
+            { clave: 'cantidad', etiqueta: 'Cantidad' },
           ]}
-          filas={establecimientos}
+          filas={drill.filas}
+          cargando={cargandoDrill}
+          onCerrar={() => setDrill(null)}
         />
+      )}
+
+      {!cargando && establecimientos.length > 1 && (
+        <ResumenConsolidado establecimientos={establecimientos} existencias={existenciasTodas} />
       )}
 
       {cargando ? (
@@ -212,20 +303,351 @@ export function TroperaPage({ sesion }: { sesion: Sesion }) {
             </thead>
             <tbody>
               {establecimientos.map((e) => (
-                <tr key={e.id}>
-                  <td>{e.nombre}</td>
-                  <td>{e.ubicacion ?? '—'}</td>
-                  <td>{e.superficieHa ? `${e.superficieHa} ha` : '—'}</td>
-                  <td>
-                    <button className="link" onClick={() => setSeleccionado(e)}>
-                      Ver hacienda →
-                    </button>
-                  </td>
-                </tr>
+                <FilaEstablecimiento key={e.id} sesion={sesion} establecimiento={e} onActualizado={cargar} />
               ))}
             </tbody>
           </table>
         </div>
+      )}
+    </div>
+  );
+}
+
+function FilaEstablecimiento({
+  sesion,
+  establecimiento,
+  onActualizado,
+}: {
+  sesion: Sesion;
+  establecimiento: Establecimiento;
+  onActualizado: () => void;
+}) {
+  const [editando, setEditando] = useState(false);
+  return (
+    <>
+      <tr>
+        <td>{establecimiento.nombre}</td>
+        <td>{establecimiento.ubicacion ?? '—'}</td>
+        <td>{establecimiento.superficieHa ? `${establecimiento.superficieHa} ha` : '—'}</td>
+        <td>
+          <button className="link" onClick={() => setEditando((v) => !v)}>
+            {editando ? 'Cerrar' : 'Editar'}
+          </button>
+        </td>
+      </tr>
+      {editando && (
+        <tr>
+          <td colSpan={4}>
+            <EditarEstablecimientoForm
+              sesion={sesion}
+              establecimiento={establecimiento}
+              onGuardado={() => {
+                setEditando(false);
+                onActualizado();
+              }}
+              onCancelar={() => setEditando(false)}
+            />
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+/** Hacienda agregada (existencias por categoría, movimientos y eventos a nivel categoría) del establecimiento elegido. */
+export function TroperaAnimalesSection({ sesion }: { sesion: Sesion }) {
+  const { establecimientos, seleccionado, seleccionadoId, setSeleccionadoId, cargando: cargandoEsts } =
+    useEstablecimientos(sesion);
+  const [existencias, setExistencias] = useState<Existencia[]>([]);
+  const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
+  const [eventos, setEventos] = useState<Evento[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [mostrarMovimiento, setMostrarMovimiento] = useState(false);
+  const [mostrarEvento, setMostrarEvento] = useState(false);
+
+  const nombreDe = (id?: string | null) => establecimientos.find((e) => e.id === id)?.nombre ?? '—';
+
+  async function cargar(id: string) {
+    setCargando(true);
+    setError(null);
+    try {
+      const [ex, mov, ev] = await Promise.all([
+        api.existenciasDeEstablecimiento(sesion, id),
+        api.movimientos(sesion, id),
+        api.eventos(sesion, id),
+      ]);
+      setExistencias(ex);
+      setMovimientos(mov);
+      setEventos(ev);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cargar');
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  useEffect(() => {
+    if (seleccionadoId) cargar(seleccionadoId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seleccionadoId]);
+
+  if (!cargandoEsts && establecimientos.length === 0) return <SinEstablecimientos />;
+
+  return (
+    <div>
+      <div className="page-head">
+        <h1>Animales</h1>
+      </div>
+      <EstablecimientoSelector
+        establecimientos={establecimientos}
+        seleccionadoId={seleccionadoId}
+        onSeleccionar={setSeleccionadoId}
+      />
+      {seleccionado && (
+        <>
+          <div className="page-head">
+            <h2>Existencias — {seleccionado.nombre}</h2>
+          </div>
+          {error && <div className="alerta">{error}</div>}
+          {cargando ? (
+            <p className="muted">Cargando…</p>
+          ) : (
+            <div className="card">
+              <table className="tabla">
+                <thead>
+                  <tr>
+                    <th>Categoría</th>
+                    <th>Cantidad</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {existencias.map((ex) => (
+                    <FilaExistencia
+                      key={ex.categoria}
+                      sesion={sesion}
+                      establecimientoId={seleccionado.id}
+                      existencia={ex}
+                      onGuardada={(nueva) =>
+                        setExistencias((prev) => prev.map((e) => (e.categoria === nueva.categoria ? nueva : e)))
+                      }
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="page-head">
+            <h2>Movimientos</h2>
+            <button className="btn" onClick={() => setMostrarMovimiento((v) => !v)}>
+              {mostrarMovimiento ? 'Cerrar' : '+ Nuevo movimiento'}
+            </button>
+          </div>
+
+          {mostrarMovimiento && (
+            <NuevoMovimientoForm
+              sesion={sesion}
+              establecimiento={seleccionado}
+              otrosEstablecimientos={establecimientos.filter((e) => e.id !== seleccionado.id)}
+              onCreado={() => {
+                setMostrarMovimiento(false);
+                cargar(seleccionado.id);
+              }}
+            />
+          )}
+
+          {!cargando &&
+            (movimientos.length === 0 ? (
+              <p className="muted">Todavía no hay movimientos registrados para este establecimiento.</p>
+            ) : (
+              <div className="card">
+                <table className="tabla">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Tipo</th>
+                      <th>Categoría</th>
+                      <th>Cantidad</th>
+                      <th>Detalle</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {movimientos.map((m) => {
+                      const esOrigenAca = m.establecimientoOrigenId === seleccionado.id;
+                      const detalle =
+                        m.tipo === 'traslado'
+                          ? esOrigenAca
+                            ? `→ ${nombreDe(m.establecimientoDestinoId)}`
+                            : `← ${nombreDe(m.establecimientoOrigenId)}`
+                          : (m.observaciones ?? '—');
+                      const signo = TIPOS_ALTA.has(m.tipo) || (m.tipo === 'traslado' && !esOrigenAca) ? '+' : '−';
+                      return (
+                        <tr key={m.id}>
+                          <td>{m.fecha}</td>
+                          <td>{ETIQUETAS_TIPO_MOVIMIENTO[m.tipo]}</td>
+                          <td>{ETIQUETAS_CATEGORIA[m.categoria]}</td>
+                          <td>{signo}{m.cantidad}</td>
+                          <td>{detalle}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+
+          <div className="page-head">
+            <h2>Eventos sanitarios y reproductivos</h2>
+            <button className="btn" onClick={() => setMostrarEvento((v) => !v)}>
+              {mostrarEvento ? 'Cerrar' : '+ Nuevo evento'}
+            </button>
+          </div>
+
+          {mostrarEvento && (
+            <NuevoEventoForm
+              sesion={sesion}
+              establecimiento={seleccionado}
+              onCreado={() => {
+                setMostrarEvento(false);
+                cargar(seleccionado.id);
+              }}
+            />
+          )}
+
+          {!cargando &&
+            (eventos.length === 0 ? (
+              <p className="muted">Todavía no hay eventos registrados para este establecimiento.</p>
+            ) : (
+              <div className="card">
+                <table className="tabla">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Tipo</th>
+                      <th>Categoría</th>
+                      <th>Cantidad</th>
+                      <th>Producto / detalle</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {eventos.map((e) => (
+                      <tr key={e.id}>
+                        <td>{e.fecha}</td>
+                        <td>{ETIQUETAS_TIPO_EVENTO[e.tipo]}</td>
+                        <td>{e.categoria ? ETIQUETAS_CATEGORIA[e.categoria] : 'Toda la hacienda'}</td>
+                        <td>{e.cantidad ?? '—'}</td>
+                        <td>{e.producto ?? e.observaciones ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Potreros del establecimiento elegido. */
+export function TroperaPotrerosSection({ sesion }: { sesion: Sesion }) {
+  const { establecimientos, seleccionado, seleccionadoId, setSeleccionadoId, cargando: cargandoEsts } =
+    useEstablecimientos(sesion);
+  const [potreros, setPotreros] = useState<Potrero[]>([]);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    if (!seleccionadoId) return;
+    setCargando(true);
+    api
+      .potreros(sesion, seleccionadoId)
+      .then(setPotreros)
+      .finally(() => setCargando(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seleccionadoId]);
+
+  if (!cargandoEsts && establecimientos.length === 0) return <SinEstablecimientos />;
+
+  return (
+    <div>
+      <div className="page-head">
+        <h1>Potreros</h1>
+      </div>
+      <EstablecimientoSelector
+        establecimientos={establecimientos}
+        seleccionadoId={seleccionadoId}
+        onSeleccionar={setSeleccionadoId}
+      />
+      {seleccionado && !cargando && (
+        <PotrerosSection
+          sesion={sesion}
+          establecimiento={seleccionado}
+          potreros={potreros}
+          onActualizado={(pots) => setPotreros(pots)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Seguimiento individual de campo (Fase E): fichas por caravana + evaluación andrológica + muestreos del establecimiento elegido. */
+export function TroperaIndividualesSection({ sesion }: { sesion: Sesion }) {
+  const { establecimientos, seleccionado, seleccionadoId, setSeleccionadoId, cargando: cargandoEsts } =
+    useEstablecimientos(sesion);
+  const [potreros, setPotreros] = useState<Potrero[]>([]);
+
+  useEffect(() => {
+    if (!seleccionadoId) return;
+    api.potreros(sesion, seleccionadoId).then(setPotreros);
+  }, [seleccionadoId]);
+
+  if (!cargandoEsts && establecimientos.length === 0) return <SinEstablecimientos />;
+
+  return (
+    <div>
+      <div className="page-head">
+        <h1>Animales individuales</h1>
+      </div>
+      <EstablecimientoSelector
+        establecimientos={establecimientos}
+        seleccionadoId={seleccionadoId}
+        onSeleccionar={setSeleccionadoId}
+      />
+      {seleccionado && (
+        <>
+          <AnimalesCampoSection sesion={sesion} establecimiento={seleccionado} potreros={potreros} />
+          <MuestreosSection sesion={sesion} establecimiento={seleccionado} />
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Catálogo org-wide de plantillas/protocolos (Fase E.5/E.6) + agenda de tareas del establecimiento elegido. */
+export function TroperaPlantillasSection({ sesion }: { sesion: Sesion }) {
+  const { establecimientos, seleccionado, seleccionadoId, setSeleccionadoId } = useEstablecimientos(sesion);
+
+  return (
+    <div>
+      <div className="page-head">
+        <h1>Plantillas y protocolos</h1>
+      </div>
+      <PlantillasYProtocolosSection sesion={sesion} />
+
+      {establecimientos.length > 0 && (
+        <>
+          <div className="page-head">
+            <h2>Agenda de tareas</h2>
+          </div>
+          <EstablecimientoSelector
+            establecimientos={establecimientos}
+            seleccionadoId={seleccionadoId}
+            onSeleccionar={setSeleccionadoId}
+          />
+          {seleccionado && <TareasSection sesion={sesion} establecimiento={seleccionado} />}
+        </>
       )}
     </div>
   );
@@ -288,310 +710,6 @@ function NuevoEstablecimientoForm({
         </button>
       </div>
     </form>
-  );
-}
-
-function EstablecimientoDetalle({
-  sesion,
-  establecimiento,
-  establecimientos,
-  onVolver,
-  onActualizado,
-}: {
-  sesion: Sesion;
-  establecimiento: Establecimiento;
-  establecimientos: Establecimiento[];
-  onVolver: () => void;
-  onActualizado: (e: Establecimiento) => void;
-}) {
-  const [existencias, setExistencias] = useState<Existencia[]>([]);
-  const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
-  const [eventos, setEventos] = useState<Evento[]>([]);
-  const [potreros, setPotreros] = useState<Potrero[]>([]);
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [editando, setEditando] = useState(false);
-  const [mostrarMovimiento, setMostrarMovimiento] = useState(false);
-  const [mostrarEvento, setMostrarEvento] = useState(false);
-
-  const nombreDe = (id?: string | null) =>
-    id ? establecimientos.find((e) => e.id === id)?.nombre ?? '—' : '—';
-
-  async function cargar() {
-    setCargando(true);
-    setError(null);
-    try {
-      const [ex, mov, ev, pot] = await Promise.all([
-        api.existenciasDeEstablecimiento(sesion, establecimiento.id),
-        api.movimientos(sesion, establecimiento.id),
-        api.eventos(sesion, establecimiento.id),
-        api.potreros(sesion, establecimiento.id),
-      ]);
-      setExistencias(ex);
-      setMovimientos(mov);
-      setEventos(ev);
-      setPotreros(pot);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar');
-    } finally {
-      setCargando(false);
-    }
-  }
-
-  useEffect(() => {
-    cargar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [establecimiento.id]);
-
-  return (
-    <div>
-      <button className="link" onClick={onVolver}>
-        ← Volver a establecimientos
-      </button>
-
-      <div className="page-head">
-        <h1>{establecimiento.nombre}</h1>
-        <button className="btn-ghost" onClick={() => setEditando((v) => !v)}>
-          {editando ? 'Cerrar' : 'Editar'}
-        </button>
-      </div>
-
-      {editando ? (
-        <EditarEstablecimientoForm
-          sesion={sesion}
-          establecimiento={establecimiento}
-          onGuardado={(actualizado) => {
-            onActualizado(actualizado);
-            setEditando(false);
-          }}
-          onCancelar={() => setEditando(false)}
-        />
-      ) : (
-        <div className="card ficha-datos">
-          <Dato etiqueta="Ubicación" valor={establecimiento.ubicacion ?? '—'} />
-          <Dato etiqueta="Superficie" valor={establecimiento.superficieHa ? `${establecimiento.superficieHa} ha` : '—'} />
-        </div>
-      )}
-
-      <div className="page-head">
-        <h2>Hacienda</h2>
-      </div>
-
-      {error && <div className="alerta">{error}</div>}
-      {!cargando && existencias.length > 0 && (
-        <ExportBar
-          nombreArchivo={`existencias-${establecimiento.nombre}`}
-          titulo={`Existencias — ${establecimiento.nombre}`}
-          columnas={[
-            { clave: 'categoria', etiqueta: 'Categoría', valor: (e: Existencia) => ETIQUETAS_CATEGORIA[e.categoria] },
-            { clave: 'cantidad', etiqueta: 'Cantidad' },
-          ]}
-          filas={existencias}
-        />
-      )}
-      {cargando ? (
-        <p className="muted">Cargando…</p>
-      ) : (
-        <div className="card">
-          <table className="tabla">
-            <thead>
-              <tr>
-                <th>Categoría</th>
-                <th>Cantidad</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {existencias.map((ex) => (
-                <FilaExistencia
-                  key={ex.categoria}
-                  sesion={sesion}
-                  establecimientoId={establecimiento.id}
-                  existencia={ex}
-                  onGuardada={(nueva) =>
-                    setExistencias((prev) =>
-                      prev.map((e) => (e.categoria === nueva.categoria ? nueva : e)),
-                    )
-                  }
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <PotrerosSection
-        sesion={sesion}
-        establecimiento={establecimiento}
-        potreros={potreros}
-        onActualizado={(pots) => setPotreros(pots)}
-      />
-
-      <AnimalesCampoSection sesion={sesion} establecimiento={establecimiento} potreros={potreros} />
-
-      <MuestreosSection sesion={sesion} establecimiento={establecimiento} />
-
-      <PlantillasYProtocolosSection sesion={sesion} />
-
-      <TareasSection sesion={sesion} establecimiento={establecimiento} />
-
-      <div className="page-head">
-        <h2>Movimientos</h2>
-        <button className="btn" onClick={() => setMostrarMovimiento((v) => !v)}>
-          {mostrarMovimiento ? 'Cerrar' : '+ Nuevo movimiento'}
-        </button>
-      </div>
-
-      {mostrarMovimiento && (
-        <NuevoMovimientoForm
-          sesion={sesion}
-          establecimiento={establecimiento}
-          otrosEstablecimientos={establecimientos.filter((e) => e.id !== establecimiento.id)}
-          onCreado={() => {
-            setMostrarMovimiento(false);
-            cargar();
-          }}
-        />
-      )}
-
-      {!cargando && movimientos.length > 0 && (
-        <ExportBar
-          nombreArchivo={`movimientos-${establecimiento.nombre}`}
-          titulo={`Movimientos — ${establecimiento.nombre}`}
-          columnas={[
-            { clave: 'fecha', etiqueta: 'Fecha' },
-            { clave: 'tipo', etiqueta: 'Tipo', valor: (m: Movimiento) => ETIQUETAS_TIPO_MOVIMIENTO[m.tipo] },
-            { clave: 'categoria', etiqueta: 'Categoría', valor: (m: Movimiento) => ETIQUETAS_CATEGORIA[m.categoria] },
-            {
-              clave: 'cantidad',
-              etiqueta: 'Cantidad',
-              valor: (m: Movimiento) => {
-                const esOrigenAca = m.establecimientoOrigenId === establecimiento.id;
-                const signo = TIPOS_ALTA.has(m.tipo) || (m.tipo === 'traslado' && !esOrigenAca) ? '+' : '−';
-                return `${signo}${m.cantidad}`;
-              },
-            },
-            {
-              clave: 'detalle',
-              etiqueta: 'Detalle',
-              valor: (m: Movimiento) => {
-                if (m.tipo !== 'traslado') return m.observaciones ?? '—';
-                const esOrigenAca = m.establecimientoOrigenId === establecimiento.id;
-                return esOrigenAca ? `→ ${nombreDe(m.establecimientoDestinoId)}` : `← ${nombreDe(m.establecimientoOrigenId)}`;
-              },
-            },
-          ]}
-          filas={movimientos}
-        />
-      )}
-      {!cargando && (
-        movimientos.length === 0 ? (
-          <p className="muted">Todavía no hay movimientos registrados para este establecimiento.</p>
-        ) : (
-          <div className="card">
-            <table className="tabla">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Tipo</th>
-                  <th>Categoría</th>
-                  <th>Cantidad</th>
-                  <th>Detalle</th>
-                </tr>
-              </thead>
-              <tbody>
-                {movimientos.map((m) => {
-                  const esOrigenAca = m.establecimientoOrigenId === establecimiento.id;
-                  const detalle =
-                    m.tipo === 'traslado'
-                      ? esOrigenAca
-                        ? `→ ${nombreDe(m.establecimientoDestinoId)}`
-                        : `← ${nombreDe(m.establecimientoOrigenId)}`
-                      : (m.observaciones ?? '—');
-                  const signo = TIPOS_ALTA.has(m.tipo) || (m.tipo === 'traslado' && !esOrigenAca) ? '+' : '−';
-                  return (
-                    <tr key={m.id}>
-                      <td>{m.fecha}</td>
-                      <td>{ETIQUETAS_TIPO_MOVIMIENTO[m.tipo]}</td>
-                      <td>{ETIQUETAS_CATEGORIA[m.categoria]}</td>
-                      <td>{signo}{m.cantidad}</td>
-                      <td>{detalle}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )
-      )}
-
-      <div className="page-head">
-        <h2>Eventos sanitarios y reproductivos</h2>
-        <button className="btn" onClick={() => setMostrarEvento((v) => !v)}>
-          {mostrarEvento ? 'Cerrar' : '+ Nuevo evento'}
-        </button>
-      </div>
-
-      {mostrarEvento && (
-        <NuevoEventoForm
-          sesion={sesion}
-          establecimiento={establecimiento}
-          onCreado={() => {
-            setMostrarEvento(false);
-            cargar();
-          }}
-        />
-      )}
-
-      {!cargando && eventos.length > 0 && (
-        <ExportBar
-          nombreArchivo={`eventos-${establecimiento.nombre}`}
-          titulo={`Eventos — ${establecimiento.nombre}`}
-          columnas={[
-            { clave: 'fecha', etiqueta: 'Fecha' },
-            { clave: 'tipo', etiqueta: 'Tipo', valor: (e: Evento) => ETIQUETAS_TIPO_EVENTO[e.tipo] },
-            {
-              clave: 'categoria',
-              etiqueta: 'Categoría',
-              valor: (e: Evento) => (e.categoria ? ETIQUETAS_CATEGORIA[e.categoria] : 'Toda la hacienda'),
-            },
-            { clave: 'cantidad', etiqueta: 'Cantidad', valor: (e: Evento) => e.cantidad ?? '—' },
-            { clave: 'detalle', etiqueta: 'Producto / detalle', valor: (e: Evento) => e.producto ?? e.observaciones ?? '—' },
-          ]}
-          filas={eventos}
-        />
-      )}
-      {!cargando && (
-        eventos.length === 0 ? (
-          <p className="muted">Todavía no hay eventos registrados para este establecimiento.</p>
-        ) : (
-          <div className="card">
-            <table className="tabla">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Tipo</th>
-                  <th>Categoría</th>
-                  <th>Cantidad</th>
-                  <th>Producto / detalle</th>
-                </tr>
-              </thead>
-              <tbody>
-                {eventos.map((e) => (
-                  <tr key={e.id}>
-                    <td>{e.fecha}</td>
-                    <td>{ETIQUETAS_TIPO_EVENTO[e.tipo]}</td>
-                    <td>{e.categoria ? ETIQUETAS_CATEGORIA[e.categoria] : 'Toda la hacienda'}</td>
-                    <td>{e.cantidad ?? '—'}</td>
-                    <td>{e.producto ?? e.observaciones ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-      )}
-    </div>
   );
 }
 
@@ -1580,19 +1698,6 @@ function MuestreosSection({ sesion, establecimiento }: { sesion: Sesion; estable
       )}
 
       {error && <div className="alerta">{error}</div>}
-      {!cargando && muestras.length > 0 && (
-        <ExportBar
-          nombreArchivo={`muestras-${establecimiento.nombre}`}
-          titulo={`Muestreos — ${establecimiento.nombre}`}
-          columnas={[
-            { clave: 'tubo', etiqueta: 'Tubo', valor: (m: Muestra) => m.tuboNumero },
-            { clave: 'caravana', etiqueta: 'Caravana', valor: (m: Muestra) => m.caravana ?? '—' },
-            { clave: 'tipo', etiqueta: 'Tipo de muestra', valor: (m: Muestra) => m.tipoMuestra ?? '—' },
-            { clave: 'fecha', etiqueta: 'Fecha' },
-          ]}
-          filas={muestras}
-        />
-      )}
       {cargando ? (
         <p className="muted">Cargando…</p>
       ) : muestras.length === 0 ? (
