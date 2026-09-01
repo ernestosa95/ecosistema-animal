@@ -61,7 +61,9 @@ async function main() {
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
       nombre text NOT NULL, presentacion text, unidad text, categoria text, activo boolean NOT NULL DEFAULT true,
-      concentracion numeric(10,3), unidad_concentracion text, dosis_sugerida_mg_kg numeric(10,3), precio numeric(12,2),
+      es_medicamento boolean NOT NULL DEFAULT false, es_fraccionable boolean NOT NULL DEFAULT false,
+      concentracion numeric(10,3), unidad_concentracion text, dosis_sugerida_mg_kg numeric(10,3),
+      precio numeric(12,2), precio_compra numeric(12,2),
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz
     );
     CREATE TABLE hce.indicaciones (
