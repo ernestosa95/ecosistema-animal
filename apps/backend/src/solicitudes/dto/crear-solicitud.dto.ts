@@ -1,8 +1,13 @@
-import { IsEmail, IsIn, IsOptional, IsString, MinLength, ValidateIf } from 'class-validator';
+import { Equals, IsEmail, IsIn, IsOptional, IsString, MinLength, ValidateIf } from 'class-validator';
 
 export class CrearSolicitudDto {
   @IsIn(['crear', 'unirse'])
   tipo!: 'crear' | 'unirse';
+
+  // Checkbox obligatorio del form de alta — @Equals(true) rechaza tanto
+  // `false` como que falte el campo directamente.
+  @Equals(true, { message: 'Tenés que aceptar los términos y condiciones para crear una cuenta' })
+  terminosAceptados!: boolean;
 
   @IsString() @MinLength(2)
   nombre!: string;

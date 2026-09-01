@@ -873,6 +873,11 @@ function SolicitudCard({ s, orgs, onResuelta }: { s: Solicitud; orgs: Organizaci
           {s.emailOrganizacion ? ` · ${s.emailOrganizacion}` : ''}
         </div>
       )}
+      <div className="adm-soldesc" style={{ color: '#6b7280' }}>
+        {s.terminosAceptadosEn
+          ? `Aceptó los términos el ${new Date(s.terminosAceptadosEn).toLocaleDateString()} (v${s.terminosVersion ?? '?'})`
+          : 'No hay registro de aceptación de términos'}
+      </div>
 
       {s.tipo === 'unirse' && (
         <div className="adm-row2" style={{ marginTop: 8 }}>

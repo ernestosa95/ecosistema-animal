@@ -48,9 +48,15 @@ const CAMPOS = {
   emailOrganizacion: solicitudes.emailOrganizacion,
   organizacionSolicitada: solicitudes.organizacionSolicitada,
   motivoRechazo: solicitudes.motivoRechazo,
+  terminosAceptadosEn: solicitudes.terminosAceptadosEn,
+  terminosVersion: solicitudes.terminosVersion,
   createdAt: solicitudes.createdAt,
   resolvedAt: solicitudes.resolvedAt,
 };
+
+// Debe coincidir con TERMINOS_VERSION en apps/web/src/legal/terminos.ts —
+// si cambia el texto de los términos, subir la fecha acá también.
+const TERMINOS_VERSION = '2026-08-30';
 
 @Injectable()
 export class SolicitudesService {
@@ -95,6 +101,8 @@ export class SolicitudesService {
         telefonoOrganizacion: dto.tipo === 'crear' ? dto.telefonoOrganizacion : null,
         emailOrganizacion: dto.tipo === 'crear' ? dto.emailOrganizacion : null,
         organizacionSolicitada: dto.tipo === 'unirse' ? dto.organizacionSolicitada : null,
+        terminosAceptadosEn: new Date(),
+        terminosVersion: TERMINOS_VERSION,
       })
       .returning({ id: solicitudes.id });
 

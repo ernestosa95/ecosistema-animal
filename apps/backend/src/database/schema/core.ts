@@ -174,6 +174,11 @@ export const solicitudes = core.table('solicitudes', {
   emailOrganizacion: text('email_organizacion'),
   organizacionSolicitada: text('organizacion_solicitada'),
   motivoRechazo: text('motivo_rechazo'),
+  // Un timestamp no nulo es la prueba de que aceptó — más simple que sumar un
+  // boolean redundante. `terminosVersion` queda para el día que el texto
+  // cambie y haga falta saber qué versión aceptó cada quien.
+  terminosAceptadosEn: timestamp('terminos_aceptados_en', { withTimezone: true }),
+  terminosVersion: text('terminos_version'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   resolvedAt: timestamp('resolved_at', { withTimezone: true }),
   resolvedPor: uuid('resolved_por').references(() => usuarios.id),

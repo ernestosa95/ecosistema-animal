@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api/client';
 import { crearSolicitud } from '../api/solicitudes';
+import { TerminosModal } from '../components/TerminosModal';
 import type { Sesion } from '../api/types';
 
 export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
@@ -23,6 +24,8 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
   const [telefonoOrganizacion, setTelefonoOrganizacion] = useState('');
   const [emailOrganizacion, setEmailOrganizacion] = useState('');
   const [organizacionSolicitada, setOrganizacionSolicitada] = useState('');
+  const [terminosAceptados, setTerminosAceptados] = useState(false);
+  const [mostrarTerminos, setMostrarTerminos] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -51,6 +54,7 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
       } else {
         await crearSolicitud({
           tipo, nombre, apellido, email, password,
+          terminosAceptados,
           telefono: telefono || undefined,
           dni: dni || undefined,
           ...(tipo === 'crear'
@@ -198,11 +202,29 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
           />
         </label>
 
+        {modo === 'registro' && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textTransform: 'none' }}>
+            <input
+              type="checkbox"
+              style={{ width: 'auto', margin: 0 }}
+              checked={terminosAceptados}
+              onChange={(e) => setTerminosAceptados(e.target.checked)}
+              required
+            />
+            Acepto los{' '}
+            <button type="button" className="link" onClick={() => setMostrarTerminos(true)}>
+              términos y condiciones
+            </button>
+          </label>
+        )}
+
         {error && <div className="alerta">{error}</div>}
 
-        <button className="btn" type="submit" disabled={cargando}>
+        <button className="btn" type="submit" disabled={cargando || (modo === 'registro' && !terminosAceptados)}>
           {cargando ? 'Procesando…' : modo === 'login' ? 'Ingresar' : 'Enviar solicitud'}
         </button>
+
+        {mostrarTerminos && <TerminosModal onCerrar={() => setMostrarTerminos(false)} />}
 
         <p className="switch">
           {modo === 'login' ? '¿No tenés cuenta?' : '¿Ya tenés cuenta?'}{' '}

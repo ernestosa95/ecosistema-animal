@@ -20,6 +20,8 @@ export interface Solicitud {
   telefonoOrganizacion?: string;
   emailOrganizacion?: string;
   organizacionSolicitada?: string;
+  terminosAceptadosEn?: string;
+  terminosVersion?: string;
   createdAt?: string;
 }
 
@@ -27,6 +29,7 @@ export interface Solicitud {
 export async function crearSolicitud(d: {
   tipo: 'crear' | 'unirse';
   nombre: string; apellido: string; email: string; password: string;
+  terminosAceptados: boolean;
   telefono?: string; dni?: string;
   nombreOrganizacion?: string; tipoOrganizacion?: string;
   direccionOrganizacion?: string; localidadOrganizacion?: string; provinciaOrganizacion?: string;
