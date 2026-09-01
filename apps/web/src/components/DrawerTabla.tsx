@@ -1,25 +1,22 @@
-import { ColumnaExport, valorDe } from '../utils/exportar';
-import { ExportBar } from './ExportBar';
+import { ColumnaExport, valorDe } from '../utils/columnasTabla';
 
 /**
  * Drawer genérico para el drill-down del dashboard (§4.2): click en una
- * tarjeta KPI abre esto con la tabla desglosada + el centro de exportación,
- * sin navegar a otra pantalla. Mismo patrón visual que el drawer de la
- * línea de tiempo médica (`PacienteDetallePage.tsx`), generalizado para
- * cualquier lista de filas + columnas.
+ * tarjeta KPI abre esto con la tabla desglosada, sin navegar a otra
+ * pantalla. Mismo patrón visual que el drawer de la línea de tiempo médica
+ * (`PacienteDetallePage.tsx`), generalizado para cualquier lista de filas +
+ * columnas.
  */
 export function DrawerTabla<T>({
   titulo,
   columnas,
   filas,
-  nombreArchivo,
   cargando,
   onCerrar,
 }: {
   titulo: string;
   columnas: ColumnaExport<T>[];
   filas: T[];
-  nombreArchivo: string;
   cargando?: boolean;
   onCerrar: () => void;
 }) {
@@ -38,8 +35,7 @@ export function DrawerTabla<T>({
           <p className="muted">Sin datos para mostrar.</p>
         ) : (
           <>
-            <ExportBar nombreArchivo={nombreArchivo} titulo={titulo} columnas={columnas} filas={filas} />
-            <table className="tabla" style={{ marginTop: '0.75rem' }}>
+            <table className="tabla">
               <thead>
                 <tr>
                   {columnas.map((c) => (

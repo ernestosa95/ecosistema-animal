@@ -3,7 +3,6 @@ import { api } from '../api/client';
 import type { Sesion, Animal, Especie, Persona } from '../api/types';
 import { CamposEspecie } from '../components/CamposEspecie';
 import { useFormularioPersistente, hayBorrador } from '../hooks/useFormularioPersistente';
-import { ExportBar } from '../components/ExportBar';
 
 export function PacientesPage({
   sesion,
@@ -103,21 +102,6 @@ export function PacientesPage({
             borderRadius: '10px',
             fontSize: '14px',
           }}
-        />
-      )}
-
-      {!cargando && filtrados.length > 0 && (
-        <ExportBar
-          nombreArchivo="animales"
-          titulo="Animales"
-          columnas={[
-            { clave: 'nombre', etiqueta: 'Nombre' },
-            { clave: 'especie', etiqueta: 'Especie', valor: (a: Animal) => especiesPorId[a.especieId] ?? '—' },
-            { clave: 'dueno', etiqueta: 'Dueño', valor: (a: Animal) => (a.personaId ? personasPorId[a.personaId] ?? '—' : '—') },
-            { clave: 'codigoLegible', etiqueta: 'Código' },
-            { clave: 'estado', etiqueta: 'Estado' },
-          ]}
-          filas={filtrados}
         />
       )}
 
@@ -261,7 +245,8 @@ function NuevoPacienteForm({
       </label>
 
       {personaId === '__nuevo__' && (
-        <>
+        <div className="span-2 subform">
+          <div className="form-titulo">Datos del dueño nuevo</div>
           <label>
             Nombre del dueño
             <input value={dNombre} onChange={(e) => campo('dNombre')(e.target.value)} required />
@@ -278,7 +263,7 @@ function NuevoPacienteForm({
             DNI (opcional)
             <input value={dDni} onChange={(e) => campo('dDni')(e.target.value)} />
           </label>
-        </>
+        </div>
       )}
 
       <label>

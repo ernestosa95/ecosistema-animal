@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { Sesion, Producto, StockItem, MovimientoStock, TipoMovimientoStock } from '../api/types';
-import { ExportBar } from '../components/ExportBar';
+import { SelectorBusqueda } from '../components/SelectorBusqueda';
 
 const ETIQUETAS_TIPO_MOVIMIENTO: Record<TipoMovimientoStock, string> = {
   compra: 'Compra',
@@ -13,6 +13,41 @@ const ETIQUETAS_TIPO_MOVIMIENTO: Record<TipoMovimientoStock, string> = {
 
 const TIPOS_ALTA = new Set<TipoMovimientoStock>(['compra']);
 
+// Listas cerradas (§ pedido del usuario: la categoría/unidad/presentación no
+// pueden quedar como texto libre — el operador elige de una lista fija, no
+// tipea). El campo sigue siendo texto plano en el backend (sin migración,
+// ver database/schema/farmacia.ts) — el cierre es sólo en el formulario.
+const CATEGORIAS = [
+  'Antibiótico',
+  'Antiparasitario',
+  'Antiinflamatorio',
+  'Analgésico',
+  'Vacuna',
+  'Vitamina / suplemento',
+  'Anestésico',
+  'Dermatológico',
+  'Otro medicamento',
+  'Alimento',
+  'Accesorios',
+  'Forraje',
+  'Higiene y cuidado',
+  'Otro',
+] as const;
+
+const UNIDADES = ['ml', 'mg', 'comprimidos', 'dosis', 'kg', 'g', 'litros', 'unidad'] as const;
+
+const PRESENTACIONES = [
+  'Frasco',
+  'Caja',
+  'Blister',
+  'Ampolla',
+  'Sachet',
+  'Bolsa',
+  'Sobre',
+  'Bidón',
+  'Unidad suelta',
+] as const;
+
 export function FarmaciaPage({ sesion }: { sesion: Sesion }) {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [stock, setStock] = useState<StockItem[]>([]);
@@ -20,6 +55,8 @@ export function FarmaciaPage({ sesion }: { sesion: Sesion }) {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
+  const [mostrarIngreso, setMostrarIngreso] = useState(false);
+  const [filtroCategoria, setFiltroCategoria] = useState('');
 
   async function cargar() {
     setCargando(true);
@@ -42,6 +79,15 @@ export function FarmaciaPage({ sesion }: { sesion: Sesion }) {
 
   const cantidadDe = (productoId: string) => stock.find((s) => s.productoId === productoId)?.cantidad ?? 0;
 
+  // Categorías realmente en uso, para el filtro y las sugerencias del alta —
+  // no hay un catálogo fijo (farmacia + alimento/accesorios/forraje conviven
+  // en el mismo stock, ver comentario del schema), así que se derivan de lo
+  // que ya se cargó.
+  const categorias = [...new Set(productos.map((p) => p.categoria).filter((c): c is string => !!c))].sort();
+  const productosFiltrados = filtroCategoria
+    ? productos.filter((p) => p.categoria === filtroCategoria)
+    : productos;
+
   if (seleccionado) {
     return (
       <ProductoDetalle
@@ -60,11 +106,31 @@ export function FarmaciaPage({ sesion }: { sesion: Sesion }) {
   return (
     <div>
       <div className="page-head">
-        <h1>Farmacia</h1>
-        <button className="btn" onClick={() => setMostrarForm((v) => !v)}>
-          {mostrarForm ? 'Cerrar' : '+ Nuevo producto'}
-        </button>
+        <h1>Farmacia y stock</h1>
+        <div className="acciones">
+          <button
+            className="btn-ghost"
+            onClick={() => {
+              setMostrarIngreso((v) => !v);
+              setMostrarForm(false);
+            }}
+          >
+            {mostrarIngreso ? 'Cerrar' : '+ Ingresos'}
+          </button>
+          <button
+            className="btn"
+            onClick={() => {
+              setMostrarForm((v) => !v);
+              setMostrarIngreso(false);
+            }}
+          >
+            {mostrarForm ? 'Cerrar' : '+ Nuevo producto'}
+          </button>
+        </div>
       </div>
+      <p className="muted">
+        Vademécum y también el resto del stock de mostrador — alimento, accesorios, forraje, lo que sea que se venda o se use.
+      </p>
 
       {mostrarForm && (
         <NuevoProductoForm
@@ -76,30 +142,39 @@ export function FarmaciaPage({ sesion }: { sesion: Sesion }) {
         />
       )}
 
+      {mostrarIngreso && (
+        <IngresoForm
+          sesion={sesion}
+          productos={productos}
+          onCreado={() => {
+            setMostrarIngreso(false);
+            cargar();
+          }}
+        />
+      )}
+
       {error && <div className="alerta">{error}</div>}
 
-      {!cargando && productos.length > 0 && (
-        <ExportBar
-          nombreArchivo="productos-farmacia"
-          titulo="Productos"
-          columnas={[
-            { clave: 'nombre', etiqueta: 'Nombre' },
-            { clave: 'presentacion', etiqueta: 'Presentación', valor: (p: Producto) => p.presentacion ?? '—' },
-            { clave: 'categoria', etiqueta: 'Categoría', valor: (p: Producto) => p.categoria ?? '—' },
-            {
-              clave: 'stock',
-              etiqueta: 'Stock',
-              valor: (p: Producto) => `${cantidadDe(p.id)}${p.unidad ? ` ${p.unidad}` : ''}`,
-            },
-          ]}
-          filas={productos}
-        />
+      {!cargando && categorias.length > 1 && (
+        <label className="filtro-categoria">
+          Categoría
+          <select value={filtroCategoria} onChange={(e) => setFiltroCategoria(e.target.value)}>
+            <option value="">Todas</option>
+            {categorias.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </label>
       )}
 
       {cargando ? (
         <p className="muted">Cargando…</p>
       ) : productos.length === 0 ? (
         <p className="muted">Todavía no hay productos. Creá el primero con "+ Nuevo producto".</p>
+      ) : productosFiltrados.length === 0 ? (
+        <p className="muted">Sin productos en la categoría "{filtroCategoria}".</p>
       ) : (
         <div className="card">
           <table className="tabla">
@@ -113,7 +188,7 @@ export function FarmaciaPage({ sesion }: { sesion: Sesion }) {
               </tr>
             </thead>
             <tbody>
-              {productos.map((p) => (
+              {productosFiltrados.map((p) => (
                 <tr key={p.id}>
                   <td>{p.nombre}</td>
                   <td>{p.presentacion ?? '—'}</td>
@@ -139,10 +214,11 @@ function NuevoProductoForm({ sesion, onCreado }: { sesion: Sesion; onCreado: () 
   const [presentacion, setPresentacion] = useState('');
   const [unidad, setUnidad] = useState('');
   const [categoria, setCategoria] = useState('');
+  const [esMedicamento, setEsMedicamento] = useState(false);
+  const [esFraccionable, setEsFraccionable] = useState(false);
   const [concentracion, setConcentracion] = useState('');
   const [unidadConcentracion, setUnidadConcentracion] = useState('');
   const [dosisSugeridaMgKg, setDosisSugeridaMgKg] = useState('');
-  const [precio, setPrecio] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -151,14 +227,13 @@ function NuevoProductoForm({ sesion, onCreado }: { sesion: Sesion; onCreado: () 
     setError(null);
     setGuardando(true);
     try {
-      const data: Record<string, unknown> = { nombre };
+      const data: Record<string, unknown> = { nombre, esMedicamento, esFraccionable };
       if (presentacion) data.presentacion = presentacion;
       if (unidad) data.unidad = unidad;
       if (categoria) data.categoria = categoria;
-      if (concentracion) data.concentracion = Number(concentracion);
-      if (unidadConcentracion) data.unidadConcentracion = unidadConcentracion;
-      if (dosisSugeridaMgKg) data.dosisSugeridaMgKg = Number(dosisSugeridaMgKg);
-      if (precio) data.precio = Number(precio);
+      if (esMedicamento && concentracion) data.concentracion = Number(concentracion);
+      if (esMedicamento && unidadConcentracion) data.unidadConcentracion = unidadConcentracion;
+      if (esMedicamento && dosisSugeridaMgKg) data.dosisSugeridaMgKg = Number(dosisSugeridaMgKg);
       await api.crearProducto(sesion, data);
       onCreado();
     } catch (err) {
@@ -176,61 +251,263 @@ function NuevoProductoForm({ sesion, onCreado }: { sesion: Sesion; onCreado: () 
       </label>
       <label>
         Presentación (opcional)
-        <input value={presentacion} onChange={(e) => setPresentacion(e.target.value)} placeholder="Ej: frasco 50ml" />
+        <select value={presentacion} onChange={(e) => setPresentacion(e.target.value)}>
+          <option value="">Sin especificar</option>
+          {PRESENTACIONES.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
       </label>
       <label>
         Unidad (opcional)
-        <input value={unidad} onChange={(e) => setUnidad(e.target.value)} placeholder="Ej: ml, comprimidos, dosis" />
+        <select value={unidad} onChange={(e) => setUnidad(e.target.value)}>
+          <option value="">Sin especificar</option>
+          {UNIDADES.map((u) => (
+            <option key={u} value={u}>
+              {u}
+            </option>
+          ))}
+        </select>
       </label>
       <label className="span-2">
         Categoría (opcional)
-        <input value={categoria} onChange={(e) => setCategoria(e.target.value)} placeholder="Ej: antibiótico, antiparasitario" />
-      </label>
-      <label>
-        Concentración (opcional)
-        <input
-          type="number"
-          step="0.001"
-          min="0"
-          value={concentracion}
-          onChange={(e) => setConcentracion(e.target.value)}
-          placeholder="Ej: 50"
+        <SelectorBusqueda
+          opciones={CATEGORIAS}
+          valor={categoria}
+          onCambiar={setCategoria}
+          placeholder="Buscar categoría…"
         />
       </label>
-      <label>
-        Unidad de concentración
-        <input
-          value={unidadConcentracion}
-          onChange={(e) => setUnidadConcentracion(e.target.value)}
-          placeholder="Ej: mg/ml"
-        />
-      </label>
-      <label>
-        Dosis sugerida (mg/kg, para la calculadora de indicaciones)
-        <input
-          type="number"
-          step="0.001"
-          min="0"
-          value={dosisSugeridaMgKg}
-          onChange={(e) => setDosisSugeridaMgKg(e.target.value)}
-          placeholder="Ej: 5"
-        />
-      </label>
-      <label>
-        Precio de venta (opcional, para cobrarlo en Caja)
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          value={precio}
-          onChange={(e) => setPrecio(e.target.value)}
-          placeholder="Ej: 1500"
-        />
-      </label>
+
+      <div className="span-2 check-fila">
+        <label>
+          <input type="checkbox" checked={esMedicamento} onChange={(e) => setEsMedicamento(e.target.checked)} />
+          Es medicamento
+        </label>
+        <label>
+          <input type="checkbox" checked={esFraccionable} onChange={(e) => setEsFraccionable(e.target.checked)} />
+          Es fraccionable (se vende/usa por porciones de un bulto, ej. kg de una bolsa)
+        </label>
+      </div>
+
+      {esMedicamento && (
+        <div className="span-2 subform">
+          <div className="form-titulo">Datos para la calculadora de dosificación (opcional)</div>
+          <label>
+            Concentración
+            <input
+              type="number"
+              step="0.001"
+              min="0"
+              value={concentracion}
+              onChange={(e) => setConcentracion(e.target.value)}
+              placeholder="Ej: 50"
+            />
+          </label>
+          <label>
+            Unidad de concentración
+            <input
+              value={unidadConcentracion}
+              onChange={(e) => setUnidadConcentracion(e.target.value)}
+              placeholder="Ej: mg/ml"
+            />
+          </label>
+          <label className="span-2">
+            Dosis sugerida (mg/kg, para la calculadora de indicaciones)
+            <input
+              type="number"
+              step="0.001"
+              min="0"
+              value={dosisSugeridaMgKg}
+              onChange={(e) => setDosisSugeridaMgKg(e.target.value)}
+              placeholder="Ej: 5"
+            />
+          </label>
+        </div>
+      )}
+
+      <p className="muted span-2">
+        El precio se carga desde "+ Ingresos", al registrar la primera entrada de stock.
+      </p>
       {error && <div className="alerta span-2">{error}</div>}
       <div className="span-2">
         <button className="btn" type="submit" disabled={guardando}>
           {guardando ? 'Guardando…' : 'Guardar producto'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * "+ Ingresos": alta de stock para un producto ya existente, sin tener que
+ * entrar a su ficha — el flujo de mostrador más común (llega mercadería,
+ * se carga cantidad + precios de una). Crea el movimiento 'compra' y de
+ * paso actualiza el precio de venta/costo del producto (ver comentario del
+ * schema: esos campos se completan típicamente desde acá, no en el alta).
+ */
+function IngresoForm({
+  sesion,
+  productos,
+  onCreado,
+}: {
+  sesion: Sesion;
+  productos: Producto[];
+  onCreado: () => void;
+}) {
+  const [nombreProducto, setNombreProducto] = useState('');
+  const producto = productos.find((p) => p.nombre === nombreProducto) ?? null;
+
+  const [cantidad, setCantidad] = useState('');
+  const [bultos, setBultos] = useState('');
+  const [contenidoPorBulto, setContenidoPorBulto] = useState('');
+  const totalCalculado =
+    bultos && contenidoPorBulto ? Number(bultos) * Number(contenidoPorBulto) : null;
+
+  const [fecha, setFecha] = useState('');
+  const [precioCompra, setPrecioCompra] = useState('');
+  const [precioVenta, setPrecioVenta] = useState('');
+  const [observaciones, setObservaciones] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+
+  function elegirProducto(nombre: string) {
+    setNombreProducto(nombre);
+    const p = productos.find((x) => x.nombre === nombre);
+    setPrecioVenta(p?.precio ?? '');
+    setPrecioCompra(p?.precioCompra ?? '');
+  }
+
+  async function guardar(e: React.FormEvent) {
+    e.preventDefault();
+    if (!producto) {
+      setError('Elegí un producto');
+      return;
+    }
+    if (!cantidad || Number(cantidad) <= 0) {
+      setError('Ingresá una cantidad mayor a 0');
+      return;
+    }
+    if (!precioVenta) {
+      setError('El precio de venta al cliente es obligatorio');
+      return;
+    }
+    setError(null);
+    setGuardando(true);
+    try {
+      const dataMovimiento: Record<string, unknown> = { productoId: producto.id, tipo: 'compra', cantidad: Number(cantidad) };
+      if (fecha) dataMovimiento.fecha = fecha;
+      if (observaciones) dataMovimiento.observaciones = observaciones;
+      await api.crearMovimientoStock(sesion, dataMovimiento);
+
+      const dataProducto: Record<string, unknown> = { precio: Number(precioVenta) };
+      if (precioCompra) dataProducto.precioCompra = Number(precioCompra);
+      await api.actualizarProducto(sesion, producto.id, dataProducto);
+
+      onCreado();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al guardar');
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <form className="card form-grid" onSubmit={guardar}>
+      <label className="span-2">
+        Producto
+        <SelectorBusqueda
+          opciones={productos.map((p) => p.nombre)}
+          valor={nombreProducto}
+          onCambiar={elegirProducto}
+          placeholder="Buscar producto…"
+        />
+      </label>
+
+      {producto && (
+        <>
+          <label>
+            Cantidad{producto.unidad ? ` (${producto.unidad})` : ''}
+            <input type="number" min="1" step="1" value={cantidad} onChange={(e) => setCantidad(e.target.value)} required />
+          </label>
+          <label>
+            Fecha (opcional)
+            <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+          </label>
+
+          <div className="span-2 subform">
+            <div className="form-titulo">
+              ¿Entró en bultos? Calculá la cantidad total en vez de hacer la cuenta a mano
+            </div>
+            <label>
+              Bultos recibidos
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={bultos}
+                onChange={(e) => setBultos(e.target.value)}
+                placeholder="Ej: 4"
+              />
+            </label>
+            <label>
+              Contenido por bulto{producto.unidad ? ` (${producto.unidad})` : ''}
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={contenidoPorBulto}
+                onChange={(e) => setContenidoPorBulto(e.target.value)}
+                placeholder="Ej: 25"
+              />
+            </label>
+            {totalCalculado !== null && (
+              <div className="span-2 sugerencia-dosis">
+                Total: <b>{totalCalculado}{producto.unidad ? ` ${producto.unidad}` : ''}</b>{' '}
+                <button type="button" className="link" onClick={() => setCantidad(String(totalCalculado))}>
+                  Usar esta cantidad
+                </button>
+              </div>
+            )}
+          </div>
+
+          <label>
+            Precio de compra al proveedor (opcional){producto.unidad ? ` — por ${producto.unidad}` : ''}
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={precioCompra}
+              onChange={(e) => setPrecioCompra(e.target.value)}
+              placeholder="Ej: 1000"
+            />
+          </label>
+          <label>
+            Precio de venta al cliente{producto.unidad ? ` (por ${producto.unidad})` : ''}
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={precioVenta}
+              onChange={(e) => setPrecioVenta(e.target.value)}
+              placeholder="Ej: 1500"
+              required
+            />
+          </label>
+
+          <label className="span-2">
+            Observaciones (opcional)
+            <input value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
+          </label>
+        </>
+      )}
+
+      {error && <div className="alerta span-2">{error}</div>}
+      <div className="span-2">
+        <button className="btn" type="submit" disabled={guardando || !producto}>
+          {guardando ? 'Guardando…' : 'Registrar ingreso'}
         </button>
       </div>
     </form>
@@ -314,16 +591,25 @@ function ProductoDetalle({
           onCancelar={() => setEditando(false)}
         />
       ) : (
-        <div className="card ficha-datos">
+        <div className="card ficha-datos ficha-datos-compacta">
           <Dato etiqueta="Presentación" valor={producto.presentacion ?? '—'} />
           <Dato etiqueta="Unidad" valor={producto.unidad ?? '—'} />
           <Dato etiqueta="Categoría" valor={producto.categoria ?? '—'} />
+          <Dato etiqueta="Medicamento" valor={producto.esMedicamento ? 'Sí' : 'No'} />
+          <Dato etiqueta="Fraccionable" valor={producto.esFraccionable ? 'Sí' : 'No'} />
           <Dato
             etiqueta="Concentración"
             valor={producto.concentracion ? `${producto.concentracion} ${producto.unidadConcentracion ?? ''}`.trim() : '—'}
           />
           <Dato etiqueta="Dosis sugerida" valor={producto.dosisSugeridaMgKg ? `${producto.dosisSugeridaMgKg} mg/kg` : '—'} />
-          <Dato etiqueta="Precio de venta" valor={producto.precio ? `$${producto.precio}` : '—'} />
+          <Dato
+            etiqueta="Precio de compra"
+            valor={producto.precioCompra ? `$${producto.precioCompra}${producto.unidad ? ` / ${producto.unidad}` : ''}` : '—'}
+          />
+          <Dato
+            etiqueta="Precio de venta"
+            valor={producto.precio ? `$${producto.precio}${producto.unidad ? ` / ${producto.unidad}` : ''}` : '—'}
+          />
         </div>
       )}
 
@@ -368,23 +654,6 @@ function ProductoDetalle({
       )}
 
       {error && <div className="alerta">{error}</div>}
-      {!cargando && movimientos.length > 0 && (
-        <ExportBar
-          nombreArchivo={`movimientos-${producto.nombre}`}
-          titulo={`Movimientos — ${producto.nombre}`}
-          columnas={[
-            { clave: 'fecha', etiqueta: 'Fecha' },
-            { clave: 'tipo', etiqueta: 'Tipo', valor: (m: MovimientoStock) => ETIQUETAS_TIPO_MOVIMIENTO[m.tipo] },
-            {
-              clave: 'cantidad',
-              etiqueta: 'Cantidad',
-              valor: (m: MovimientoStock) => `${TIPOS_ALTA.has(m.tipo) ? '+' : '−'}${m.cantidad}`,
-            },
-            { clave: 'observaciones', etiqueta: 'Observaciones', valor: (m: MovimientoStock) => m.observaciones ?? '—' },
-          ]}
-          filas={movimientos}
-        />
-      )}
       {!cargando && (
         movimientos.length === 0 ? (
           <p className="muted">Todavía no hay movimientos registrados para este producto.</p>
@@ -436,6 +705,16 @@ function NuevoMovimientoForm({
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
+  // Calculadora de bultos (F: compra en bulto, venta/uso fraccionado — ej.
+  // entran 4 bolsas de 25kg cada una, después se va vendiendo de a 1-2kg).
+  // Sólo afecta la carga: el stock siempre se lleva en la unidad de venta
+  // del producto (kg), nunca en "bolsas" — así una compra de bultos y una
+  // venta fraccionada descuentan del mismo número.
+  const [bultos, setBultos] = useState('');
+  const [contenidoPorBulto, setContenidoPorBulto] = useState('');
+  const totalCalculado =
+    bultos && contenidoPorBulto ? Number(bultos) * Number(contenidoPorBulto) : null;
+
   async function guardar(e: React.FormEvent) {
     e.preventDefault();
     if (!cantidad || Number(cantidad) <= 0) {
@@ -477,6 +756,45 @@ function NuevoMovimientoForm({
         Fecha (opcional)
         <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
       </label>
+
+      {tipo === 'compra' && (
+        <div className="span-2 subform">
+          <div className="form-titulo">
+            ¿Entró en bultos? Calculá la cantidad total en vez de hacer la cuenta a mano
+          </div>
+          <label>
+            Bultos recibidos
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={bultos}
+              onChange={(e) => setBultos(e.target.value)}
+              placeholder="Ej: 4"
+            />
+          </label>
+          <label>
+            Contenido por bulto{producto.unidad ? ` (${producto.unidad})` : ''}
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={contenidoPorBulto}
+              onChange={(e) => setContenidoPorBulto(e.target.value)}
+              placeholder="Ej: 25"
+            />
+          </label>
+          {totalCalculado !== null && (
+            <div className="span-2 sugerencia-dosis">
+              Total: <b>{totalCalculado}{producto.unidad ? ` ${producto.unidad}` : ''}</b>{' '}
+              <button type="button" className="link" onClick={() => setCantidad(String(totalCalculado))}>
+                Usar esta cantidad
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       <label className="span-2">
         Observaciones (opcional)
         <input value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
@@ -515,10 +833,13 @@ function EditarProductoForm({
   const [presentacion, setPresentacion] = useState(producto.presentacion ?? '');
   const [unidad, setUnidad] = useState(producto.unidad ?? '');
   const [categoria, setCategoria] = useState(producto.categoria ?? '');
+  const [esMedicamento, setEsMedicamento] = useState(producto.esMedicamento);
+  const [esFraccionable, setEsFraccionable] = useState(producto.esFraccionable);
   const [concentracion, setConcentracion] = useState(producto.concentracion ?? '');
   const [unidadConcentracion, setUnidadConcentracion] = useState(producto.unidadConcentracion ?? '');
   const [dosisSugeridaMgKg, setDosisSugeridaMgKg] = useState(producto.dosisSugeridaMgKg ?? '');
   const [precio, setPrecio] = useState(producto.precio ?? '');
+  const [precioCompra, setPrecioCompra] = useState(producto.precioCompra ?? '');
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -527,14 +848,15 @@ function EditarProductoForm({
     setError(null);
     setGuardando(true);
     try {
-      const data: Record<string, unknown> = { nombre };
+      const data: Record<string, unknown> = { nombre, esMedicamento, esFraccionable };
       if (presentacion) data.presentacion = presentacion;
       if (unidad) data.unidad = unidad;
       if (categoria) data.categoria = categoria;
-      data.concentracion = concentracion ? Number(concentracion) : undefined;
-      data.unidadConcentracion = unidadConcentracion || undefined;
-      data.dosisSugeridaMgKg = dosisSugeridaMgKg ? Number(dosisSugeridaMgKg) : undefined;
+      data.concentracion = esMedicamento && concentracion ? Number(concentracion) : undefined;
+      data.unidadConcentracion = esMedicamento ? unidadConcentracion || undefined : undefined;
+      data.dosisSugeridaMgKg = esMedicamento && dosisSugeridaMgKg ? Number(dosisSugeridaMgKg) : undefined;
       data.precio = precio ? Number(precio) : undefined;
+      data.precioCompra = precioCompra ? Number(precioCompra) : undefined;
       const actualizado = await api.actualizarProducto(sesion, producto.id, data);
       onGuardado(actualizado);
     } catch (err) {
@@ -552,42 +874,88 @@ function EditarProductoForm({
       </label>
       <label>
         Presentación
-        <input value={presentacion} onChange={(e) => setPresentacion(e.target.value)} />
+        <select value={presentacion} onChange={(e) => setPresentacion(e.target.value)}>
+          <option value="">Sin especificar</option>
+          {/* Si el producto ya tenía un valor previo a la lista cerrada, se conserva como opción para no perderlo al editar. */}
+          {presentacion && !(PRESENTACIONES as readonly string[]).includes(presentacion) && (
+            <option value={presentacion}>{presentacion}</option>
+          )}
+          {PRESENTACIONES.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
       </label>
       <label>
         Unidad
-        <input value={unidad} onChange={(e) => setUnidad(e.target.value)} />
+        <select value={unidad} onChange={(e) => setUnidad(e.target.value)}>
+          <option value="">Sin especificar</option>
+          {unidad && !(UNIDADES as readonly string[]).includes(unidad) && <option value={unidad}>{unidad}</option>}
+          {UNIDADES.map((u) => (
+            <option key={u} value={u}>
+              {u}
+            </option>
+          ))}
+        </select>
       </label>
       <label className="span-2">
         Categoría
-        <input value={categoria} onChange={(e) => setCategoria(e.target.value)} />
-      </label>
-      <label>
-        Concentración
-        <input
-          type="number"
-          step="0.001"
-          min="0"
-          value={concentracion}
-          onChange={(e) => setConcentracion(e.target.value)}
+        <SelectorBusqueda
+          opciones={categoria && !(CATEGORIAS as readonly string[]).includes(categoria) ? [categoria, ...CATEGORIAS] : CATEGORIAS}
+          valor={categoria}
+          onCambiar={setCategoria}
+          placeholder="Buscar categoría…"
         />
       </label>
+
+      <div className="span-2 check-fila">
+        <label>
+          <input type="checkbox" checked={esMedicamento} onChange={(e) => setEsMedicamento(e.target.checked)} />
+          Es medicamento
+        </label>
+        <label>
+          <input type="checkbox" checked={esFraccionable} onChange={(e) => setEsFraccionable(e.target.checked)} />
+          Es fraccionable (se vende/usa por porciones de un bulto, ej. kg de una bolsa)
+        </label>
+      </div>
+
+      {esMedicamento && (
+        <div className="span-2 subform">
+          <div className="form-titulo">Datos para la calculadora de dosificación (opcional)</div>
+          <label>
+            Concentración
+            <input
+              type="number"
+              step="0.001"
+              min="0"
+              value={concentracion}
+              onChange={(e) => setConcentracion(e.target.value)}
+            />
+          </label>
+          <label>
+            Unidad de concentración
+            <input value={unidadConcentracion} onChange={(e) => setUnidadConcentracion(e.target.value)} placeholder="Ej: mg/ml" />
+          </label>
+          <label className="span-2">
+            Dosis sugerida (mg/kg)
+            <input
+              type="number"
+              step="0.001"
+              min="0"
+              value={dosisSugeridaMgKg}
+              onChange={(e) => setDosisSugeridaMgKg(e.target.value)}
+            />
+          </label>
+        </div>
+      )}
+
       <label>
-        Unidad de concentración
-        <input value={unidadConcentracion} onChange={(e) => setUnidadConcentracion(e.target.value)} placeholder="Ej: mg/ml" />
+        Precio de compra al proveedor (opcional){unidad ? ` — por ${unidad}` : ''}
+        <input type="number" step="0.01" min="0" value={precioCompra} onChange={(e) => setPrecioCompra(e.target.value)} />
       </label>
       <label>
-        Dosis sugerida (mg/kg)
-        <input
-          type="number"
-          step="0.001"
-          min="0"
-          value={dosisSugeridaMgKg}
-          onChange={(e) => setDosisSugeridaMgKg(e.target.value)}
-        />
-      </label>
-      <label>
-        Precio de venta
+        Precio de venta{unidad ? ` (por ${unidad})` : ''}
         <input type="number" step="0.01" min="0" value={precio} onChange={(e) => setPrecio(e.target.value)} />
       </label>
       {error && <div className="alerta span-2">{error}</div>}

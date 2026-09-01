@@ -147,18 +147,22 @@ Sólo visible en la nav para roles `propietario`/`admin`.
 
 ---
 
-## 11. Farmacia (vademécum + stock)
+## 11. Farmacia y stock (vademécum + insumos generales)
 
-Sólo visible en la nav para roles `propietario`/`admin`/`veterinario`.
+Sólo visible en la nav para roles `propietario`/`admin`/`veterinario`. Desde 2026-09-01 cubre explícitamente cualquier insumo de mostrador (alimento, accesorios, forraje), no sólo medicamentos.
 
-- [ ] **11.1 — Alta de producto:** "Farmacia" → "+ Nuevo producto" → nombre (obligatorio) + presentación/unidad/categoría (opcionales, ej. "frasco 50ml" / "ml" / "antibiótico"). Guardar. Debe aparecer en el listado con stock en 0.
-- [ ] **11.2 — Ver detalle:** "Ver →" sobre el producto → debe mostrar sus datos, un campo de stock en 0, y sin movimientos todavía.
-- [ ] **11.3 — Movimiento de compra:** "+ Nuevo movimiento" → tipo "Compra", cantidad (ej. 100) → guardar. El stock debe subir a 100 y el movimiento aparecer en el historial con signo "+".
-- [ ] **11.4 — Movimiento de uso:** otro movimiento, tipo "Uso", cantidad menor a la disponible (ej. 30) → el stock debe bajar (70) y el historial mostrarlo con signo "−".
-- [ ] **11.5 — Baja rechazada por stock insuficiente:** tipo "Merma" con una cantidad mayor a la disponible → debe rechazar con un mensaje de error, **sin** cambiar el stock.
-- [ ] **11.6 — Corrección directa:** cambiar el número de "Stock" a mano y "Guardar corrección" (esto no deja historial, a diferencia de un movimiento). Confirmar que se actualiza.
-- [ ] **11.7 — Editar producto:** "Editar" sobre el producto → cambiar presentación o categoría → guardar.
-- [ ] **11.8 — Dispensa desde una consulta (F4.3):** ver 3.6/3.7 — se prueba desde la ficha del paciente, no desde acá, pero el movimiento que genera (tipo "Uso" con la consulta asociada) debe aparecer en el historial de este producto igual que cualquier otro movimiento.
+- [ ] **11.1 — Alta de producto (no medicamento):** "Farmacia y stock" → "+ Nuevo producto" → nombre (obligatorio) + presentación/unidad (opcionales, `<select>` de lista cerrada) + categoría (opcional, buscador de lista cerrada — tipear "alim" y elegir "Alimento" de las sugerencias). **No** tildar "Es medicamento" → el subform de concentración/dosis no debe aparecer. Guardar. Debe aparecer en el listado con stock en 0 y **sin** campo de precio en este formulario (el precio se carga aparte, ver 11.9).
+- [ ] **11.2 — Alta de producto (medicamento):** repetir el alta tildando "Es medicamento" → debe aparecer el subform "Datos para la calculadora de dosificación" (concentración/unidad de concentración/dosis sugerida, todos opcionales).
+- [ ] **11.3 — Ver detalle:** "Ver →" sobre un producto → debe mostrar sus datos (incluyendo Medicamento/Fraccionable Sí/No y Precio de compra/venta si ya se cargaron), un campo de stock, y el historial de movimientos.
+- [ ] **11.4 — Movimiento de compra:** desde el detalle, "+ Nuevo movimiento" → tipo "Compra", cantidad (ej. 100) → guardar. El stock debe subir y el movimiento aparecer en el historial con signo "+".
+- [ ] **11.5 — Calculadora de bultos (en el movimiento):** al elegir tipo "Compra" debe aparecer "¿Entró en bultos?" con "Bultos recibidos" × "Contenido por bulto" → el total calculado y "Usar esta cantidad" debe completar el campo Cantidad.
+- [ ] **11.6 — Movimiento de uso:** otro movimiento, tipo "Uso", cantidad menor a la disponible → el stock debe bajar y el historial mostrarlo con signo "−".
+- [ ] **11.7 — Baja rechazada por stock insuficiente:** tipo "Merma" con una cantidad mayor a la disponible → debe rechazar con un mensaje de error, **sin** cambiar el stock.
+- [ ] **11.8 — Corrección directa:** cambiar el número de "Stock" a mano y "Guardar corrección" (esto no deja historial, a diferencia de un movimiento). Confirmar que se actualiza.
+- [ ] **11.9 — Ingresos (alta de stock con precios):** "Farmacia y stock" → "+ Ingresos" → buscar un producto ya existente, cargar cantidad (con la misma calculadora de bultos), precio de compra al proveedor (opcional) y precio de venta al cliente (obligatorio) → "Registrar ingreso". Debe subir el stock y actualizar ambos precios del producto (visibles en su ficha, "por [unidad]").
+- [ ] **11.10 — Filtro por categoría:** con productos en más de una categoría, debe aparecer un selector "Categoría" arriba del listado que filtra la tabla.
+- [ ] **11.11 — Editar producto:** "Editar" sobre un producto → cambiar categoría (buscador), tildar/destildar "Es medicamento"/"Es fraccionable", ajustar precios → guardar. Un valor de categoría previo a la lista cerrada (cargado por API, no por este form) debe seguir apareciendo como opción al editar, no perderse.
+- [ ] **11.12 — Dispensa desde una consulta (F4.3):** ver 3.6/3.7 — se prueba desde la ficha del paciente, no desde acá, pero el movimiento que genera (tipo "Uso" con la consulta asociada) debe aparecer en el historial de este producto igual que cualquier otro movimiento.
 
 ---
 
@@ -171,6 +175,19 @@ Sólo visible en la nav para roles `propietario`/`admin`/`veterinario`.
 - [ ] **12.5 — No se repite solo:** recargar la página (o volver a loguearse) → el tour **no** debe reaparecer solo.
 - [ ] **12.6 — Reabrir manualmente:** botón "❓ Ayuda" (arriba a la derecha) → debe arrancar el tour de nuevo desde el paso 1, en cualquier momento.
 - [ ] **12.7 — Por rol:** repetir 12.1 con un usuario de cada rol (veterinario, recepción, capataz) → el contenido del tour debe ser distinto (más corto, enfocado en lo que ese rol realmente usa) — comparar contra lo que ve un propietario/admin.
+
+---
+
+## 13. Home — Centro de operaciones (Huella)
+
+Home de Huella (pestaña "Home" en el rail). Cada acceso rápido sólo debe aparecer para los roles indicados.
+
+- [ ] **13.1 — Nueva consulta** (`propietario`/`admin`/`veterinario`): tarjeta "Nueva consulta" → modal de búsqueda de paciente → elegir uno existente **o** "No aparece: crear paciente nuevo" (con alta de dueño inline si hace falta) → debe navegar directo a la ficha del paciente con "Historia clínica" ya abierta en modo alta.
+- [ ] **13.2 — Registro de vacuna** (`propietario`/`admin`/`veterinario`): igual que 13.1 pero debe abrir el drawer "Nueva vacuna" en la ficha del paciente.
+- [ ] **13.3 — Venta común** (`propietario`/`admin`/`recepcion`): tarjeta "Venta común" → si no hay caja abierta, debe ofrecer "Ir a Caja" en vez del formulario. Con caja abierta: buscar un producto (buscador, no `<select>`), cargar cantidad, el precio unitario debe precargarse con el precio actual del producto y el total recalcularse solo. Si se cambia el precio unitario, debe avisar que el precio general del producto va a quedar así, y al guardar el producto debe quedar con ese nuevo precio (verificar en Farmacia).
+- [ ] **13.4 — Nuevo turno** (`propietario`/`admin`/`veterinario`/`recepcion`): tarjeta "Nuevo turno" → mismo picker de paciente que 13.1 → elegir una agenda (si hay alguna configurada) debe mostrar los horarios disponibles como botones (los ocupados, tachados/deshabilitados) en vez del campo de hora libre; sin agenda, campo de hora libre. Crear el turno y confirmar que aparece en "Turnos de hoy" si la fecha es hoy.
+- [ ] **13.5 — Turnos de hoy:** debajo de las tarjetas, tabla con los turnos de hoy (no cancelados/atendidos) — un turno de otro día no debe aparecer. Click en una fila abre la ficha de ese paciente. Botón "Ver todos los turnos →" navega a la pestaña Turnos.
+- [ ] **13.6 — Sin accesos para el rol:** con un usuario que no tenga ninguno de los roles anteriores, el panel debe mostrar "No tenés accesos rápidos disponibles para tu rol" en vez de tarjetas vacías.
 
 ---
 

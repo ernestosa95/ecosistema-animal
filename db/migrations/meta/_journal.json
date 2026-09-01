@@ -134,6 +134,13 @@
       "when": 1788135649709,
       "tag": "0018_heavy_sabretooth",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1788223287283,
+      "tag": "0019_useful_trauma",
+      "breakpoints": true
     }
   ]
 }

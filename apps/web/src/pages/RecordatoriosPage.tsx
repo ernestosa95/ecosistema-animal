@@ -66,130 +66,112 @@ export default function RecordatoriosPage({ sesion, onAbrirPaciente }: Props) {
   const abrir = (animalId: string) => { const a = animalPorId.get(animalId); if (a) onAbrirPaciente?.(a); };
 
   return (
-    <div className="rc-wrap">
-      <style>{CSS}</style>
+    <div className="layout-2col">
+      <div className="layout-main">
+        <div className="page-head">
+          <div>
+            <h1>Recordatorios</h1>
+            <p className="muted">Clientes a contactar por vacunas y turnos próximos.</p>
+          </div>
+          <div className="recordatorios-ventana">
+            <span className="muted">Ventana:</span>
+            {VENTANAS.map((v) => (
+              <button key={v} className={dias === v ? 'btn' : 'btn-ghost'} onClick={() => setDias(v)}>
+                {v} días
+              </button>
+            ))}
+          </div>
+        </div>
 
-      <div className="rc-head">
-        <div>
-          <h1 className="rc-title">Recordatorios</h1>
-          <p className="rc-sub">Clientes a contactar por vacunas y turnos próximos.</p>
-        </div>
-        <div className="rc-ventana">
-          <span>Ventana:</span>
-          {VENTANAS.map((v) => (
-            <button key={v} className={`rc-chip ${dias === v ? 'active' : ''}`} onClick={() => setDias(v)}>{v} días</button>
-          ))}
-        </div>
+        {error && <div className="alerta">{error}</div>}
+
+        {cargando ? (
+          <p className="muted">Cargando…</p>
+        ) : (
+          <>
+            <div className="recordatorios-seccion">
+              <div className="recordatorios-seccion-titulo">
+                <h2 className="form-titulo">Vacunas por vencer o vencidas</h2>
+                <span className="chip">{vacunas.length}</span>
+              </div>
+              <div className="card">
+                {vacunas.length === 0 ? (
+                  <p className="muted">No hay vacunas pendientes en esta ventana.</p>
+                ) : (
+                  vacunas.map((v) => {
+                    const d = diasHasta(v.proximaDosis);
+                    const vencida = d !== null && d < 0;
+                    const dueno = duenoDe(v.animalId);
+                    const tel = soloDigitos(dueno?.celular ?? dueno?.telefono);
+                    const msg = encodeURIComponent(
+                      `Hola${dueno ? ' ' + dueno.nombre : ''}, te escribimos de la veterinaria: ${v.animalNombre} tiene la vacuna ${v.producto} ${vencida ? 'vencida' : 'próxima a vencer'} (${fmtFecha(v.proximaDosis)}). ¿Coordinamos un turno?`,
+                    );
+                    return (
+                      <div key={v.id} className="rc-row">
+                        <button className="rc-pac" onClick={() => abrir(v.animalId)} title="Abrir ficha">
+                          {v.animalNombre}
+                          {dueno && <span className="rc-due"> · {dueno.nombre} {dueno.apellido}</span>}
+                          <div className="rc-motivo">{v.producto} · vence {fmtFecha(v.proximaDosis)}</div>
+                        </button>
+                        <span className={`rc-badge ${vencida ? 'venc' : 'prox'}`}>
+                          {vencida ? `Vencida hace ${Math.abs(d as number)}d` : `En ${d}d`}
+                        </span>
+                        <div className="rc-contacto">
+                          {tel ? (
+                            <>
+                              <a className="rc-btn wa" href={`https://wa.me/${tel}?text=${msg}`} target="_blank" rel="noreferrer">WhatsApp</a>
+                              <a className="rc-btn ghost" href={`tel:${tel}`}>Llamar</a>
+                            </>
+                          ) : (
+                            <span className="muted rc-sincontacto">Sin teléfono</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            <div className="recordatorios-seccion">
+              <div className="recordatorios-seccion-titulo">
+                <h2 className="form-titulo">Próximos turnos</h2>
+                <span className="chip">{turnos.length}</span>
+              </div>
+              <div className="card">
+                {turnos.length === 0 ? (
+                  <p className="muted">No hay turnos en esta ventana.</p>
+                ) : (
+                  turnos.map((t) => {
+                    const a = animalPorId.get(t.animalId);
+                    const dueno = duenoDe(t.animalId);
+                    const tel = soloDigitos(dueno?.celular ?? dueno?.telefono);
+                    return (
+                      <div key={t.id} className="rc-row">
+                        <button className="rc-pac" onClick={() => abrir(t.animalId)} title="Abrir ficha">
+                          {a?.nombre ?? 'Animal'}
+                          {dueno && <span className="rc-due"> · {dueno.nombre} {dueno.apellido}</span>}
+                          <div className="rc-motivo">{fmtFecha(t.fechaHora)} · {fmtHora(t.fechaHora)} · {t.motivo || 'Sin motivo'}</div>
+                        </button>
+                        <span className="rc-badge estado">{t.estado}</span>
+                        <div className="rc-contacto">
+                          {tel ? (
+                            <a className="rc-btn ghost" href={`tel:${tel}`}>Llamar</a>
+                          ) : (
+                            <span className="muted rc-sincontacto">Sin teléfono</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
-      {error && <div className="rc-alerta">{error}</div>}
-
-      {cargando ? (
-        <div className="rc-empty">Cargando…</div>
-      ) : (
-        <>
-          {/* Vacunas */}
-          <h2 className="rc-h2">Vacunas por vencer o vencidas <span className="rc-count">{vacunas.length}</span></h2>
-          <div className="rc-card">
-            {vacunas.length === 0 ? (
-              <div className="rc-muted">No hay vacunas pendientes en esta ventana.</div>
-            ) : (
-              vacunas.map((v) => {
-                const d = diasHasta(v.proximaDosis);
-                const vencida = d !== null && d < 0;
-                const dueno = duenoDe(v.animalId);
-                const tel = soloDigitos(dueno?.celular ?? dueno?.telefono);
-                const msg = encodeURIComponent(
-                  `Hola${dueno ? ' ' + dueno.nombre : ''}, te escribimos de la veterinaria: ${v.animalNombre} tiene la vacuna ${v.producto} ${vencida ? 'vencida' : 'próxima a vencer'} (${fmtFecha(v.proximaDosis)}). ¿Coordinamos un turno?`,
-                );
-                return (
-                  <div key={v.id} className="rc-row">
-                    <button className="rc-pac" onClick={() => abrir(v.animalId)} title="Abrir ficha">
-                      {v.animalNombre}
-                      {dueno && <span className="rc-due"> · {dueno.nombre} {dueno.apellido}</span>}
-                      <div className="rc-motivo">{v.producto} · vence {fmtFecha(v.proximaDosis)}</div>
-                    </button>
-                    <span className={`rc-badge ${vencida ? 'venc' : 'prox'}`}>
-                      {vencida ? `Vencida hace ${Math.abs(d as number)}d` : `En ${d}d`}
-                    </span>
-                    <div className="rc-contacto">
-                      {tel ? (
-                        <>
-                          <a className="rc-btn wa" href={`https://wa.me/${tel}?text=${msg}`} target="_blank" rel="noreferrer">WhatsApp</a>
-                          <a className="rc-btn ghost" href={`tel:${tel}`}>Llamar</a>
-                        </>
-                      ) : (
-                        <span className="rc-muted rc-sincontacto">Sin teléfono</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          {/* Turnos próximos */}
-          <h2 className="rc-h2">Próximos turnos <span className="rc-count">{turnos.length}</span></h2>
-          <div className="rc-card">
-            {turnos.length === 0 ? (
-              <div className="rc-muted">No hay turnos en esta ventana.</div>
-            ) : (
-              turnos.map((t) => {
-                const a = animalPorId.get(t.animalId);
-                const dueno = duenoDe(t.animalId);
-                const tel = soloDigitos(dueno?.celular ?? dueno?.telefono);
-                return (
-                  <div key={t.id} className="rc-row">
-                    <button className="rc-pac" onClick={() => abrir(t.animalId)} title="Abrir ficha">
-                      {a?.nombre ?? 'Animal'}
-                      {dueno && <span className="rc-due"> · {dueno.nombre} {dueno.apellido}</span>}
-                      <div className="rc-motivo">{fmtFecha(t.fechaHora)} · {fmtHora(t.fechaHora)} · {t.motivo || 'Sin motivo'}</div>
-                    </button>
-                    <span className="rc-badge estado">{t.estado}</span>
-                    <div className="rc-contacto">
-                      {tel ? (
-                        <a className="rc-btn ghost" href={`tel:${tel}`}>Llamar</a>
-                      ) : (
-                        <span className="rc-muted rc-sincontacto">Sin teléfono</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </>
-      )}
+      <div className="layout-side" />
     </div>
   );
 }
-
-const CSS = `
-.rc-wrap { max-width: 900px; margin: 0 auto; }
-.rc-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
-.rc-title { margin: 0; font-size: 1.3rem; }
-.rc-sub { margin: .2rem 0 0; color: #7a857f; font-size: .85rem; }
-.rc-ventana { display: flex; align-items: center; gap: .4rem; font-size: .82rem; color: #5a655f; }
-.rc-chip { border: 1px solid #d9ddd7; background: #fff; border-radius: 999px; padding: .25rem .7rem; cursor: pointer; font-size: .8rem; }
-.rc-chip.active { background: #0E7C6B; color: #fff; border-color: #0E7C6B; }
-.rc-h2 { font-size: 1rem; margin: 1.4rem .2rem .5rem; display: flex; align-items: center; gap: .5rem; }
-.rc-count { background: #eef4f2; color: #0E7C6B; font-size: .72rem; font-weight: 700; border-radius: 999px; padding: .05rem .5rem; }
-.rc-card { background: #fff; border: 1px solid #e5e8e4; border-radius: 12px; overflow: hidden; }
-.rc-row { display: flex; align-items: center; gap: .75rem; padding: .7rem .9rem; border-top: 1px solid #f0f1ee; flex-wrap: wrap; }
-.rc-row:first-child { border-top: none; }
-.rc-pac { flex: 1; min-width: 12rem; text-align: left; background: none; border: none; cursor: pointer; padding: 0; font: inherit; color: #26302c; font-weight: 600; }
-.rc-due { color: #7a857f; font-weight: 400; }
-.rc-motivo { font-size: .8rem; color: #7a857f; font-weight: 400; margin-top: .15rem; }
-.rc-badge { font-size: .72rem; font-weight: 700; border-radius: 999px; padding: .12rem .55rem; white-space: nowrap; border: 1px solid; }
-.rc-badge.venc { color: #C0492F; border-color: #C0492F; background: #fdecea; }
-.rc-badge.prox { color: #E9A23B; border-color: #E9A23B; background: #fdf5e8; }
-.rc-badge.estado { color: #0E7C6B; border-color: #cfe6e0; background: #eef7f4; text-transform: capitalize; }
-.rc-contacto { display: flex; gap: .35rem; align-items: center; }
-.rc-btn { border-radius: 8px; padding: .32rem .7rem; font-size: .8rem; font-weight: 600; text-decoration: none; border: 1px solid transparent; }
-.rc-btn.wa { background: #25D366; color: #fff; }
-.rc-btn.ghost { background: #fff; border-color: #d9ddd7; color: #46514d; }
-.rc-sincontacto { font-size: .78rem; }
-.rc-muted { color: #7a857f; font-size: .85rem; padding: .3rem 0; }
-.rc-alerta { background: #fdeceb; color: #b4423a; border: 1px solid #f2b8b3; border-radius: 8px; padding: .5rem .7rem; margin-bottom: .75rem; font-size: .88rem; }
-.rc-empty { text-align: center; color: #7a857f; padding: 2.5rem; }
-`;

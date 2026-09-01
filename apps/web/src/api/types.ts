@@ -307,12 +307,19 @@ export interface Producto {
   unidad?: string | null;
   categoria?: string | null;
   activo: boolean;
+  // Gatilla mostrar/pedir los datos de la calculadora de dosificación.
+  esMedicamento: boolean;
+  // Informativo: se vende/usa por porciones de un bulto mayor (ej. kg de una
+  // bolsa) en vez de por unidad completa.
+  esFraccionable: boolean;
   // Datos opcionales para la calculadora de dosificación (Fase B).
   concentracion?: string | null;
   unidadConcentracion?: string | null;
   dosisSugeridaMgKg?: string | null;
-  // Precio de venta unitario (Fase D) — opcional, no todo se vende suelto en mostrador.
+  // Precio de venta y costo de compra, por la unidad del producto (Fase D) —
+  // opcionales, se completan/actualizan típicamente desde Ingresos.
   precio?: string | null;
+  precioCompra?: string | null;
 }
 
 export interface StockItem {

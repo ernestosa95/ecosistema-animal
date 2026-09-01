@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsBoolean, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateProductoDto {
   @IsString()
@@ -17,7 +17,16 @@ export class CreateProductoDto {
   @IsString()
   categoria?: string;
 
-  // Datos opcionales para la calculadora de dosificación (Fase B).
+  @IsOptional()
+  @IsBoolean()
+  esMedicamento?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  esFraccionable?: boolean;
+
+  // Datos opcionales para la calculadora de dosificación (Fase B) — sólo
+  // tienen sentido si esMedicamento.
   @IsOptional()
   @IsNumber()
   @Min(0)
@@ -36,4 +45,9 @@ export class CreateProductoDto {
   @IsNumber()
   @Min(0)
   precio?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  precioCompra?: number;
 }

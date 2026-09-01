@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import type { Sesion, Persona, Animal } from '../api/types';
-import { ExportBar } from '../components/ExportBar';
 
 export function PersonasPage({ sesion, personaIdInicial }: { sesion: Sesion; personaIdInicial?: string }) {
   const [personas, setPersonas] = useState<Persona[]>([]);
@@ -96,21 +95,6 @@ export function PersonasPage({ sesion, personaIdInicial }: { sesion: Sesion; per
             borderRadius: '10px',
             fontSize: '14px',
           }}
-        />
-      )}
-
-      {!cargando && filtradas.length > 0 && (
-        <ExportBar
-          nombreArchivo="duenos"
-          titulo="Dueños"
-          columnas={[
-            { clave: 'nombre', etiqueta: 'Nombre', valor: (p: Persona) => `${p.nombre} ${p.apellido}` },
-            { clave: 'dni', etiqueta: 'DNI', valor: (p: Persona) => p.dni ?? '—' },
-            { clave: 'celular', etiqueta: 'Celular', valor: (p: Persona) => p.celular ?? '—' },
-            { clave: 'email', etiqueta: 'Email', valor: (p: Persona) => p.email ?? '—' },
-            { clave: 'domicilio', etiqueta: 'Domicilio', valor: (p: Persona) => p.domicilio ?? '—' },
-          ]}
-          filas={filtradas}
         />
       )}
 

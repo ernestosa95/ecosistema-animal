@@ -7,7 +7,6 @@
 import { useEffect, useState } from 'react';
 import { api, type Veterinario } from '../api/client';
 import type { Sesion, Caja, Cobro, Egreso, Producto, EstadoAuditoriaCaja } from '../api/types';
-import { ExportBar } from '../components/ExportBar';
 
 const ROLES_AUDITORIA_HONORARIOS = new Set(['propietario', 'admin']);
 
@@ -171,22 +170,6 @@ function Mostrador({ sesion }: { sesion: Sesion }) {
         <p className="muted">Todavía no hay cobros en esta caja.</p>
       ) : (
         <>
-          <ExportBar
-            nombreArchivo="cobros-caja"
-            titulo="Cobros"
-            columnas={[
-              { clave: 'hora', etiqueta: 'Hora', valor: (c: Cobro) => new Date(c.createdAt).toLocaleTimeString() },
-              { clave: 'concepto', etiqueta: 'Concepto' },
-              { clave: 'monto', etiqueta: 'Monto' },
-              { clave: 'metodoPago', etiqueta: 'Método de pago', valor: (c: Cobro) => c.metodoPago ?? '—' },
-              {
-                clave: 'veterinario',
-                etiqueta: 'Profesional',
-                valor: (c: Cobro) => nombreVeterinario(veterinarios, c.veterinarioId),
-              },
-            ]}
-            filas={cobros}
-          />
           <div className="card">
             <table className="tabla">
               <thead>
@@ -811,17 +794,6 @@ function Honorarios({ sesion }: { sesion: Sesion }) {
             </div>
           </div>
 
-          <ExportBar
-            nombreArchivo="honorarios"
-            titulo="Honorarios"
-            columnas={[
-              { clave: 'fecha', etiqueta: 'Fecha', valor: (c: Cobro) => new Date(c.createdAt).toLocaleDateString() },
-              { clave: 'concepto', etiqueta: 'Concepto' },
-              { clave: 'monto', etiqueta: 'Monto' },
-              { clave: 'liquidado', etiqueta: 'Liquidado', valor: (c: Cobro) => (c.liquidado ? 'Sí' : 'No') },
-            ]}
-            filas={cobros}
-          />
           <div className="card">
             <table className="tabla">
               <thead>

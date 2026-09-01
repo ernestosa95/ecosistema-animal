@@ -42,8 +42,22 @@ export const productos = farmacia.table('productos', {
   dosisSugeridaMgKg: numeric('dosis_sugerida_mg_kg', { precision: 10, scale: 3 }),
   // Precio de venta unitario (Fase D, §2.6 del spec UI/UX) — opcional: no
   // todos los productos se venden sueltos en mostrador (algunos son sólo
-  // insumo clínico, dispensado vía consulta).
+  // insumo clínico, dispensado vía consulta). Se carga/actualiza típicamente
+  // desde el flujo de Ingresos, no en el alta del producto (ver precioCompra).
   precio: numeric('precio', { precision: 12, scale: 2 }),
+  // Costo de compra al proveedor — separado del precio de venta, ambos por
+  // la misma unidad del producto (ver `unidad`). Igual que `precio`, se
+  // completa/actualiza desde Ingresos; nunca se infiere del precio de venta.
+  precioCompra: numeric('precio_compra', { precision: 12, scale: 2 }),
+  // Gatilla mostrar/pedir concentración, unidad de concentración y dosis
+  // sugerida en el alta — un insumo no clínico (alimento, accesorios) no
+  // tiene por qué completar esos campos.
+  esMedicamento: boolean('es_medicamento').notNull().default(false),
+  // Informativo por ahora (no cambia la precisión del stock, que sigue
+  // siendo entero): distingue insumos que se venden por unidad completa
+  // (ej. una cama) de los que se venden por porciones de un bulto mayor
+  // (ej. kg de una bolsa de alimento) — ver el flujo de Ingresos.
+  esFraccionable: boolean('es_fraccionable').notNull().default(false),
   activo: boolean('activo').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

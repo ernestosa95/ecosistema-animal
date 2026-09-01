@@ -19,10 +19,13 @@ export class ProductosService {
         presentacion: dto.presentacion,
         unidad: dto.unidad,
         categoria: dto.categoria,
+        esMedicamento: dto.esMedicamento ?? false,
+        esFraccionable: dto.esFraccionable ?? false,
         concentracion: dto.concentracion?.toString(),
         unidadConcentracion: dto.unidadConcentracion,
         dosisSugeridaMgKg: dto.dosisSugeridaMgKg?.toString(),
         precio: dto.precio?.toString(),
+        precioCompra: dto.precioCompra?.toString(),
       })
       .returning();
     return producto;
@@ -72,10 +75,13 @@ export class ProductosService {
         ...(dto.unidad !== undefined && { unidad: dto.unidad }),
         ...(dto.categoria !== undefined && { categoria: dto.categoria }),
         ...(dto.activo !== undefined && { activo: dto.activo }),
+        ...(dto.esMedicamento !== undefined && { esMedicamento: dto.esMedicamento }),
+        ...(dto.esFraccionable !== undefined && { esFraccionable: dto.esFraccionable }),
         ...(dto.concentracion !== undefined && { concentracion: dto.concentracion.toString() }),
         ...(dto.unidadConcentracion !== undefined && { unidadConcentracion: dto.unidadConcentracion }),
         ...(dto.dosisSugeridaMgKg !== undefined && { dosisSugeridaMgKg: dto.dosisSugeridaMgKg.toString() }),
         ...(dto.precio !== undefined && { precio: dto.precio.toString() }),
+        ...(dto.precioCompra !== undefined && { precioCompra: dto.precioCompra.toString() }),
         updatedAt: new Date(),
       })
       .where(and(eq(productos.id, id), eq(productos.organizacionId, organizacionId)))

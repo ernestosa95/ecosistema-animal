@@ -8,6 +8,8 @@ Gestor de workspaces: **pnpm workspaces** (también funciona con npm workspaces)
 
 > Este documento se auditó contra el código real (no al revés). Antes de esta fecha describía una versión más chica del backend/web que ya quedó atrás — ver `CHANGELOG.md` (entrada "Auditoría de estado real vs. documentado") para el detalle de lo que cambió.
 
+> ⚠️ **Drift conocido, sin auditar todavía**: el árbol de `apps/web/src/` de acá abajo quedó desactualizado a partir del rediseño del shell (nav rail por solución, 2026-08-30) y no refleja lo agregado después — entre otras cosas: `nav/config.ts` (config del rail), `pages/HuellaHomeSection.tsx` (reemplazó a `DashboardPage.tsx`, ver `CHANGELOG.md` 2026-09-01: centro de operaciones + turnos de hoy), `pages/CajaPage.tsx` (Fase D), `components/Omnibox.tsx`, `components/DrawerTabla.tsx`, `components/TutorialGuiado.tsx`, `components/TerminosModal.tsx`, y de la sesión del 2026-09-01: `components/SelectorBusqueda.tsx` (combobox de lista cerrada), `components/SeleccionarAnimalModal.tsx`, `components/VentaRapidaModal.tsx`, `components/NuevoTurnoRapidoModal.tsx`, `utils/columnasTabla.ts` (reemplazó a `utils/exportar.ts`, que ya no existe — el centro de exportación se removió app-wide). No confiar en el árbol para saber qué existe hoy; usar `find`/`grep` sobre el código real.
+
 ---
 
 ## 🌳 Vista general (estado actual)

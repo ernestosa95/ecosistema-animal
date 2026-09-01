@@ -23,6 +23,14 @@ export class UpdateProductoDto {
   activo?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  esMedicamento?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  esFraccionable?: boolean;
+
+  @IsOptional()
   @IsNumber()
   @Min(0)
   concentracion?: number;
@@ -40,4 +48,9 @@ export class UpdateProductoDto {
   @IsNumber()
   @Min(0)
   precio?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  precioCompra?: number;
 }

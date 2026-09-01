@@ -13,11 +13,13 @@ export function PacienteDetallePage({
   animal: animalInicial,
   onVolver,
   abrirConsulta = false,
+  abrirVacuna = false,
 }: {
   sesion: Sesion;
   animal: Animal;
   onVolver: () => void;
   abrirConsulta?: boolean;
+  abrirVacuna?: boolean;
 }) {
   const [animal, setAnimal] = useState<Animal>(animalInicial);
   const [consultas, setConsultas] = useState<Consulta[]>([]);
@@ -34,7 +36,7 @@ export function PacienteDetallePage({
   const [editandoConsultaId, setEditandoConsultaId] = useState<string | null>(null);
   const [dispensandoConsultaId, setDispensandoConsultaId] = useState<string | null>(null);
   const [indicandoConsultaId, setIndicandoConsultaId] = useState<string | null>(null);
-  const [mostrarVacuna, setMostrarVacuna] = useState(false);
+  const [mostrarVacuna, setMostrarVacuna] = useState(() => !!abrirVacuna);
   const [editando, setEditando] = useState(false);
   const [generandoCarnet, setGenerandoCarnet] = useState(false);
   const [generandoFicha, setGenerandoFicha] = useState(false);
@@ -53,6 +55,28 @@ export function PacienteDetallePage({
     const p = personas.find((x) => x.id === animal.personaId);
     return p ? `${p.nombre} ${p.apellido}` : '—';
   }, [personas, animal.personaId]);
+
+  const VACUNAS_POR_PAGINA = 2;
+  const [paginaVacunas, setPaginaVacunas] = useState(0);
+  const vacunacionesOrdenadas = useMemo(
+    () => [...vacunaciones].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()),
+    [vacunaciones],
+  );
+  const totalPaginasVacunas = Math.max(1, Math.ceil(vacunacionesOrdenadas.length / VACUNAS_POR_PAGINA));
+  const paginaVacunasSegura = Math.min(paginaVacunas, totalPaginasVacunas - 1);
+  const vacunasPagina = vacunacionesOrdenadas.slice(
+    paginaVacunasSegura * VACUNAS_POR_PAGINA,
+    paginaVacunasSegura * VACUNAS_POR_PAGINA + VACUNAS_POR_PAGINA,
+  );
+
+  const CONSULTAS_POR_PAGINA = 3;
+  const [paginaConsultas, setPaginaConsultas] = useState(0);
+  const totalPaginasConsultas = Math.max(1, Math.ceil(consultas.length / CONSULTAS_POR_PAGINA));
+  const paginaConsultasSegura = Math.min(paginaConsultas, totalPaginasConsultas - 1);
+  const consultasPagina = consultas.slice(
+    paginaConsultasSegura * CONSULTAS_POR_PAGINA,
+    paginaConsultasSegura * CONSULTAS_POR_PAGINA + CONSULTAS_POR_PAGINA,
+  );
 
   async function cargar() {
     setCargando(true);
@@ -128,6 +152,8 @@ export function PacienteDetallePage({
         ← Volver a animales
       </button>
 
+      <div className="layout-2col">
+      <div className="layout-main">
       <div className="page-head">
         <h1>{animal.nombre}</h1>
         <div className="acciones">
@@ -157,7 +183,7 @@ export function PacienteDetallePage({
           onCancelar={() => setEditando(false)}
         />
       ) : (
-        <div className="card ficha-datos">
+        <div className="card ficha-datos ficha-datos-compacta">
           <Dato etiqueta="Especie" valor={especieNombre} />
           <Dato etiqueta="Dueño" valor={duenoNombre} />
           <Dato etiqueta="Sexo" valor={animal.sexo ?? '—'} />
@@ -205,13 +231,13 @@ export function PacienteDetallePage({
         />
       )}
 
-      {!cargando && (consultas.length > 0 || vacunaciones.length > 0) && (
-        <HistoriaTimeline consultas={consultas} vacunaciones={vacunaciones} onSeleccionar={setItemLinea} />
-      )}
-      {itemLinea && <DrawerItemLinea item={itemLinea} onCerrar={() => setItemLinea(null)} />}
-
       {error && <div className="alerta">{error}</div>}
-      {cargando ? (
+      {/* Oculta la tabla mientras se está cargando una consulta nueva — no
+          aporta mientras se completa el formulario y sacarla de en medio es
+          lo que le hace lugar al formulario sin scroll de página (editar una
+          consulta existente sí la deja a la vista: ahí el contexto de las
+          demás filas importa). */}
+      {mostrarConsulta ? null : cargando ? (
         <p className="muted">Cargando…</p>
       ) : consultas.length === 0 ? (
         <p className="muted">Todavía no hay consultas registradas para este paciente.</p>
@@ -229,7 +255,7 @@ export function PacienteDetallePage({
               </tr>
             </thead>
             <tbody>
-              {consultas.map((c) =>
+              {consultasPagina.map((c) =>
                 editandoConsultaId === c.id ? (
                   <tr key={c.id}>
                     <td colSpan={6}>
@@ -312,52 +338,119 @@ export function PacienteDetallePage({
         </div>
       )}
 
-      <div className="page-head">
-        <h2>Vacunaciones</h2>
-        <button className="btn" onClick={() => setMostrarVacuna((v) => !v)}>
-          {mostrarVacuna ? 'Cerrar' : '+ Nueva vacuna'}
-        </button>
+      {!mostrarConsulta && totalPaginasConsultas > 1 && (
+        <div className="paginacion">
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={paginaConsultasSegura === 0}
+            onClick={() => setPaginaConsultas(paginaConsultasSegura - 1)}
+          >
+            ‹ Anterior
+          </button>
+          <span className="muted">
+            Página {paginaConsultasSegura + 1} de {totalPaginasConsultas}
+          </span>
+          <button
+            type="button"
+            className="btn-ghost"
+            disabled={paginaConsultasSegura >= totalPaginasConsultas - 1}
+            onClick={() => setPaginaConsultas(paginaConsultasSegura + 1)}
+          >
+            Siguiente ›
+          </button>
+        </div>
+      )}
+
+      </div>
+
+      <div className="layout-side">
+        <div className="card card-timeline-side">
+          <h3 className="form-titulo">Línea de tiempo</h3>
+          {!cargando && (consultas.length > 0 || vacunaciones.length > 0) ? (
+            <HistoriaTimeline consultas={consultas} vacunaciones={vacunaciones} onSeleccionar={setItemLinea} />
+          ) : (
+            <p className="muted">Sin eventos todavía.</p>
+          )}
+        </div>
+
+        <div className="card card-vacunas-side">
+          <div className="card-vacunas-head">
+            <h3 className="form-titulo">Vacunas</h3>
+            <button className="btn btn-compacto" onClick={() => setMostrarVacuna(true)}>
+              + Nueva
+            </button>
+          </div>
+          {cargando ? (
+            <p className="muted">Cargando…</p>
+          ) : vacunacionesOrdenadas.length === 0 ? (
+            <p className="muted">Sin vacunas registradas.</p>
+          ) : (
+            <>
+              <ul className="vacunas-lista-compacta">
+                {vacunasPagina.map((v) => (
+                  <li key={v.id}>
+                    <button
+                      type="button"
+                      onClick={() => setItemLinea({ tipo: 'vacuna', fecha: v.fecha, data: v })}
+                    >
+                      <span className="vacuna-fecha">{new Date(v.fecha).toLocaleDateString()}</span>
+                      <span className="vacuna-producto">{v.producto ?? '—'}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {totalPaginasVacunas > 1 && (
+                <div className="paginacion-compacta">
+                  <button
+                    type="button"
+                    className="link"
+                    disabled={paginaVacunasSegura === 0}
+                    onClick={() => setPaginaVacunas(paginaVacunasSegura - 1)}
+                  >
+                    ‹
+                  </button>
+                  <span>
+                    {paginaVacunasSegura + 1}/{totalPaginasVacunas}
+                  </span>
+                  <button
+                    type="button"
+                    className="link"
+                    disabled={paginaVacunasSegura >= totalPaginasVacunas - 1}
+                    onClick={() => setPaginaVacunas(paginaVacunasSegura + 1)}
+                  >
+                    ›
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
       </div>
 
       {mostrarVacuna && (
-        <NuevaVacunacionForm
-          sesion={sesion}
-          animalId={animal.id}
-          onCreada={() => {
-            setMostrarVacuna(false);
-            cargar();
-          }}
-        />
+        <div className="drawer-overlay" onClick={() => setMostrarVacuna(false)}>
+          <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="drawer-head">
+              <span>💉 Nueva vacuna</span>
+              <button className="link" onClick={() => setMostrarVacuna(false)}>
+                Cerrar ✕
+              </button>
+            </div>
+            <NuevaVacunacionForm
+              sesion={sesion}
+              animalId={animal.id}
+              onCreada={() => {
+                setMostrarVacuna(false);
+                cargar();
+              }}
+            />
+          </div>
+        </div>
       )}
 
-      {!cargando && (
-        vacunaciones.length === 0 ? (
-          <p className="muted">Todavía no hay vacunas registradas para este paciente.</p>
-        ) : (
-          <div className="card">
-            <table className="tabla">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Producto</th>
-                  <th>Próxima dosis</th>
-                  <th>Lote</th>
-                </tr>
-              </thead>
-              <tbody>
-                {vacunaciones.map((v) => (
-                  <tr key={v.id}>
-                    <td>{v.fecha}</td>
-                    <td>{v.producto ?? '—'}</td>
-                    <td>{v.proximaDosis ?? '—'}</td>
-                    <td>{v.loteProducto ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-      )}
+      {itemLinea && <DrawerItemLinea item={itemLinea} onCerrar={() => setItemLinea(null)} />}
     </div>
   );
 }
@@ -567,17 +660,21 @@ function ConsultaForm({
   }
 
   return (
-    <form className="card form-grid" onSubmit={guardar}>
-      <label className="span-2">
+    <form className="card form-grid consulta-form" onSubmit={guardar}>
+      <label>
         Motivo
         <input value={motivo} onChange={(e) => campo('motivo')(e.target.value)} />
       </label>
-      <label className="span-2">
+      <label>
+        Observaciones
+        <input value={observaciones} onChange={(e) => campo('observaciones')(e.target.value)} />
+      </label>
+      <label>
         Anamnesis
         <MacroPicker categoria="anamnesis" macros={macros} onInsertar={(t) => campo('anamnesis')(anamnesis ? `${anamnesis}\n${t}` : t)} />
         <textarea rows={2} value={anamnesis} onChange={(e) => campo('anamnesis')(e.target.value)} />
       </label>
-      <label className="span-2">
+      <label>
         Examen físico
         <MacroPicker categoria="examenFisico" macros={macros} onInsertar={(t) => campo('examenFisico')(examenFisico ? `${examenFisico}\n${t}` : t)} />
         <textarea rows={2} value={examenFisico} onChange={(e) => campo('examenFisico')(e.target.value)} />
@@ -617,10 +714,6 @@ function ConsultaForm({
         {!consulta && previa?.temperaturaC && (
           <span className="muted hint-previo">Anterior: {previa.temperaturaC} °C</span>
         )}
-      </label>
-      <label className="span-2">
-        Observaciones
-        <input value={observaciones} onChange={(e) => campo('observaciones')(e.target.value)} />
       </label>
       {error && <div className="alerta span-2">{error}</div>}
       <div className="span-2 acciones">
@@ -1169,10 +1262,12 @@ const ICONO_LINEA: Record<ItemLinea['tipo'], string> = { consulta: '🩺', vacun
 
 /**
  * Línea del tiempo médica (§3.1): consultas y vacunaciones intercaladas por
- * fecha, con iconografía por tipo de evento. Un click abre el detalle en un
- * panel lateral (drawer) sin perder el contexto de lo que esté abierto en la
- * página (p. ej. una consulta en edición) — el drawer es un overlay, no una
- * navegación.
+ * fecha (orden cronológico, más antiguo primero — es una línea de tiempo,
+ * se lee de izquierda a derecha), con iconografía por tipo de evento,
+ * alternadas arriba/abajo de un eje central para que se puedan leer varias
+ * a la vez sin amontonarse. Un click abre el detalle en un panel lateral
+ * (drawer) sin perder el contexto de lo que esté abierto en la página (p.
+ * ej. una consulta en edición) — el drawer es un overlay, no una navegación.
  */
 function HistoriaTimeline({
   consultas,
@@ -1186,19 +1281,34 @@ function HistoriaTimeline({
   const items: ItemLinea[] = [
     ...consultas.map((c): ItemLinea => ({ tipo: 'consulta', fecha: c.fecha, data: c })),
     ...vacunaciones.map((v): ItemLinea => ({ tipo: 'vacuna', fecha: v.fecha, data: v })),
-  ].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+  ].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
 
   return (
-    <div className="card timeline">
-      {items.map((item, i) => (
-        <button key={i} type="button" className="timeline-item" onClick={() => onSeleccionar(item)}>
-          <span className="timeline-icono">{ICONO_LINEA[item.tipo]}</span>
-          <span className="timeline-fecha">{new Date(item.fecha).toLocaleDateString()}</span>
-          <span className="timeline-titulo">
-            {item.tipo === 'consulta' ? item.data.motivo || 'Consulta' : item.data.producto || 'Vacuna'}
-          </span>
-        </button>
-      ))}
+    <div className="timeline-wrap-v">
+      <div className="timeline-v">
+        {items.map((item, i) => {
+          const lado = i % 2 === 0 ? 'izquierda' : 'derecha';
+          const titulo = item.tipo === 'consulta' ? item.data.motivo || 'Consulta' : item.data.producto || 'Vacuna';
+          const tarjeta = (
+            <button type="button" className="timeline-card timeline-v-card" onClick={() => onSeleccionar(item)}>
+              <span className="timeline-icono">{ICONO_LINEA[item.tipo]}</span>
+              <span className="timeline-fecha">{new Date(item.fecha).toLocaleDateString()}</span>
+              <span className="timeline-titulo">{titulo}</span>
+            </button>
+          );
+          return (
+            <div key={i} className={`timeline-v-item ${lado}`}>
+              <div className="timeline-v-half left">
+                {lado === 'izquierda' && <>{tarjeta}<span className="timeline-v-stem" /></>}
+              </div>
+              <span className={`timeline-v-dot${item.tipo === 'vacuna' ? ' vacuna' : ''}`} />
+              <div className="timeline-v-half right">
+                {lado === 'derecha' && <><span className="timeline-v-stem" />{tarjeta}</>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
