@@ -1,0 +1,1 @@
+ALTER TABLE "hce"."vacunaciones" ADD COLUMN "recordatorio_descartado_en" timestamp with time zone;

@@ -141,6 +141,90 @@
       "when": 1788223287283,
       "tag": "0019_useful_trauma",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1788391349983,
+      "tag": "0020_fancy_beyonder",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1788398412312,
+      "tag": "0021_outgoing_karnak",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1788398971713,
+      "tag": "0022_salty_preak",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1788451042680,
+      "tag": "0023_heavy_silverclaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1788451846053,
+      "tag": "0024_gorgeous_namorita",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1788469960543,
+      "tag": "0025_cultured_cable",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1788488072049,
+      "tag": "0026_thin_spectrum",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1788568509268,
+      "tag": "0027_outgoing_jocasta",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1788569125472,
+      "tag": "0028_charming_joshua_kane",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1788569966932,
+      "tag": "0029_silent_mentallo",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1788575182645,
+      "tag": "0030_sticky_sheva_callister",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1788578353315,
+      "tag": "0031_gorgeous_madripoor",
+      "breakpoints": true
     }
   ]
 }

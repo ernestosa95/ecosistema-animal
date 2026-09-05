@@ -1,0 +1,1 @@
+ALTER TABLE "core"."solicitudes" ADD COLUMN "plan_id" uuid;

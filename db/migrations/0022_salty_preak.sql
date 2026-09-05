@@ -1,0 +1,1 @@
+ALTER TABLE "plataforma"."planes" ADD COLUMN "limites_roles" jsonb DEFAULT '{}'::jsonb NOT NULL;

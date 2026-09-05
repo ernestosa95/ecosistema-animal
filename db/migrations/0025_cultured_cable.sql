@@ -1,0 +1,1 @@
+ALTER TABLE "hce"."consultas" ADD COLUMN "costo" numeric(12, 2);
