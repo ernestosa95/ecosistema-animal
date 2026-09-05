@@ -1,8 +1,13 @@
 import { Model } from '@nozbe/watermelondb';
 import { date, readonly, text } from '@nozbe/watermelondb/decorators';
 
-// Sólo lectura desde el mobile en esta iteración — no hay alta ni cambios
-// de estado acá, sólo se sincroniza lo que ya existe en el servidor.
+// Alta offline sumada 2026-09-02 (acceso rápido "Nuevo turno" del Home) —
+// antes era sólo lectura. A propósito, sigue sin motor de agendas/slots
+// (eso es un concepto online de la web, `agendas`/`agenda_bloques`, no
+// sincronizado a este dispositivo): un turno cargado offline no valida
+// colisión de horario, se resuelve recién al sincronizar. "Atender" (ver
+// `(app)/turnos.tsx`) sí cambia `estado` directo acá, mismo criterio que el
+// resto de las altas offline.
 export class Turno extends Model {
   static table = 'turnos';
 

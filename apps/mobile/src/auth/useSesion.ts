@@ -7,7 +7,9 @@ export interface Sesion {
   token: string;
   refreshToken: string;
   organizacionId: string;
-  rol: string;
+  roles: string[];
+  huellaActiva: boolean;
+  troperaActiva: boolean;
 }
 
 async function cargar(): Promise<Sesion | null> {

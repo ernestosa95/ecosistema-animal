@@ -18,7 +18,9 @@ import {
   animalesCampo, potreros, hallazgos, torosVirtuales, muestras,
   plantillasTareas, protocolosIatf, tareas,
 } from '../database/schema/tropera';
+import { productos, stock, movimientosStock } from '../database/schema/farmacia';
 import { aplicarMovimiento } from '../tropera/movimientos/aplicar-movimiento';
+import { aplicarMovimientoStock } from '../farmacia/movimientos/aplicar-movimiento-stock';
 import { generarProximoCodigoLegible } from '../core/animales/generar-proximo-codigo-legible';
 
 export interface TablaSync {
@@ -57,6 +59,18 @@ export const REGISTRY: TablaSync[] = [
   { name: 'consultas', table: consultas },
   { name: 'vacunaciones', table: vacunaciones },
   { name: 'turnos', table: turnos },
+  // Farmacia (2026-09-02): antes deliberadamente fuera del registry
+  // ("desk/online por diseño", ver nota vieja en apps/mobile/src/db/schema.ts)
+  // — se suma ahora para el flujo de Venta rápida offline del mobile.
+  // Orden: después de `consultas` (movimientos_stock.consultaId es FK
+  // opcional), `productos` antes de `movimientos_stock` (depende de él).
+  { name: 'productos', table: productos },
+  { name: 'stock', table: stock },
+  {
+    name: 'movimientos_stock',
+    table: movimientosStock,
+    afterCreate: (tx, orgId, row) => aplicarMovimientoStock(tx, orgId, row),
+  },
   { name: 'establecimientos', table: establecimientos },
   { name: 'existencias', table: existencias },
   {

@@ -1,16 +1,19 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Q } from '@nozbe/watermelondb';
 import { database } from '@/db/database';
-import { uuid } from '@/db/uuid';
 import { useObservedQuery } from '@/db/useQuery';
 import { useSesionContext } from '@/auth/SesionContext';
 import { useEspecies } from '@/api/useEspecies';
 import { Persona } from '@/db/models/Persona';
-import { Animal } from '@/db/models/Animal';
-import { Colors } from '@/constants/theme';
+import { altaPacienteOffline } from '@/db/altaPaciente';
+import { SelectorDueno, type DuenoElegido } from '@/components/SelectorDueno';
+import { Colors, Radii } from '@/constants/theme';
+import { Field } from '@/components/Field';
+import { Button } from '@/components/Button';
+import { Alerta } from '@/components/Alerta';
 
 const SEXOS = [
   { value: '', label: 'Sin especificar' },
@@ -18,8 +21,6 @@ const SEXOS = [
   { value: 'hembra', label: 'Hembra' },
   { value: 'indefinido', label: 'Indefinido' },
 ] as const;
-
-const NUEVO_DUENO = '__nuevo__';
 
 export default function NuevoPacienteScreen() {
   const { sesion } = useSesionContext();
@@ -38,11 +39,7 @@ export default function NuevoPacienteScreen() {
   const [especieId, setEspecieId] = useState<string | null>(null);
   const [sexo, setSexo] = useState<(typeof SEXOS)[number]['value']>('');
   const [microchip, setMicrochip] = useState('');
-  const [duenoId, setDuenoId] = useState<string | null>(null);
-  const [nuevoNombre, setNuevoNombre] = useState('');
-  const [nuevoApellido, setNuevoApellido] = useState('');
-  const [nuevoCelular, setNuevoCelular] = useState('');
-  const [nuevoDni, setNuevoDni] = useState('');
+  const [dueno, setDueno] = useState<DuenoElegido | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,49 +53,23 @@ export default function NuevoPacienteScreen() {
       setError('Elegí una especie');
       return;
     }
-    if (duenoId === NUEVO_DUENO && (!nuevoNombre.trim() || !nuevoApellido.trim())) {
-      setError('El dueño nuevo necesita nombre y apellido');
+    if (!dueno) {
+      setError('El dueño es obligatorio');
       return;
     }
 
     setGuardando(true);
     setError(null);
     try {
-      let personaId: string | null = duenoId;
-      await database.write(async () => {
-        if (duenoId === NUEVO_DUENO) {
-          const persona = await database.get<Persona>('personas').create((p) => {
-            p._raw.id = uuid();
-            p.organizacionId = sesion.organizacionId;
-            p.nombre = nuevoNombre.trim();
-            p.apellido = nuevoApellido.trim();
-            p.celular = nuevoCelular.trim() || null;
-            p.dni = nuevoDni.trim() || null;
-            p.sexo = null;
-            p.fechaNacimiento = null;
-            p.telefono = null;
-            p.email = null;
-          });
-          personaId = persona.id;
-        }
-
-        const animal = await database.get<Animal>('animales').create((a) => {
-          a._raw.id = uuid();
-          a.organizacionId = sesion.organizacionId;
-          a.especieId = especieId;
-          a.personaId = personaId;
-          a.nombre = nombre.trim();
-          a.sexo = sexo || null;
-          a.fechaNacimiento = null;
-          a.fechaNacEstimada = false;
-          a.fotoUrl = null;
-          a.microchip = microchip.trim() || null;
-          a.codigoLegible = null;
-          a.estado = 'activo';
-          a.datosEspecificos = '{}';
-        });
-        router.replace(`/paciente/${animal.id}`);
+      const animalId = await altaPacienteOffline(sesion, {
+        nombre,
+        especieId,
+        sexo,
+        microchip,
+        duenoId: dueno.duenoId,
+        duenoNuevo: dueno.duenoNuevo,
       });
+      router.replace(`/paciente/${animalId}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al guardar');
       setGuardando(false);
@@ -106,15 +77,14 @@ export default function NuevoPacienteScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <ScrollView style={styles.container}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backButton}>
           <Text style={styles.link}>‹ Volver</Text>
         </Pressable>
         <Text style={styles.title}>Nuevo paciente</Text>
 
-        <Text style={styles.label}>Nombre</Text>
-        <TextInput style={styles.input} value={nombre} onChangeText={setNombre} />
+        <Field label="Nombre" value={nombre} onChangeText={setNombre} />
 
         <Text style={styles.label}>Especie</Text>
         <View style={styles.chipRow}>
@@ -142,60 +112,27 @@ export default function NuevoPacienteScreen() {
           ))}
         </View>
 
-        <Text style={styles.label}>Microchip (opcional, 15 dígitos ISO)</Text>
-        <TextInput
-          style={styles.input}
+        <Field
+          label="Microchip (opcional, 15 dígitos ISO)"
           value={microchip}
           onChangeText={setMicrochip}
           keyboardType="numeric"
           maxLength={15}
         />
 
-        <Text style={styles.label}>Dueño (opcional)</Text>
-        <View style={styles.chipRow}>
-          {personas.map((p) => (
-            <Pressable
-              key={p.id}
-              onPress={() => setDuenoId(duenoId === p.id ? null : p.id)}
-              style={[styles.chip, duenoId === p.id && styles.chipActivo]}
-            >
-              <Text style={[styles.chipText, duenoId === p.id && styles.chipTextActivo]}>
-                {p.nombre} {p.apellido}
-              </Text>
-            </Pressable>
-          ))}
-          <Pressable
-            onPress={() => setDuenoId(duenoId === NUEVO_DUENO ? null : NUEVO_DUENO)}
-            style={[styles.chip, duenoId === NUEVO_DUENO && styles.chipActivo]}
-          >
-            <Text style={[styles.chipText, duenoId === NUEVO_DUENO && styles.chipTextActivo]}>
-              ＋ Nuevo dueño
-            </Text>
-          </Pressable>
+        <Text style={styles.label}>Dueño</Text>
+        <SelectorDueno personas={personas} value={dueno} onChange={setDueno} />
+
+        {error && <Alerta mensaje={error} />}
+
+        <View style={styles.boton}>
+          <Button
+            title={guardando ? 'Guardando…' : 'Guardar paciente'}
+            onPress={guardar}
+            disabled={guardando}
+          />
         </View>
-
-        {duenoId === NUEVO_DUENO && (
-          <View>
-            <Text style={styles.label}>Nombre del dueño</Text>
-            <TextInput style={styles.input} value={nuevoNombre} onChangeText={setNuevoNombre} />
-            <Text style={styles.label}>Apellido del dueño</Text>
-            <TextInput style={styles.input} value={nuevoApellido} onChangeText={setNuevoApellido} />
-            <Text style={styles.label}>Celular (opcional)</Text>
-            <TextInput style={styles.input} value={nuevoCelular} onChangeText={setNuevoCelular} keyboardType="phone-pad" />
-            <Text style={styles.label}>DNI (opcional)</Text>
-            <TextInput style={styles.input} value={nuevoDni} onChangeText={setNuevoDni} keyboardType="numeric" />
-          </View>
-        )}
-
-        {error && <Text style={styles.error}>{error}</Text>}
-
-        <Pressable style={styles.button} onPress={guardar} disabled={guardando}>
-          <Text style={styles.buttonText}>{guardando ? 'Guardando…' : 'Guardar paciente (offline)'}</Text>
-        </Pressable>
-        <Text style={styles.hint}>
-          Se guarda en el dispositivo. El código legible lo asigna el servidor recién al
-          sincronizar (pestaña "Sincronización").
-        </Text>
+        <Text style={styles.hint}>El código legible puede tardar un momento en aparecer.</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -207,22 +144,12 @@ const styles = StyleSheet.create({
   backButton: { alignSelf: 'flex-start', paddingVertical: 4, paddingRight: 12 },
   link: { color: Colors.verdeDark, fontWeight: '600', marginBottom: 12 },
   title: { fontSize: 20, fontWeight: '700', color: Colors.text, marginBottom: 12 },
-  label: { fontSize: 13, color: Colors.text, marginTop: 10, marginBottom: 4 },
-  input: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    backgroundColor: Colors.card,
-    color: Colors.text,
-  },
+  label: { fontSize: 13, color: Colors.text, marginTop: 10, marginBottom: 4, fontWeight: '500' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 16,
+    borderRadius: Radii.pill,
     paddingHorizontal: 12,
     paddingVertical: 6,
     backgroundColor: Colors.card,
@@ -230,14 +157,6 @@ const styles = StyleSheet.create({
   chipActivo: { backgroundColor: Colors.verde, borderColor: Colors.verde },
   chipText: { color: Colors.text, fontSize: 13 },
   chipTextActivo: { color: '#fff' },
-  error: { color: Colors.danger, marginTop: 12 },
-  button: {
-    backgroundColor: Colors.verde,
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  buttonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
-  hint: { color: Colors.muted, fontSize: 13, marginTop: 8, marginBottom: 32 },
+  boton: { marginTop: 16 },
+  hint: { color: Colors.muted, fontSize: 13, marginTop: 10, marginBottom: 32 },
 });

@@ -6,10 +6,71 @@ import { schemaMigrations, createTable, addColumns } from '@nozbe/watermelondb/S
  * + 5 columnas nuevas en `eventos` (ver nota en schema.ts sobre lo que
  * quedó afuera: plantilla_items/protocolo_iatf_pasos/evaluaciones_andrologicas).
  * v3 → v4: `personas.domicilio`.
+ * v4 → v5: Farmacia (productos/stock/movimientos_stock), para Venta rápida offline.
+ * v5 → v6: `consultas.costo`.
  * Sólo creación de tablas nuevas — nada de lo existente (tropera.*) cambia.
  */
 export const migrations = schemaMigrations({
   migrations: [
+    {
+      toVersion: 6,
+      steps: [
+        addColumns({
+          table: 'consultas',
+          columns: [{ name: 'costo', type: 'number', isOptional: true }],
+        }),
+      ],
+    },
+    {
+      toVersion: 5,
+      steps: [
+        createTable({
+          name: 'productos',
+          columns: [
+            { name: 'organizacion_id', type: 'string', isIndexed: true },
+            { name: 'nombre', type: 'string' },
+            { name: 'presentacion', type: 'string', isOptional: true },
+            { name: 'unidad', type: 'string', isOptional: true },
+            { name: 'categoria', type: 'string', isOptional: true },
+            { name: 'es_medicamento', type: 'boolean' },
+            { name: 'es_fraccionable', type: 'boolean' },
+            { name: 'concentracion', type: 'number', isOptional: true },
+            { name: 'unidad_concentracion', type: 'string', isOptional: true },
+            { name: 'dosis_sugerida_mg_kg', type: 'number', isOptional: true },
+            { name: 'precio', type: 'number', isOptional: true },
+            { name: 'precio_compra', type: 'number', isOptional: true },
+            { name: 'activo', type: 'boolean' },
+            { name: 'created_at', type: 'number' },
+            { name: 'updated_at', type: 'number' },
+          ],
+        }),
+        createTable({
+          name: 'stock',
+          columns: [
+            { name: 'organizacion_id', type: 'string', isIndexed: true },
+            { name: 'producto_id', type: 'string', isIndexed: true },
+            { name: 'cantidad', type: 'number' },
+            { name: 'created_at', type: 'number' },
+            { name: 'updated_at', type: 'number' },
+          ],
+        }),
+        createTable({
+          name: 'movimientos_stock',
+          columns: [
+            { name: 'organizacion_id', type: 'string', isIndexed: true },
+            { name: 'producto_id', type: 'string', isIndexed: true },
+            { name: 'tipo', type: 'string' },
+            { name: 'cantidad', type: 'number' },
+            { name: 'fecha', type: 'string' },
+            { name: 'observaciones', type: 'string', isOptional: true },
+            { name: 'consulta_id', type: 'string', isOptional: true },
+            { name: 'usuario_id', type: 'string', isOptional: true },
+            { name: 'created_at', type: 'number' },
+            { name: 'updated_at', type: 'number' },
+          ],
+        }),
+      ],
+    },
     {
       toVersion: 4,
       steps: [

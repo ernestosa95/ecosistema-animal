@@ -12,15 +12,22 @@ import { appSchema, tableSchema } from '@nozbe/watermelondb';
 // inmutables), y el motor de sync genérico asume esas columnas en toda
 // tabla registrada. Sumarlas requeriría antes esa migración de backend,
 // que es una decisión de alcance aparte, no sólo "capa de datos".
-// Tampoco están Farmacia ni Caja (desk/online por diseño, no pensadas para
-// captura offline en el campo) ni `hce.macros`/indicaciones (ayuda de
-// escritorio, bajo valor offline).
+// Farmacia se sumó en v5 (ver más abajo). Caja sigue afuera (desk/online por
+// diseño, no tiene un flujo rápido offline equivalente) al igual que
+// `hce.macros`/indicaciones (ayuda de escritorio, bajo valor offline).
 // v3→v4: `personas.domicilio` (agregado al backend a pedido del usuario).
+// v4→v5: Farmacia (productos/stock/movimientos_stock) — antes deliberadamente
+// afuera ("desk/online por diseño"), se suma para el flujo de Venta rápida
+// offline del Home. Caja sigue afuera (no tiene equivalente de captura rápida
+// offline todavía).
+// v5→v6: `consultas.costo` (monto cobrado, por defecto 0) — mismo campo que
+// ya era obligatorio en el alta web desde 2026-09-03, le faltaba a este
+// schema y al alta offline del Home/ficha.
 // Nombres de columna en snake_case porque así los serializa
 // `serializeRow`/`valoresParaEscribir` (contrato = objeto WatermelonDB, no
 // el camelCase de Drizzle).
 export const schema = appSchema({
-  version: 4,
+  version: 6,
   tables: [
     tableSchema({
       name: 'personas',
@@ -73,6 +80,7 @@ export const schema = appSchema({
         { name: 'peso_kg', type: 'number', isOptional: true },
         { name: 'temperatura_c', type: 'number', isOptional: true },
         { name: 'observaciones', type: 'string', isOptional: true },
+        { name: 'costo', type: 'number', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],
@@ -267,6 +275,52 @@ export const schema = appSchema({
         { name: 'fecha_programada', type: 'string' },
         { name: 'estado', type: 'string' },
         { name: 'observaciones', type: 'string', isOptional: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    // ---- Farmacia (v5) ----
+    tableSchema({
+      name: 'productos',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'nombre', type: 'string' },
+        { name: 'presentacion', type: 'string', isOptional: true },
+        { name: 'unidad', type: 'string', isOptional: true },
+        { name: 'categoria', type: 'string', isOptional: true },
+        { name: 'es_medicamento', type: 'boolean' },
+        { name: 'es_fraccionable', type: 'boolean' },
+        { name: 'concentracion', type: 'number', isOptional: true },
+        { name: 'unidad_concentracion', type: 'string', isOptional: true },
+        { name: 'dosis_sugerida_mg_kg', type: 'number', isOptional: true },
+        { name: 'precio', type: 'number', isOptional: true },
+        { name: 'precio_compra', type: 'number', isOptional: true },
+        { name: 'activo', type: 'boolean' },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'stock',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'producto_id', type: 'string', isIndexed: true },
+        { name: 'cantidad', type: 'number' },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'movimientos_stock',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'producto_id', type: 'string', isIndexed: true },
+        { name: 'tipo', type: 'string' },
+        { name: 'cantidad', type: 'number' },
+        { name: 'fecha', type: 'string' },
+        { name: 'observaciones', type: 'string', isOptional: true },
+        { name: 'consulta_id', type: 'string', isOptional: true },
+        { name: 'usuario_id', type: 'string', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],

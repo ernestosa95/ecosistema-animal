@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, FlatList, TextInput, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, FlatList, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Q } from '@nozbe/watermelondb';
@@ -13,9 +13,27 @@ import { Persona } from '@/db/models/Persona';
 import { Consulta } from '@/db/models/Consulta';
 import { Vacunacion } from '@/db/models/Vacunacion';
 import { Colors } from '@/constants/theme';
+import { Field } from '@/components/Field';
+import { Button } from '@/components/Button';
+import { Alerta } from '@/components/Alerta';
+import { EmptyState } from '@/components/EmptyState';
+import { Card } from '@/components/Card';
+import { FotoAnimal } from '@/components/FotoAnimal';
+import { BuscadorCatalogoVacunas } from '@/components/BuscadorCatalogoVacunas';
+import { BuscadorCatalogoDiagnosticos } from '@/components/BuscadorCatalogoDiagnosticos';
+import { CampoColapsable } from '@/components/CampoColapsable';
+import { CampoFecha } from '@/components/CampoFecha';
+import { api } from '@/api/client';
+
+// `seccion` (?seccion=consulta|vacunacion) llega desde los accesos rápidos
+// del Home ("Nueva consulta"/"Registro de vacuna" en (app)/home.tsx vía
+// SeleccionarAnimalModal) para abrir la sección correspondiente sin que el
+// veterinario tenga que buscarla — mismo espíritu que la web, donde
+// `onAbrirPaciente(animal, { abrirConsulta: true })` hace lo mismo.
+type SeccionParam = 'consulta' | 'vacunacion';
 
 export default function PacienteDetalleScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, seccion: seccionInicial } = useLocalSearchParams<{ id: string; seccion?: SeccionParam }>();
   const { sesion } = useSesionContext();
   const router = useRouter();
   const { especies } = useEspecies();
@@ -37,7 +55,9 @@ export default function PacienteDetalleScreen() {
     [animal?.personaId],
   );
 
-  const [seccion, setSeccion] = useState<'consulta' | 'vacunacion' | null>(null);
+  const [seccion, setSeccion] = useState<SeccionParam | null>(
+    seccionInicial === 'consulta' || seccionInicial === 'vacunacion' ? seccionInicial : null,
+  );
 
   // Consulta
   const [motivo, setMotivo] = useState('');
@@ -45,6 +65,7 @@ export default function PacienteDetalleScreen() {
   const [tratamiento, setTratamiento] = useState('');
   const [pesoKg, setPesoKg] = useState('');
   const [observacionesConsulta, setObservacionesConsulta] = useState('');
+  const [costo, setCosto] = useState('0');
 
   // Vacunación
   const [producto, setProducto] = useState('');
@@ -76,13 +97,16 @@ export default function PacienteDetalleScreen() {
           c.pesoKg = pesoKg ? Number(pesoKg) : null;
           c.temperaturaC = null;
           c.observaciones = observacionesConsulta.trim() || null;
+          c.costo = costo.trim() ? Number(costo) : 0;
         });
       });
+      api.registrarEvento(sesion, 'accion', 'consulta-crear');
       setMotivo('');
       setDiagnostico('');
       setTratamiento('');
       setPesoKg('');
       setObservacionesConsulta('');
+      setCosto('0');
       setOk(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al guardar');
@@ -114,6 +138,7 @@ export default function PacienteDetalleScreen() {
           v.loteProducto = loteProducto.trim() || null;
         });
       });
+      api.registrarEvento(sesion, 'accion', 'vacunacion-crear');
       setProducto('');
       setLoteProducto('');
       setProximaDosis('');
@@ -127,12 +152,12 @@ export default function PacienteDetalleScreen() {
 
   if (!animal) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <View style={styles.container}>
           <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backButton}>
             <Text style={styles.link}>‹ Volver</Text>
           </Pressable>
-          <Text style={styles.empty}>Cargando…</Text>
+          <EmptyState mensaje="Cargando…" />
         </View>
       </SafeAreaView>
     );
@@ -141,11 +166,13 @@ export default function PacienteDetalleScreen() {
   const especie = especies.find((e) => e.id === animal.especieId);
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <ScrollView style={styles.container}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backButton}>
           <Text style={styles.link}>‹ Volver</Text>
         </Pressable>
+
+        <FotoAnimal animal={animal} />
 
         <Text style={styles.title}>{animal.nombre}</Text>
         <Text style={styles.sub}>
@@ -158,97 +185,129 @@ export default function PacienteDetalleScreen() {
           </Text>
         )}
 
-        <Text style={styles.sectionTitle}>Consultas</Text>
-        <FlatList
-          data={consultas}
-          keyExtractor={(c) => c.id}
-          scrollEnabled={false}
-          renderItem={({ item }) => (
-            <View style={styles.row}>
-              <Text style={styles.rowTitle}>{item.fecha.toLocaleDateString()}</Text>
-              {item.motivo ? <Text style={styles.rowSub}>{item.motivo}</Text> : null}
-              {item.diagnostico ? <Text style={styles.rowSub}>Dx: {item.diagnostico}</Text> : null}
-            </View>
-          )}
-          ListEmptyComponent={<Text style={styles.empty}>Sin consultas cargadas todavía.</Text>}
-        />
-        <Pressable
-          style={styles.linkButton}
-          onPress={() => {
-            setSeccion(seccion === 'consulta' ? null : 'consulta');
-            setError(null);
-            setOk(false);
-          }}
-        >
-          <Text style={styles.link}>{seccion === 'consulta' ? '‹ Cancelar' : '+ Nueva consulta'}</Text>
-        </Pressable>
-
-        {seccion === 'consulta' && (
-          <View>
-            <Text style={styles.label}>Motivo</Text>
-            <TextInput style={styles.input} value={motivo} onChangeText={setMotivo} />
-            <Text style={styles.label}>Diagnóstico</Text>
-            <TextInput style={styles.input} value={diagnostico} onChangeText={setDiagnostico} />
-            <Text style={styles.label}>Tratamiento</Text>
-            <TextInput style={styles.input} value={tratamiento} onChangeText={setTratamiento} />
-            <Text style={styles.label}>Peso (kg)</Text>
-            <TextInput style={styles.input} value={pesoKg} onChangeText={setPesoKg} keyboardType="numeric" />
-            <Text style={styles.label}>Observaciones</Text>
-            <TextInput style={styles.input} value={observacionesConsulta} onChangeText={setObservacionesConsulta} />
-            <Pressable style={styles.button} onPress={guardarConsulta} disabled={guardando}>
-              <Text style={styles.buttonText}>{guardando ? 'Guardando…' : 'Guardar consulta (offline)'}</Text>
+        {seccion !== 'vacunacion' && (
+          <>
+            <Text style={styles.sectionTitle}>Consultas</Text>
+            <Card>
+              <FlatList
+                data={consultas}
+                keyExtractor={(c) => c.id}
+                scrollEnabled={false}
+                renderItem={({ item }) => (
+                  <View style={styles.row}>
+                    <Text style={styles.rowTitle}>{item.fecha.toLocaleDateString()}</Text>
+                    {item.motivo ? <Text style={styles.rowSub}>{item.motivo}</Text> : null}
+                    {item.diagnostico ? <Text style={styles.rowSub}>Dx: {item.diagnostico}</Text> : null}
+                    <Text style={styles.rowSub}>${item.costo ?? 0}</Text>
+                  </View>
+                )}
+                ListEmptyComponent={<EmptyState mensaje="Sin consultas cargadas todavía." />}
+              />
+            </Card>
+            <Pressable
+              style={styles.linkButton}
+              onPress={() => {
+                setSeccion(seccion === 'consulta' ? null : 'consulta');
+                setError(null);
+                setOk(false);
+              }}
+            >
+              <Text style={styles.link}>{seccion === 'consulta' ? '‹ Cancelar' : '+ Nueva consulta'}</Text>
             </Pressable>
-          </View>
+
+            {seccion === 'consulta' && (
+              <View>
+                <CampoColapsable label="Motivo" valor={motivo} abiertoInicial>
+                  <Field label="" value={motivo} onChangeText={setMotivo} />
+                </CampoColapsable>
+                <CampoColapsable label="Diagnóstico" valor={diagnostico}>
+                  <BuscadorCatalogoDiagnosticos
+                    label=""
+                    especieId={animal.especieId}
+                    valor={diagnostico}
+                    onCambiar={setDiagnostico}
+                    placeholder="Buscar en el catálogo común o escribir uno nuevo…"
+                  />
+                </CampoColapsable>
+                <CampoColapsable label="Tratamiento" valor={tratamiento}>
+                  <Field label="" value={tratamiento} onChangeText={setTratamiento} />
+                </CampoColapsable>
+                <CampoColapsable label="Peso (kg)" valor={pesoKg}>
+                  <Field label="" value={pesoKg} onChangeText={setPesoKg} keyboardType="numeric" />
+                </CampoColapsable>
+                <CampoColapsable label="Observaciones" valor={observacionesConsulta}>
+                  <Field label="" value={observacionesConsulta} onChangeText={setObservacionesConsulta} />
+                </CampoColapsable>
+                <CampoColapsable label="Monto cobrado" valor={costo}>
+                  <Field label="" value={costo} onChangeText={setCosto} keyboardType="numeric" />
+                </CampoColapsable>
+                <View style={styles.boton}>
+                  <Button
+                    title={guardando ? 'Guardando…' : 'Guardar consulta'}
+                    onPress={guardarConsulta}
+                    disabled={guardando}
+                  />
+                </View>
+              </View>
+            )}
+          </>
         )}
 
-        <Text style={styles.sectionTitle}>Vacunaciones</Text>
-        <FlatList
-          data={vacunaciones}
-          keyExtractor={(v) => v.id}
-          scrollEnabled={false}
-          renderItem={({ item }) => (
-            <View style={styles.row}>
-              <Text style={styles.rowTitle}>{item.producto ?? 'Sin producto'}</Text>
-              <Text style={styles.rowSub}>
-                {item.fecha}
-                {item.proximaDosis ? ` · próxima dosis: ${item.proximaDosis}` : ''}
-              </Text>
-            </View>
-          )}
-          ListEmptyComponent={<Text style={styles.empty}>Sin vacunaciones cargadas todavía.</Text>}
-        />
-        <Pressable
-          style={styles.linkButton}
-          onPress={() => {
-            setSeccion(seccion === 'vacunacion' ? null : 'vacunacion');
-            setError(null);
-            setOk(false);
-          }}
-        >
-          <Text style={styles.link}>{seccion === 'vacunacion' ? '‹ Cancelar' : '+ Nueva vacunación'}</Text>
-        </Pressable>
-
-        {seccion === 'vacunacion' && (
-          <View>
-            <Text style={styles.label}>Producto</Text>
-            <TextInput style={styles.input} value={producto} onChangeText={setProducto} />
-            <Text style={styles.label}>Lote (opcional)</Text>
-            <TextInput style={styles.input} value={loteProducto} onChangeText={setLoteProducto} />
-            <Text style={styles.label}>Próxima dosis (opcional, AAAA-MM-DD)</Text>
-            <TextInput style={styles.input} value={proximaDosis} onChangeText={setProximaDosis} />
-            <Pressable style={styles.button} onPress={guardarVacunacion} disabled={guardando}>
-              <Text style={styles.buttonText}>{guardando ? 'Guardando…' : 'Guardar vacunación (offline)'}</Text>
+        {seccion !== 'consulta' && (
+          <>
+            <Text style={styles.sectionTitle}>Vacunaciones</Text>
+            <Card>
+              <FlatList
+                data={vacunaciones}
+                keyExtractor={(v) => v.id}
+                scrollEnabled={false}
+                renderItem={({ item }) => (
+                  <View style={styles.row}>
+                    <Text style={styles.rowTitle}>{item.producto ?? 'Sin producto'}</Text>
+                    <Text style={styles.rowSub}>
+                      {item.fecha}
+                      {item.proximaDosis ? ` · próxima dosis: ${item.proximaDosis}` : ''}
+                    </Text>
+                  </View>
+                )}
+                ListEmptyComponent={<EmptyState mensaje="Sin vacunaciones cargadas todavía." />}
+              />
+            </Card>
+            <Pressable
+              style={styles.linkButton}
+              onPress={() => {
+                setSeccion(seccion === 'vacunacion' ? null : 'vacunacion');
+                setError(null);
+                setOk(false);
+              }}
+            >
+              <Text style={styles.link}>{seccion === 'vacunacion' ? '‹ Cancelar' : '+ Nueva vacunación'}</Text>
             </Pressable>
-          </View>
+
+            {seccion === 'vacunacion' && (
+              <View>
+                <BuscadorCatalogoVacunas
+                  especieId={animal.especieId}
+                  valor={producto}
+                  onCambiar={setProducto}
+                  placeholder="Buscar en el catálogo común o escribir uno nuevo…"
+                />
+                <Field label="Lote (opcional)" value={loteProducto} onChangeText={setLoteProducto} />
+                <CampoFecha label="Próxima dosis (opcional)" value={proximaDosis} onCambiar={setProximaDosis} />
+                <View style={styles.boton}>
+                  <Button
+                    title={guardando ? 'Guardando…' : 'Guardar vacunación'}
+                    onPress={guardarVacunacion}
+                    disabled={guardando}
+                  />
+                </View>
+              </View>
+            )}
+          </>
         )}
 
-        {error && <Text style={styles.error}>{error}</Text>}
-        {ok && <Text style={styles.ok}>Guardado. Quedó pendiente hasta la próxima sincronización.</Text>}
-
-        <Text style={styles.hint}>
-          Las altas se guardan en el dispositivo — usá la pestaña "Sincronización" para enviarlas
-          al servidor.
-        </Text>
+        {error && <Alerta mensaje={error} />}
+        {ok && <Text style={styles.ok}>Guardado ✓</Text>}
       </ScrollView>
     </SafeAreaView>
   );
@@ -257,40 +316,19 @@ export default function PacienteDetalleScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.bg },
   container: { flex: 1, padding: 16, backgroundColor: Colors.bg },
+  scrollContent: { paddingBottom: 48 },
   backButton: { alignSelf: 'flex-start', paddingVertical: 4, paddingRight: 12 },
   link: { color: Colors.verdeDark, fontWeight: '600' },
-  linkButton: { paddingVertical: 8 },
+  linkButton: { paddingVertical: 10 },
   title: { fontSize: 20, fontWeight: '700', color: Colors.text, marginTop: 8 },
   sub: { fontSize: 14, color: Colors.muted, marginTop: 2 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginTop: 20, marginBottom: 6 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.text, marginTop: 20, marginBottom: 8 },
   row: {
     paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
   rowTitle: { fontSize: 14, fontWeight: '600', color: Colors.text },
   rowSub: { fontSize: 13, color: Colors.muted, marginTop: 1 },
-  empty: { color: Colors.muted, paddingVertical: 8 },
-  label: { fontSize: 13, color: Colors.text, marginTop: 10, marginBottom: 4 },
-  input: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    backgroundColor: Colors.card,
-    color: Colors.text,
-  },
-  error: { color: Colors.danger, marginTop: 12 },
+  boton: { marginTop: 12 },
   ok: { color: Colors.verdeDark, marginTop: 12 },
-  button: {
-    backgroundColor: Colors.verde,
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  buttonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
   hint: { color: Colors.muted, fontSize: 13, marginTop: 20, marginBottom: 32 },
 });

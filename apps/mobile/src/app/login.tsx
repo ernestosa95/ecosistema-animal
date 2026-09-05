@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { api } from '@/api/client';
 import { useSesionContext } from '@/auth/SesionContext';
 import { Colors } from '@/constants/theme';
+import { Field } from '@/components/Field';
+import { Button } from '@/components/Button';
+import { Alerta } from '@/components/Alerta';
 
 export default function LoginScreen() {
   const { iniciar } = useSesionContext();
@@ -10,6 +13,21 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
+  const [modo, setModo] = useState<'login' | 'olvide'>('login');
+  const [olvideEnviado, setOlvideEnviado] = useState(false);
+
+  async function enviarOlvide() {
+    setError(null);
+    setCargando(true);
+    try {
+      await api.olvidePassword(email);
+      setOlvideEnviado(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error inesperado');
+    } finally {
+      setCargando(false);
+    }
+  }
 
   async function entrar() {
     setError(null);
@@ -22,7 +40,12 @@ export default function LoginScreen() {
         token: login.accessToken,
         refreshToken: login.refreshToken,
         organizacionId: org.organizacionId,
-        rol: org.rol,
+        // El backend devuelve `roles` (arreglo, desde el role-stacking de la
+        // Fase A) — nunca `rol`. Guardar `org.rol` acá quedaba silenciosamente
+        // undefined porque nada lo leía todavía.
+        roles: org.roles ?? [],
+        huellaActiva: org.huellaActiva,
+        troperaActiva: org.troperaActiva,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error inesperado');
@@ -31,53 +54,84 @@ export default function LoginScreen() {
     }
   }
 
+  if (modo === 'olvide') {
+    return (
+      <KeyboardAvoidingView style={styles.wrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <Text style={styles.brand}>🐾 Huella</Text>
+        <Text style={styles.title}>Recuperar contraseña</Text>
+
+        {olvideEnviado ? (
+          <>
+            <Text style={styles.info}>
+              Si <Text style={{ fontWeight: '700' }}>{email}</Text> tiene una cuenta, te enviamos un
+              email con un link para elegir una contraseña nueva. Abrilo desde el celular.
+            </Text>
+            <View style={styles.boton}>
+              <Button
+                title="Volver a ingresar"
+                variant="ghost"
+                onPress={() => { setModo('login'); setOlvideEnviado(false); }}
+              />
+            </View>
+          </>
+        ) : (
+          <>
+            <Field
+              label="Email"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+            {error && <Alerta mensaje={error} />}
+            <View style={styles.boton}>
+              <Button
+                title={cargando ? 'Enviando…' : 'Enviar link de recuperación'}
+                onPress={enviarOlvide}
+                disabled={cargando || !email.trim()}
+              />
+            </View>
+            <Pressable onPress={() => { setError(null); setModo('login'); }} style={styles.link}>
+              <Text style={styles.linkTexto}>‹ Volver a ingresar</Text>
+            </Pressable>
+          </>
+        )}
+      </KeyboardAvoidingView>
+    );
+  }
+
   return (
     <KeyboardAvoidingView style={styles.wrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Text style={styles.brand}>Ecosistema · Salud Animal</Text>
+      <Text style={styles.brand}>🐾 Huella</Text>
       <Text style={styles.title}>Ingresar</Text>
 
-      <Text style={styles.label}>Email</Text>
-      <TextInput
-        style={styles.input}
+      <Field
+        label="Email"
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
         keyboardType="email-address"
       />
-      <Text style={styles.label}>Contraseña</Text>
-      <TextInput style={styles.input} value={password} onChangeText={setPassword} secureTextEntry />
+      <Field label="Contraseña" value={password} onChangeText={setPassword} secureTextEntry />
 
-      {error && <Text style={styles.error}>{error}</Text>}
+      {error && <Alerta mensaje={error} />}
 
-      <Pressable style={styles.button} onPress={entrar} disabled={cargando}>
-        <Text style={styles.buttonText}>{cargando ? 'Ingresando…' : 'Ingresar'}</Text>
+      <View style={styles.boton}>
+        <Button title={cargando ? 'Ingresando…' : 'Ingresar'} onPress={entrar} disabled={cargando} />
+      </View>
+      <Pressable onPress={() => { setError(null); setModo('olvide'); }} style={styles.link}>
+        <Text style={styles.linkTexto}>¿Olvidaste tu contraseña?</Text>
       </Pressable>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, justifyContent: 'center', padding: 24, gap: 8, backgroundColor: Colors.bg },
-  brand: { fontSize: 14, color: Colors.muted, marginBottom: 4 },
-  title: { fontSize: 24, fontWeight: '700', marginBottom: 16, color: Colors.text },
-  label: { fontSize: 13, color: Colors.text, marginTop: 8 },
-  input: {
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    backgroundColor: Colors.card,
-    color: Colors.text,
-  },
-  error: { color: Colors.danger, marginTop: 12 },
-  button: {
-    backgroundColor: Colors.verde,
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  buttonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+  wrap: { flex: 1, justifyContent: 'center', padding: 24, backgroundColor: Colors.bg },
+  brand: { fontSize: 15, fontWeight: '700', color: Colors.verdeDark, marginBottom: 4 },
+  title: { fontSize: 24, fontWeight: '700', marginBottom: 12, color: Colors.text },
+  boton: { marginTop: 20 },
+  info: { fontSize: 15, color: Colors.text, lineHeight: 21 },
+  link: { marginTop: 16, alignItems: 'center' },
+  linkTexto: { color: Colors.verdeDark, fontWeight: '600', fontSize: 13.5 },
 });

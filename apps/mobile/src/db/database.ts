@@ -19,6 +19,9 @@ import { Muestra } from './models/Muestra';
 import { PlantillaTarea } from './models/PlantillaTarea';
 import { ProtocoloIatf } from './models/ProtocoloIatf';
 import { Tarea } from './models/Tarea';
+import { Producto } from './models/Producto';
+import { Stock } from './models/Stock';
+import { MovimientoStock } from './models/MovimientoStock';
 
 // jsi: false (bridge asíncrono estándar) a propósito: el binding JSI de
 // WatermelonDB en Android necesita registrar WatermelonDBJSIPackage vía
@@ -42,5 +45,6 @@ export const database = new Database({
     Persona, Animal, Consulta, Vacunacion, Turno,
     AnimalCampo, Potrero, Hallazgo, ToroVirtual, Muestra,
     PlantillaTarea, ProtocoloIatf, Tarea,
+    Producto, Stock, MovimientoStock,
   ],
 });

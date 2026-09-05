@@ -16,6 +16,7 @@ export class Consulta extends Model {
   @field('peso_kg') pesoKg: number | null;
   @field('temperatura_c') temperaturaC: number | null;
   @text('observaciones') observaciones: string | null;
+  @field('costo') costo: number | null;
   @readonly @date('created_at') createdAt: Date;
   @readonly @date('updated_at') updatedAt: Date;
 }
