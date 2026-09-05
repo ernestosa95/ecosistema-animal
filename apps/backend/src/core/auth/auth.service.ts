@@ -3,6 +3,7 @@ import {
   Inject,
   ConflictException,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -12,6 +13,7 @@ import { DRIZZLE, DrizzleDB } from '../../database/drizzle.provider';
 import { usuarios, organizaciones, membresias } from '../../database/schema';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { MailService } from '../../common/mail/mail.service';
 
 @Injectable()
 export class AuthService {
@@ -19,6 +21,7 @@ export class AuthService {
     @Inject(DRIZZLE) private readonly db: DrizzleDB,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly mail: MailService,
   ) {}
 
   /**
@@ -118,6 +121,67 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Usuario no encontrado');
 
     return this.emitirTokens(user.id, user.email);
+  }
+
+  /**
+   * "Olvidé mi contraseña" — nunca revela si el email existe o no (siempre
+   * resuelve igual), sólo dispara el mail cuando sí hay una cuenta. El token
+   * es un JWT stateless de vida corta, mismo patrón que `PortalTokenService`
+   * pero con `scope: 'reset_password'`; `resetearPassword()` lo invalida
+   * comparando su `iat` contra `passwordChangedAt`.
+   */
+  async solicitarResetPassword(email: string): Promise<void> {
+    const [user] = await this.db
+      .select()
+      .from(usuarios)
+      .where(eq(usuarios.email, email))
+      .limit(1);
+    if (!user) return;
+
+    const token = this.jwt.sign(
+      { sub: user.id, scope: 'reset_password' },
+      { expiresIn: '30m' },
+    );
+    // Mismo origen que ya sirve el resto de la SPA (`PORTAL_BASE_URL`) — no
+    // hace falta una variable nueva sólo para este link.
+    const frontendUrl = process.env.PORTAL_BASE_URL ?? 'http://localhost:5173';
+    const link = `${frontendUrl}/?resetToken=${token}`;
+    await this.mail.enviar(
+      user.email,
+      'Recuperar tu contraseña',
+      `<p>Recibimos un pedido para restablecer tu contraseña.</p>
+       <p><a href="${link}">Hacé click acá para elegir una nueva</a> (válido por 30 minutos).</p>
+       <p>Si no fuiste vos, podés ignorar este email.</p>`,
+    );
+  }
+
+  async resetearPassword(token: string, nuevaPassword: string): Promise<void> {
+    let payload: { sub?: string; scope?: string; iat?: number };
+    try {
+      payload = this.jwt.verify(token);
+    } catch {
+      throw new UnauthorizedException('El enlace es inválido o venció, pedí uno nuevo');
+    }
+    if (payload.scope !== 'reset_password' || !payload.sub) {
+      throw new UnauthorizedException('El enlace es inválido o venció, pedí uno nuevo');
+    }
+
+    const [user] = await this.db
+      .select()
+      .from(usuarios)
+      .where(eq(usuarios.id, payload.sub))
+      .limit(1);
+    if (!user) throw new BadRequestException('El enlace es inválido o venció, pedí uno nuevo');
+
+    if (user.passwordChangedAt && payload.iat! * 1000 < user.passwordChangedAt.getTime()) {
+      throw new UnauthorizedException('Este enlace ya fue usado, pedí uno nuevo');
+    }
+
+    const passwordHash = await bcrypt.hash(nuevaPassword, 10);
+    await this.db
+      .update(usuarios)
+      .set({ passwordHash, passwordChangedAt: new Date() })
+      .where(eq(usuarios.id, user.id));
   }
 
   private emitirTokens(sub: string, email: string) {

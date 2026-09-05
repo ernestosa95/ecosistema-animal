@@ -1,12 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import { crearSolicitud } from '../api/solicitudes';
+import { crearSolicitud, listarPlanesPublicos, type PlanPublico } from '../api/solicitudes';
 import { TerminosModal } from '../components/TerminosModal';
+import { InfoRoles } from '../components/InfoRoles';
+import { rolInfoDe } from '../config/rolesInfo';
 import type { Sesion } from '../api/types';
 
 export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
-  const [modo, setModo] = useState<'login' | 'registro'>('login');
+  // La landing pública pasa el plan elegido como ?plan=<id> al mandar acá
+  // (ver LandingPage.tsx) — si viene, arranca directo en modo registro con
+  // ese plan preseleccionado en cuanto la lista de planes carga.
+  const [planIdInicial] = useState(() => new URLSearchParams(window.location.search).get('plan'));
+  const [modo, setModo] = useState<'login' | 'registro' | 'olvide'>(planIdInicial ? 'registro' : 'login');
   const [enviada, setEnviada] = useState(false);
+  const [olvideEnviado, setOlvideEnviado] = useState(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -15,7 +22,8 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
   const [telefono, setTelefono] = useState('');
   const [dni, setDni] = useState('');
 
-  const [tipo, setTipo] = useState<'crear' | 'unirse'>('crear');
+  const [planes, setPlanes] = useState<PlanPublico[]>([]);
+  const [planId, setPlanId] = useState('');
   const [nombreOrganizacion, setNombreOrganizacion] = useState('');
   const [tipoOrganizacion, setTipoOrganizacion] = useState('clinica');
   const [direccionOrganizacion, setDireccionOrganizacion] = useState('');
@@ -23,12 +31,22 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
   const [provinciaOrganizacion, setProvinciaOrganizacion] = useState('');
   const [telefonoOrganizacion, setTelefonoOrganizacion] = useState('');
   const [emailOrganizacion, setEmailOrganizacion] = useState('');
-  const [organizacionSolicitada, setOrganizacionSolicitada] = useState('');
   const [terminosAceptados, setTerminosAceptados] = useState(false);
   const [mostrarTerminos, setMostrarTerminos] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
+
+  useEffect(() => {
+    if (modo === 'registro' && planes.length === 0) {
+      listarPlanesPublicos().then((ps) => {
+        setPlanes(ps);
+        if (planIdInicial && ps.some((p) => p.id === planIdInicial)) setPlanId(planIdInicial);
+      }).catch(() => {});
+    }
+  }, [modo]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const planElegido = planes.find((p) => p.id === planId);
 
   async function entrar() {
     const login = await api.login(email, password);
@@ -49,24 +67,24 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
     setError(null);
     setCargando(true);
     try {
-      if (modo === 'login') {
+      if (modo === 'olvide') {
+        await api.olvidePassword(email);
+        setOlvideEnviado(true);
+      } else if (modo === 'login') {
         await entrar();
       } else {
+        if (!planId) throw new Error('Elegí un plan');
         await crearSolicitud({
-          tipo, nombre, apellido, email, password,
+          nombre, apellido, email, password,
           terminosAceptados,
-          telefono: telefono || undefined,
-          dni: dni || undefined,
-          ...(tipo === 'crear'
-            ? {
-                nombreOrganizacion, tipoOrganizacion,
-                direccionOrganizacion: direccionOrganizacion || undefined,
-                localidadOrganizacion: localidadOrganizacion || undefined,
-                provinciaOrganizacion: provinciaOrganizacion || undefined,
-                telefonoOrganizacion: telefonoOrganizacion || undefined,
-                emailOrganizacion: emailOrganizacion || undefined,
-              }
-            : { organizacionSolicitada }),
+          telefono, dni,
+          planId,
+          nombreOrganizacion, tipoOrganizacion,
+          direccionOrganizacion: direccionOrganizacion || undefined,
+          localidadOrganizacion: localidadOrganizacion || undefined,
+          provinciaOrganizacion: provinciaOrganizacion || undefined,
+          telefonoOrganizacion: telefonoOrganizacion || undefined,
+          emailOrganizacion: emailOrganizacion || undefined,
         });
         setEnviada(true);
       }
@@ -98,6 +116,30 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
     );
   }
 
+  if (olvideEnviado) {
+    return (
+      <div className="login-wrap">
+        <div className="card login-card">
+          <div className="brand brand-lg">
+            <span className="brand-dot" />
+            Ecosistema · Salud Animal
+          </div>
+          <h1>Revisá tu email</h1>
+          <p>
+            Si <b>{email}</b> tiene una cuenta, te enviamos un link para elegir una contraseña
+            nueva. Válido por 30 minutos.
+          </p>
+          <button
+            className="btn"
+            onClick={() => { setOlvideEnviado(false); setModo('login'); }}
+          >
+            Volver al inicio
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="login-wrap">
       <form className="card login-card" onSubmit={enviar}>
@@ -105,7 +147,7 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
           <span className="brand-dot" />
           Ecosistema · Salud Animal
         </div>
-        <h1>{modo === 'login' ? 'Ingresar' : 'Solicitar acceso'}</h1>
+        <h1>{modo === 'login' ? 'Ingresar' : modo === 'olvide' ? 'Recuperar contraseña' : 'Solicitar acceso'}</h1>
 
         {modo === 'registro' && (
           <>
@@ -118,72 +160,78 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
               <input value={apellido} onChange={(e) => setApellido(e.target.value)} required />
             </label>
             <label>
-              Teléfono (opcional)
-              <input value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+              Teléfono
+              <input value={telefono} onChange={(e) => setTelefono(e.target.value)} required minLength={6} />
             </label>
             <label>
-              DNI (opcional)
-              <input value={dni} onChange={(e) => setDni(e.target.value)} />
+              DNI
+              <input value={dni} onChange={(e) => setDni(e.target.value)} required minLength={6} />
             </label>
 
             <label>
-              ¿Qué querés hacer?
-              <select value={tipo} onChange={(e) => setTipo(e.target.value as 'crear' | 'unirse')}>
-                <option value="crear">Crear una veterinaria o campo nuevo</option>
-                <option value="unirse">Unirme a una veterinaria existente</option>
+              Nombre de la institución / campo
+              <input
+                value={nombreOrganizacion}
+                onChange={(e) => setNombreOrganizacion(e.target.value)}
+                required
+              />
+            </label>
+            <label>
+              Tipo
+              <select value={tipoOrganizacion} onChange={(e) => setTipoOrganizacion(e.target.value)}>
+                <option value="clinica">Clínica</option>
+                <option value="establecimiento">Establecimiento</option>
+                <option value="mixta">Mixta</option>
               </select>
             </label>
+            <label>
+              Dirección (opcional)
+              <input value={direccionOrganizacion} onChange={(e) => setDireccionOrganizacion(e.target.value)} placeholder="Calle, número..." />
+            </label>
+            <label>
+              Localidad (opcional)
+              <input value={localidadOrganizacion} onChange={(e) => setLocalidadOrganizacion(e.target.value)} />
+            </label>
+            <label>
+              Provincia (opcional)
+              <input value={provinciaOrganizacion} onChange={(e) => setProvinciaOrganizacion(e.target.value)} />
+            </label>
+            <label>
+              Teléfono de la institución (opcional)
+              <input value={telefonoOrganizacion} onChange={(e) => setTelefonoOrganizacion(e.target.value)} />
+            </label>
+            <label>
+              Email de contacto de la institución (opcional)
+              <input type="email" value={emailOrganizacion} onChange={(e) => setEmailOrganizacion(e.target.value)} />
+            </label>
 
-            {tipo === 'crear' ? (
-              <>
-                <label>
-                  Nombre de la institución / campo
-                  <input
-                    value={nombreOrganizacion}
-                    onChange={(e) => setNombreOrganizacion(e.target.value)}
-                    required
-                  />
-                </label>
-                <label>
-                  Tipo
-                  <select value={tipoOrganizacion} onChange={(e) => setTipoOrganizacion(e.target.value)}>
-                    <option value="clinica">Clínica</option>
-                    <option value="establecimiento">Establecimiento</option>
-                    <option value="mixta">Mixta</option>
-                  </select>
-                </label>
-                <label>
-                  Dirección (opcional)
-                  <input value={direccionOrganizacion} onChange={(e) => setDireccionOrganizacion(e.target.value)} placeholder="Calle, número..." />
-                </label>
-                <label>
-                  Localidad (opcional)
-                  <input value={localidadOrganizacion} onChange={(e) => setLocalidadOrganizacion(e.target.value)} />
-                </label>
-                <label>
-                  Provincia (opcional)
-                  <input value={provinciaOrganizacion} onChange={(e) => setProvinciaOrganizacion(e.target.value)} />
-                </label>
-                <label>
-                  Teléfono de la institución (opcional)
-                  <input value={telefonoOrganizacion} onChange={(e) => setTelefonoOrganizacion(e.target.value)} />
-                </label>
-                <label>
-                  Email de contacto de la institución (opcional)
-                  <input type="email" value={emailOrganizacion} onChange={(e) => setEmailOrganizacion(e.target.value)} />
-                </label>
-              </>
-            ) : (
-              <label>
-                Veterinaria a la que querés unirte
-                <input
-                  value={organizacionSolicitada}
-                  onChange={(e) => setOrganizacionSolicitada(e.target.value)}
-                  placeholder="Nombre de la veterinaria"
-                  required
-                />
-              </label>
+            <label>
+              Plan
+              <select value={planId} onChange={(e) => setPlanId(e.target.value)} required>
+                <option value="">Elegí un plan…</option>
+                {planes.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre}{p.precioMensual ? ` — $${p.precioMensual}/mes` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {planElegido && (
+              <div className="card" style={{ padding: '0.6rem 0.75rem', marginBottom: '0.75rem' }}>
+                {planElegido.descripcion && (
+                  <p className="muted" style={{ fontSize: '0.85rem', margin: '0 0 0.4rem' }}>{planElegido.descripcion}</p>
+                )}
+                <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '0 0 0.3rem' }}>Este plan incluye:</p>
+                <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '0.85rem' }}>
+                  {Object.entries(planElegido.limitesRoles ?? {})
+                    .filter(([, n]) => n > 0)
+                    .map(([rol, n]) => (
+                      <li key={rol}>{n} × {rolInfoDe(rol)?.label ?? rol}</li>
+                    ))}
+                </ul>
+              </div>
             )}
+            <InfoRoles />
           </>
         )}
 
@@ -191,16 +239,29 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
           Email
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         </label>
-        <label>
-          Contraseña
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-          />
-        </label>
+        {modo !== 'olvide' && (
+          <label>
+            Contraseña
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+            />
+          </label>
+        )}
+        {modo === 'login' && (
+          <p className="switch" style={{ marginTop: '-0.5rem' }}>
+            <button
+              type="button"
+              className="link"
+              onClick={() => { setError(null); setModo('olvide'); }}
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+          </p>
+        )}
 
         {modo === 'registro' && (
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textTransform: 'none' }}>
@@ -221,24 +282,38 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
         {error && <div className="alerta">{error}</div>}
 
         <button className="btn" type="submit" disabled={cargando || (modo === 'registro' && !terminosAceptados)}>
-          {cargando ? 'Procesando…' : modo === 'login' ? 'Ingresar' : 'Enviar solicitud'}
+          {cargando
+            ? 'Procesando…'
+            : modo === 'login'
+              ? 'Ingresar'
+              : modo === 'olvide'
+                ? 'Enviar link de recuperación'
+                : 'Enviar solicitud'}
         </button>
 
         {mostrarTerminos && <TerminosModal onCerrar={() => setMostrarTerminos(false)} />}
 
-        <p className="switch">
-          {modo === 'login' ? '¿No tenés cuenta?' : '¿Ya tenés cuenta?'}{' '}
-          <button
-            type="button"
-            className="link"
-            onClick={() => {
-              setError(null);
-              setModo(modo === 'login' ? 'registro' : 'login');
-            }}
-          >
-            {modo === 'login' ? 'Solicitar acceso' : 'Ingresar'}
-          </button>
-        </p>
+        {modo === 'olvide' ? (
+          <p className="switch">
+            <button type="button" className="link" onClick={() => { setError(null); setModo('login'); }}>
+              ‹ Volver a ingresar
+            </button>
+          </p>
+        ) : (
+          <p className="switch">
+            {modo === 'login' ? '¿No tenés cuenta?' : '¿Ya tenés cuenta?'}{' '}
+            <button
+              type="button"
+              className="link"
+              onClick={() => {
+                setError(null);
+                setModo(modo === 'login' ? 'registro' : 'login');
+              }}
+            >
+              {modo === 'login' ? 'Solicitar acceso' : 'Ingresar'}
+            </button>
+          </p>
+        )}
       </form>
     </div>
   );
