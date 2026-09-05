@@ -1,0 +1,10 @@
+# Caddy interno del contenedor "web" — sólo sirve los archivos estáticos del
+# build de Vite (:80 sin TLS, adentro de la red Docker del proyecto). El
+# HTTPS/dominio real lo maneja el Caddy "edge" compartido de toda la VPS
+# (ver docs/Plan_Despliegue.md, sección 3), que le hace reverse_proxy a
+# este contenedor — dos Caddys con roles distintos, no uno duplicando al
+# otro.
+:80
+root * /srv
+file_server
+try_files {path} /index.html

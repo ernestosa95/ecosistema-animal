@@ -1,0 +1,28 @@
+# Nunca copiar node_modules del host al contexto de build — cada imagen
+# corre su propio "pnpm install" fresco adentro (ver apps/backend/Dockerfile
+# y apps/web/Dockerfile); copiar el del host es lento y puede arrastrar un
+# node_modules local inconsistente con el hoisted (ver docs/CHANGELOG.md).
+node_modules
+**/node_modules
+
+.git
+
+# apps/mobile no participa de ningún build de Docker (no se despliega en la
+# VPS, es la app de celular) — pero su package.json tiene que seguir
+# presente, pnpm necesita verlo para resolver el workspace (`pnpm-lock.yaml`
+# lo referencia) aunque nunca se compile. Sólo se excluyen sus artefactos
+# nativos pesados y generados.
+apps/mobile/android
+apps/mobile/ios
+apps/mobile/.expo
+
+# Datos locales de dev, nunca deberían terminar en una imagen.
+apps/backend/pgdata
+apps/backend/uploads
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+dist
+apps/*/dist

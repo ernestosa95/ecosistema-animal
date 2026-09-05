@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD, Reflector } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import configuration from './config/configuration';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './core/auth/auth.module';
@@ -20,6 +22,8 @@ import { MensajesAdminModule } from './admin/mensajes/mensajes-admin.module';
 import { MensajesModule } from './mensajes/mensajes.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { CajaModule } from './caja/caja.module';
+import { AnaliticaModule } from './analitica/analitica.module';
+import { HealthModule } from './health/health.module';
 
 /**
  * Módulo raíz. Registra todos los módulos del ecosistema.
@@ -30,6 +34,12 @@ import { CajaModule } from './caja/caja.module';
       isGlobal: true,
       load: [configuration],
     }),
+    // Límite general de toda la API (100 req/min por IP) — generoso a
+    // propósito, no es el que protege login/forgot-password/reset-password
+    // (esos tienen su propio límite más estricto vía @Throttle, ver
+    // auth.controller.ts). Sólo existe para que un guard global esté
+    // disponible sin tener que declarar uno por endpoint sensible a mano.
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]),
     DatabaseModule,
     AuthModule,
     EspeciesModule,
@@ -49,6 +59,9 @@ import { CajaModule } from './caja/caja.module';
     MensajesModule,
     DashboardModule,
     CajaModule,
+    AnaliticaModule,
+    HealthModule,
   ],
+  providers: [Reflector, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

@@ -1,0 +1,60 @@
+# Stack de producción de ESTE proyecto (ecosistema-animal) — ver
+# docs/Plan_Despliegue.md para la arquitectura completa (Caddy "edge"
+# compartido con caddy-docker-proxy, un Postgres propio por proyecto).
+# Variables sin default acá (${POSTGRES_PASSWORD}, ${APP_DOMAIN},
+# ${API_DOMAIN}) vienen del .env de esta misma carpeta — ver .env.example.
+#
+# No pensado para dev local (dev sigue siendo PGlite + `pnpm --filter backend
+# start:dev` / `pnpm --filter web dev`, sin Docker) — sólo para la VPS.
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    env_file: apps/backend/.env
+    restart: unless-stopped
+    volumes:
+      - uploads:/app/apps/backend/uploads
+    networks:
+      - default
+      - edge
+    labels:
+      caddy: ${API_DOMAIN}
+      caddy.reverse_proxy: "{{upstreams 3000}}"
+    depends_on:
+      - postgres
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ecosistema
+      POSTGRES_USER: ecosistema_app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - default # sin "edge" — nunca alcanzable desde afuera del proyecto
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: https://${API_DOMAIN}
+    restart: unless-stopped
+    networks:
+      - default
+      - edge
+    labels:
+      caddy: ${APP_DOMAIN}
+      caddy.reverse_proxy: "{{upstreams 80}}"
+
+networks:
+  default:
+  edge:
+    external: true
+
+volumes:
+  pgdata:
+  uploads:
