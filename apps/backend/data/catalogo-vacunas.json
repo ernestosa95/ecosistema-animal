@@ -1,0 +1,50 @@
+[
+  { "id_aplicacion": 1001, "especie": "Bovino", "categoria": "Vacunas Oficiales/Obligatorias", "nombre": "Fiebre Aftosa" },
+  { "id_aplicacion": 1002, "especie": "Bovino", "categoria": "Vacunas Oficiales/Obligatorias", "nombre": "Brucelosis (Cepa 19 o Delta 19)" },
+  { "id_aplicacion": 1003, "especie": "Bovino", "categoria": "Vacunas Oficiales/Obligatorias", "nombre": "Carbunclo bacteridiano" },
+  { "id_aplicacion": 1004, "especie": "Bovino", "categoria": "Vacunas Reproductivas/Respiratorias", "nombre": "Complejo Reproductivo (IBR, BVD, Campylobacter, Leptospira)" },
+  { "id_aplicacion": 1005, "especie": "Bovino", "categoria": "Vacunas Clostridiales", "nombre": "Mancha, Gangrena y Enterotoxemia" },
+  { "id_aplicacion": 1006, "especie": "Bovino", "categoria": "Antiparasitarios", "nombre": "Desparasitación Interna (Ivermectina/Ricobendazol)" },
+  { "id_aplicacion": 1007, "especie": "Bovino", "categoria": "Antiparasitarios", "nombre": "Desparasitación Externa (Pour on/Baño)" },
+  { "id_aplicacion": 1008, "especie": "Bovino", "categoria": "Suplementos", "nombre": "Cobre y Zinc inyectable" },
+
+  { "id_aplicacion": 2001, "especie": "Canino", "categoria": "Vacunas Esenciales", "nombre": "Séxtuple / Quíntuple (Parvovirus, Moquillo, Hepatitis, Leptospirosis)" },
+  { "id_aplicacion": 2002, "especie": "Canino", "categoria": "Vacunas Esenciales", "nombre": "Antirrábica" },
+  { "id_aplicacion": 2003, "especie": "Canino", "categoria": "Vacunas Opcionales", "nombre": "Tos de las perreras (Bordetella / Parainfluenza)" },
+  { "id_aplicacion": 2004, "especie": "Canino", "categoria": "Antiparasitarios", "nombre": "Desparasitación Interna (Comprimidos/Suspensión)" },
+  { "id_aplicacion": 2005, "especie": "Canino", "categoria": "Antiparasitarios", "nombre": "Control de Pulgas y Garrapatas (Pipeta/Pastilla/Collar)" },
+
+  { "id_aplicacion": 3001, "especie": "Felino", "categoria": "Vacunas Esenciales", "nombre": "Triple Felina (Panleucopenia, Rinotraqueítis, Calicivirus)" },
+  { "id_aplicacion": 3002, "especie": "Felino", "categoria": "Vacunas Esenciales", "nombre": "Antirrábica" },
+  { "id_aplicacion": 3003, "especie": "Felino", "categoria": "Vacunas Opcionales", "nombre": "Leucemia Felina (FeLV)" },
+  { "id_aplicacion": 3004, "especie": "Felino", "categoria": "Antiparasitarios", "nombre": "Desparasitación Interna (Amplio espectro)" },
+  { "id_aplicacion": 3005, "especie": "Felino", "categoria": "Antiparasitarios", "nombre": "Control de Pulgas (Pipeta)" },
+
+  { "id_aplicacion": 4001, "especie": "Equino", "categoria": "Vacunas Esenciales", "nombre": "Encefalomielitis Equina" },
+  { "id_aplicacion": 4002, "especie": "Equino", "categoria": "Vacunas Esenciales", "nombre": "Influenza Equina" },
+  { "id_aplicacion": 4003, "especie": "Equino", "categoria": "Vacunas Esenciales", "nombre": "Tétanos" },
+  { "id_aplicacion": 4004, "especie": "Equino", "categoria": "Vacunas Opcionales", "nombre": "Adenitis Equina (Gurma)" },
+  { "id_aplicacion": 4005, "especie": "Equino", "categoria": "Antiparasitarios", "nombre": "Desparasitación Interna (Pasta oral - Ivermectina/Pamoato)" },
+
+  { "id_aplicacion": 5001, "especie": "Porcino", "categoria": "Vacunas", "nombre": "Circovirus Porcino (PCV2)" },
+  { "id_aplicacion": 5002, "especie": "Porcino", "categoria": "Vacunas", "nombre": "Micoplasma (Neumonía enzoótica)" },
+  { "id_aplicacion": 5003, "especie": "Porcino", "categoria": "Vacunas", "nombre": "Parvovirus y Erisipela" },
+  { "id_aplicacion": 5004, "especie": "Porcino", "categoria": "Suplementos", "nombre": "Hierro Dextrano (Lechones)" },
+  { "id_aplicacion": 5005, "especie": "Porcino", "categoria": "Antiparasitarios", "nombre": "Desparasitación (Ivermectina/Doramectina)" },
+
+  { "id_aplicacion": 6001, "especie": "Ovino", "categoria": "Vacunas Clostridiales", "nombre": "Triple o Cuádruple (Mancha, Tétanos, Enterotoxemia)" },
+  { "id_aplicacion": 6002, "especie": "Ovino", "categoria": "Vacunas", "nombre": "Ectima Contagioso" },
+  { "id_aplicacion": 6003, "especie": "Ovino", "categoria": "Antiparasitarios", "nombre": "Antiparasitario Interno (Fasciolicida/Nematodicida)" },
+  { "id_aplicacion": 6004, "especie": "Ovino", "categoria": "Antiparasitarios", "nombre": "Baño Antisárnico / Melofaguicida" },
+
+  { "id_aplicacion": 7001, "especie": "Caprino", "categoria": "Vacunas Clostridiales", "nombre": "Triple o Cuádruple (Mancha, Tétanos, Enterotoxemia)" },
+  { "id_aplicacion": 7002, "especie": "Caprino", "categoria": "Vacunas", "nombre": "Ectima Contagioso" },
+  { "id_aplicacion": 7003, "especie": "Caprino", "categoria": "Antiparasitarios", "nombre": "Antiparasitario Interno" },
+  { "id_aplicacion": 7004, "especie": "Caprino", "categoria": "Suplementos", "nombre": "Suplemento de Selenio y Vitamina E" },
+
+  { "id_aplicacion": 8001, "especie": "Ave", "categoria": "Vacunas Esenciales", "nombre": "Enfermedad de Marek" },
+  { "id_aplicacion": 8002, "especie": "Ave", "categoria": "Vacunas Esenciales", "nombre": "Enfermedad de Newcastle" },
+  { "id_aplicacion": 8003, "especie": "Ave", "categoria": "Vacunas Esenciales", "nombre": "Bronquitis Infecciosa" },
+  { "id_aplicacion": 8004, "especie": "Ave", "categoria": "Vacunas", "nombre": "Viruela Aviar" },
+  { "id_aplicacion": 8005, "especie": "Ave", "categoria": "Vacunas", "nombre": "Gumboro (Enfermedad Infecciosa de la Bolsa)" }
+]

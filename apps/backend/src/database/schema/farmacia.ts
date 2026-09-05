@@ -25,6 +25,23 @@ import { consultas } from './hce';
 
 export const farmacia = pgSchema('farmacia');
 
+// Catálogo de referencia GLOBAL (no por organización, mismo criterio que
+// `core.especies`) importado del registro nacional de productos veterinarios
+// de SENASA (F4.1) — sólo para asistir la búsqueda al dar de alta un
+// producto propio (nombre/empresa/certificado, ver
+// `vademecum-senasa.service.ts`). No reemplaza `productos`: cada
+// organización sigue eligiendo qué tiene realmente en stock, esto es apenas
+// un buscador que autocompleta el nombre comercial. `certificado` NO es
+// único — el registro real tiene ~245 certificados repetidos (extensiones/
+// renovaciones bajo el mismo número), así que no hay constraint de
+// unicidad ni upsert por certificado, sólo un import de una sola vez.
+export const vademecumSenasa = farmacia.table('vademecum_senasa', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  certificado: text('certificado').notNull(),
+  nombreComercial: text('nombre_comercial').notNull(),
+  empresa: text('empresa'),
+});
+
 export const productos = farmacia.table('productos', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizacionId: uuid('organizacion_id')
@@ -78,6 +95,13 @@ export const stock = farmacia.table('stock', {
   cantidad: integer('cantidad').notNull().default(0),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  // Sumado junto con updated_at/deleted_at de movimientos_stock para poder
+  // sumar las 3 tablas de farmacia al registry de /sync (mismo gap que ya
+  // se había dado, y resuelto igual, con tropera.existencias en F1.5) — el
+  // motor genérico de pull/push asume estas dos columnas en toda tabla
+  // registrada. `stock` no tiene borrado real hoy (una fila por producto,
+  // se corrige, no se borra), pero la columna es requisito del motor.
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
 });
 
 export const tipoMovimientoStock = farmacia.enum('tipo_movimiento_stock', [
@@ -113,4 +137,10 @@ export const movimientosStock = farmacia.table('movimientos_stock', {
   consultaId: uuid('consulta_id').references(() => consultas.id),
   usuarioId: uuid('usuario_id').references(() => usuarios.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // Ver nota en `stock.deletedAt` — mismo motivo (requisito del motor de
+  // sync genérico). Un movimiento de stock nunca se edita ni se borra hoy
+  // (es un ledger), pero updated_at se bumpea igual si en el futuro se
+  // corrige algo puntual (ej. observaciones) sin pasar por otro movimiento.
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
 });

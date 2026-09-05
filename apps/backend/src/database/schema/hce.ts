@@ -4,7 +4,7 @@
  */
 import { pgSchema, uuid, text, timestamp, numeric, date, integer, boolean, time } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import { organizaciones, animales, usuarios, personas } from './core';
+import { organizaciones, animales, usuarios, personas, especies } from './core';
 // Referencia circular con farmacia.ts (que a su vez importa `consultas` de
 // acá) — Drizzle soporta esto porque `.references()` recibe un thunk, que
 // recién se evalúa en tiempo de consulta, no al cargar el módulo.
@@ -39,6 +39,12 @@ export const consultas = hce.table('consultas', {
   pesoKg: numeric('peso_kg', { precision: 6, scale: 2 }),
   temperaturaC: numeric('temperatura_c', { precision: 4, scale: 1 }),
   observaciones: text('observaciones'),
+  // Costo de la consulta — obligatorio a nivel DTO desde 2026-09-03, nullable
+  // acá para no romper las filas ya cargadas. Es sólo un dato de referencia
+  // en la ficha: no genera un cobro automático en caja (el cobro real, con
+  // método de pago y demás, se sigue cargando a mano desde Caja — mismo
+  // criterio de acoplamiento flojo que la dispensa F4.3).
+  costo: numeric('costo', { precision: 12, scale: 2 }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
@@ -59,9 +65,41 @@ export const vacunaciones = hce.table('vacunaciones', {
   fecha: date('fecha').notNull().default(sql`current_date`),
   proximaDosis: date('proxima_dosis'),
   loteProducto: text('lote_producto'),
+  // No nulo = el staff descartó el recordatorio de esta dosis (ej. ya se
+  // contactó al dueño y no quiere seguir viéndolo en la lista, o decidió
+  // que no aplica). No borra la vacunación ni la próxima dosis — sólo la
+  // saca de recordatorios(). Reversible a nivel de datos (columna, no soft
+  // delete) aunque hoy no hay UI para deshacer.
+  recordatorioDescartadoEn: timestamp('recordatorio_descartado_en', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
+});
+
+// Catálogo de referencia GLOBAL (no por organización, mismo criterio que
+// `core.especies` y `farmacia.vademecum_senasa`) de vacunas/antiparasitarios
+// comunes por especie — sólo asiste el campo `producto` (texto libre) de
+// `vacunaciones` con sugerencias filtradas por la especie del paciente, no
+// es una fuente de verdad ni un vínculo real con lo que se registra.
+export const catalogoVacunas = hce.table('catalogo_vacunas', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  especieId: uuid('especie_id')
+    .notNull()
+    .references(() => especies.id),
+  categoria: text('categoria').notNull(),
+  nombre: text('nombre').notNull(),
+});
+
+// Mismo criterio que `catalogoVacunas` — catálogo de referencia GLOBAL de
+// diagnósticos comunes por especie, sólo asiste el campo `diagnostico`
+// (texto libre) de `consultas`.
+export const catalogoDiagnosticos = hce.table('catalogo_diagnosticos', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  especieId: uuid('especie_id')
+    .notNull()
+    .references(() => especies.id),
+  categoria: text('categoria').notNull(),
+  nombre: text('nombre').notNull(),
 });
 
 export const categoriaMacro = hce.enum('categoria_macro', [

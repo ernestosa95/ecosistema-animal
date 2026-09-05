@@ -6,7 +6,10 @@ import type {
 } from '../api/types';
 import { camposDeEspecie } from '../config/especieDatos';
 import { CamposEspecie } from '../components/CamposEspecie';
+import { BuscadorCatalogoVacunas } from '../components/BuscadorCatalogoVacunas';
+import { BuscadorCatalogoDiagnosticos } from '../components/BuscadorCatalogoDiagnosticos';
 import { useFormularioPersistente, hayBorrador } from '../hooks/useFormularioPersistente';
+import { comprimirImagen } from '../utils/comprimirImagen';
 
 export function PacienteDetallePage({
   sesion,
@@ -36,11 +39,32 @@ export function PacienteDetallePage({
   const [editandoConsultaId, setEditandoConsultaId] = useState<string | null>(null);
   const [dispensandoConsultaId, setDispensandoConsultaId] = useState<string | null>(null);
   const [indicandoConsultaId, setIndicandoConsultaId] = useState<string | null>(null);
+  const [menuConsultaId, setMenuConsultaId] = useState<string | null>(null);
   const [mostrarVacuna, setMostrarVacuna] = useState(() => !!abrirVacuna);
   const [editando, setEditando] = useState(false);
   const [generandoCarnet, setGenerandoCarnet] = useState(false);
   const [generandoFicha, setGenerandoFicha] = useState(false);
   const [itemLinea, setItemLinea] = useState<ItemLinea | null>(null);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const [errorFoto, setErrorFoto] = useState<string | null>(null);
+
+  async function elegirFoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const archivo = e.target.files?.[0];
+    e.target.value = '';
+    if (!archivo) return;
+    setErrorFoto(null);
+    setSubiendoFoto(true);
+    try {
+      const comprimida = await comprimirImagen(archivo);
+      const actualizado = await api.subirFotoAnimal(sesion, animal.id, comprimida);
+      setAnimal(actualizado);
+      api.registrarEvento(sesion, 'accion', 'foto-subir');
+    } catch (err) {
+      setErrorFoto(err instanceof Error ? err.message : 'No se pudo subir la foto');
+    } finally {
+      setSubiendoFoto(false);
+    }
+  }
 
   const especieNombre = useMemo(
     () => especies.find((e) => e.id === animal.especieId)?.nombre ?? '—',
@@ -125,6 +149,7 @@ export function PacienteDetallePage({
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      api.registrarEvento(sesion, 'accion', tipo === 'carnet' ? 'carnet-generar' : 'ficha-generar');
     } catch (e) {
       const nombre = tipo === 'carnet' ? 'el carnet' : 'la ficha';
       alert(`No se pudo generar ${nombre}: ` + (e instanceof Error ? e.message : 'error'));
@@ -137,6 +162,7 @@ export function PacienteDetallePage({
     if (!confirm('¿Borrar esta consulta? No se puede deshacer.')) return;
     try {
       await api.eliminarConsulta(sesion, id);
+      api.registrarEvento(sesion, 'accion', 'consulta-borrar');
       if (editandoConsultaId === id) setEditandoConsultaId(null);
       cargar();
     } catch (e) {
@@ -155,7 +181,16 @@ export function PacienteDetallePage({
       <div className="layout-2col">
       <div className="layout-main">
       <div className="page-head">
-        <h1>{animal.nombre}</h1>
+        <div className="pac-titulo-foto">
+          <label className="pac-avatar" title={subiendoFoto ? 'Subiendo…' : animal.fotoUrl ? 'Cambiar foto' : '+ Agregar foto'}>
+            {animal.fotoUrl ? <img src={animal.fotoUrl} alt={animal.nombre} /> : <span>🐾</span>}
+            <input type="file" accept="image/*" disabled={subiendoFoto} onChange={elegirFoto} />
+          </label>
+          <div>
+            <h1>{animal.nombre}</h1>
+            {errorFoto && <div className="pac-avatar-err">{errorFoto}</div>}
+          </div>
+        </div>
         <div className="acciones">
           <span className="chip">{animal.estado}</span>
           <button className="btn-ghost" onClick={() => abrirDocumento('ficha')} disabled={generandoFicha}>
@@ -222,11 +257,18 @@ export function PacienteDetallePage({
         <ConsultaForm
           sesion={sesion}
           animalId={animal.id}
+          especieId={animal.especieId}
           macros={macros}
           previa={consultas[0]}
-          onGuardada={() => {
+          onGuardada={(creada) => {
             setMostrarConsulta(false);
             cargar();
+            // Sigue directo a indicar medicamento/plan de tratamiento para la
+            // consulta recién creada, sin tener que reabrirla por el menú ⋮.
+            if (creada) {
+              setDispensandoConsultaId(creada.id);
+              setIndicandoConsultaId(creada.id);
+            }
           }}
         />
       )}
@@ -251,6 +293,7 @@ export function PacienteDetallePage({
                 <th>Diagnóstico</th>
                 <th>Tratamiento</th>
                 <th>Peso</th>
+                <th>Costo</th>
                 <th />
               </tr>
             </thead>
@@ -258,10 +301,11 @@ export function PacienteDetallePage({
               {consultasPagina.map((c) =>
                 editandoConsultaId === c.id ? (
                   <tr key={c.id}>
-                    <td colSpan={6}>
+                    <td colSpan={7}>
                       <ConsultaForm
                         sesion={sesion}
                         animalId={animal.id}
+                        especieId={animal.especieId}
                         consulta={c}
                         macros={macros}
                         onGuardada={() => {
@@ -280,35 +324,60 @@ export function PacienteDetallePage({
                       <td>{c.diagnostico ?? '—'}</td>
                       <td>{c.tratamiento ?? '—'}</td>
                       <td>{c.pesoKg ? `${c.pesoKg} kg` : '—'}</td>
-                      <td>
+                      <td>{c.costo != null ? `$${c.costo}` : '—'}</td>
+                      <td className="menu-fila">
                         <button
-                          className="link"
-                          onClick={() =>
-                            setDispensandoConsultaId(dispensandoConsultaId === c.id ? null : c.id)
-                          }
+                          className="menu-fila-btn"
+                          aria-label="Acciones de esta consulta"
+                          onClick={() => setMenuConsultaId(menuConsultaId === c.id ? null : c.id)}
                         >
-                          {dispensandoConsultaId === c.id ? 'Cerrar' : 'Dispensar'}
-                        </button>{' '}
-                        <button
-                          className="link"
-                          onClick={() =>
-                            setIndicandoConsultaId(indicandoConsultaId === c.id ? null : c.id)
-                          }
-                        >
-                          {indicandoConsultaId === c.id ? 'Cerrar' : 'Indicación'}
-                        </button>{' '}
-                        <button
-                          className="link"
-                          onClick={() => {
-                            setMostrarConsulta(false);
-                            setEditandoConsultaId(c.id);
-                          }}
-                        >
-                          Editar
-                        </button>{' '}
-                        <button className="link" onClick={() => borrarConsulta(c.id)}>
-                          Borrar
+                          ⋮
                         </button>
+                        {menuConsultaId === c.id && (
+                          <>
+                            <div className="overlay-transparente" onClick={() => setMenuConsultaId(null)} />
+                            <div className="menu-fila-dropdown">
+                              <button
+                                className="dropdown-item"
+                                onClick={() => {
+                                  setMenuConsultaId(null);
+                                  setDispensandoConsultaId(dispensandoConsultaId === c.id ? null : c.id);
+                                }}
+                              >
+                                💊 {dispensandoConsultaId === c.id ? 'Cerrar' : 'Indicar medicamento'}
+                              </button>
+                              <button
+                                className="dropdown-item"
+                                onClick={() => {
+                                  setMenuConsultaId(null);
+                                  setIndicandoConsultaId(indicandoConsultaId === c.id ? null : c.id);
+                                }}
+                              >
+                                📋 {indicandoConsultaId === c.id ? 'Cerrar indicación' : 'Indicación'}
+                              </button>
+                              <div className="dropdown-divider" />
+                              <button
+                                className="dropdown-item"
+                                onClick={() => {
+                                  setMenuConsultaId(null);
+                                  setMostrarConsulta(false);
+                                  setEditandoConsultaId(c.id);
+                                }}
+                              >
+                                ✏️ Editar
+                              </button>
+                              <button
+                                className="dropdown-item"
+                                onClick={() => {
+                                  setMenuConsultaId(null);
+                                  borrarConsulta(c.id);
+                                }}
+                              >
+                                🗑️ Borrar
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </td>
                     </tr>
                     {dispensandoConsultaId === c.id && (
@@ -441,6 +510,7 @@ export function PacienteDetallePage({
             <NuevaVacunacionForm
               sesion={sesion}
               animalId={animal.id}
+              especieId={animal.especieId}
               onCreada={() => {
                 setMostrarVacuna(false);
                 cargar();
@@ -510,6 +580,7 @@ function EditarPacienteForm({
         datosEspecificos,
       };
       const actualizado = await api.actualizarAnimal(sesion, animal.id, data);
+      api.registrarEvento(sesion, 'accion', 'paciente-editar');
       onGuardado(actualizado);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
@@ -592,6 +663,7 @@ function EditarPacienteForm({
 function ConsultaForm({
   sesion,
   animalId,
+  especieId,
   consulta,
   macros = [],
   previa,
@@ -600,11 +672,14 @@ function ConsultaForm({
 }: {
   sesion: Sesion;
   animalId: string;
+  especieId: string;
   consulta?: Consulta;
   macros?: Macro[];
   /** Consulta anterior del mismo animal, para precargar constantes vitales (delta editing, §3.1). */
   previa?: Consulta;
-  onGuardada: () => void;
+  /** En un alta nueva (no edición) recibe la consulta recién creada, para poder
+   * seguir directo a indicar medicamento/plan de tratamiento sin re-navegar. */
+  onGuardada: (consultaCreada?: Consulta) => void;
   onCancelar?: () => void;
 }) {
   // Persistencia local: clave separada por paciente+consulta (una consulta
@@ -623,11 +698,15 @@ function ConsultaForm({
       pesoKg: consulta?.pesoKg ?? previa?.pesoKg ?? '',
       temperaturaC: consulta?.temperaturaC ?? previa?.temperaturaC ?? '',
       observaciones: consulta?.observaciones ?? '',
+      // Por defecto en 0 (no vacío) para no obligar a tipear en cada alta —
+      // ya queda "solicitado" con sólo mostrarlo, y 0 es un valor válido
+      // (cortesía) igual que antes.
+      costo: consulta?.costo ?? '0',
     },
   );
   const campo = <K extends keyof typeof form>(k: K) => (v: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
-  const { motivo, anamnesis, examenFisico, diagnostico, tratamiento, pesoKg, temperaturaC, observaciones } = form;
+  const { motivo, anamnesis, examenFisico, diagnostico, tratamiento, pesoKg, temperaturaC, observaciones, costo } = form;
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -645,13 +724,18 @@ function ConsultaForm({
       if (observaciones) data.observaciones = observaciones;
       if (pesoKg) data.pesoKg = Number(pesoKg);
       if (temperaturaC) data.temperaturaC = Number(temperaturaC);
+      if (costo !== '') data.costo = Number(costo);
       if (consulta) {
         await api.actualizarConsulta(sesion, consulta.id, data);
+        api.registrarEvento(sesion, 'accion', 'consulta-editar');
+        limpiarBorrador();
+        onGuardada();
       } else {
-        await api.crearConsulta(sesion, data);
+        const creada = await api.crearConsulta(sesion, data);
+        api.registrarEvento(sesion, 'accion', 'consulta-crear');
+        limpiarBorrador();
+        onGuardada(creada);
       }
-      limpiarBorrador();
-      onGuardada();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
     } finally {
@@ -682,7 +766,13 @@ function ConsultaForm({
       <label>
         Diagnóstico
         <MacroPicker categoria="diagnostico" macros={macros} onInsertar={(t) => campo('diagnostico')(t)} />
-        <input value={diagnostico} onChange={(e) => campo('diagnostico')(e.target.value)} />
+        <BuscadorCatalogoDiagnosticos
+          sesion={sesion}
+          especieId={especieId}
+          valor={diagnostico}
+          onCambiar={campo('diagnostico')}
+          placeholder="Buscar en el catálogo común o escribir uno nuevo…"
+        />
       </label>
       <label>
         Tratamiento
@@ -714,6 +804,16 @@ function ConsultaForm({
         {!consulta && previa?.temperaturaC && (
           <span className="muted hint-previo">Anterior: {previa.temperaturaC} °C</span>
         )}
+      </label>
+      <label>
+        Costo
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          value={costo}
+          onChange={(e) => campo('costo')(e.target.value)}
+        />
       </label>
       {error && <div className="alerta span-2">{error}</div>}
       <div className="span-2 acciones">
@@ -768,7 +868,8 @@ function MacroPicker({
 }
 
 /**
- * Dispensa de fármacos ligada a una consulta (F4.3): lista lo ya dispensado
+ * Medicamentos indicados en una consulta (F4.3, antes llamado "Dispensa de
+ * fármacos" — el nombre no comunicaba bien la acción): lista lo ya indicado
  * (movimientos de stock tipo 'uso' con esta consultaId) y permite cargar uno
  * nuevo, que descuenta stock vía el mismo endpoint que usa Farmacia.
  */
@@ -795,7 +896,7 @@ function DispensaPanel({
       const d = await api.movimientosStock(sesion, undefined, consultaId);
       setDispensas(d);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar dispensas');
+      setError(err instanceof Error ? err.message : 'Error al cargar los medicamentos indicados');
     } finally {
       setCargando(false);
     }
@@ -822,12 +923,13 @@ function DispensaPanel({
         consultaId,
         observaciones: observaciones || undefined,
       });
+      api.registrarEvento(sesion, 'accion', 'medicamento-indicar');
       setProductoId('');
       setCantidad('');
       setObservaciones('');
       cargar();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo dispensar');
+      setError(err instanceof Error ? err.message : 'No se pudo indicar el medicamento');
     } finally {
       setGuardando(false);
     }
@@ -835,11 +937,11 @@ function DispensaPanel({
 
   return (
     <div className="card">
-      <div className="form-titulo">Dispensa de fármacos</div>
+      <div className="form-titulo">Medicamentos indicados</div>
       {cargando ? (
         <p className="muted">Cargando…</p>
       ) : dispensas.length === 0 ? (
-        <p className="muted">Todavía no se dispensó nada en esta consulta.</p>
+        <p className="muted">Todavía no se indicó ningún medicamento en esta consulta.</p>
       ) : (
         <table className="tabla">
           <thead>
@@ -891,7 +993,7 @@ function DispensaPanel({
         {error && <div className="alerta span-2">{error}</div>}
         <div className="span-2">
           <button className="btn" type="submit" disabled={guardando || productos.length === 0}>
-            {guardando ? 'Dispensando…' : 'Dispensar'}
+            {guardando ? 'Guardando…' : 'Indicar medicamento'}
           </button>
           {productos.length === 0 && (
             <span className="muted" style={{ marginLeft: '0.5rem' }}>
@@ -992,6 +1094,7 @@ function IndicacionesPanel({
       if (observaciones) data.observaciones = observaciones;
 
       await api.crearIndicacion(sesion, data);
+      api.registrarEvento(sesion, 'accion', 'indicacion-crear');
 
       if (origen === 'stock_interno' && cantidadStock && Number(cantidadStock) > 0) {
         try {
@@ -1028,6 +1131,7 @@ function IndicacionesPanel({
   async function alternarActivo(i: Indicacion) {
     try {
       await api.actualizarIndicacion(sesion, i.id, { activo: !i.activo });
+      api.registrarEvento(sesion, 'accion', 'indicacion-alternar');
       cargar();
     } catch (err) {
       alert('No se pudo actualizar: ' + (err instanceof Error ? err.message : 'error'));
@@ -1038,6 +1142,7 @@ function IndicacionesPanel({
     if (!confirm('¿Borrar esta indicación?')) return;
     try {
       await api.eliminarIndicacion(sesion, id);
+      api.registrarEvento(sesion, 'accion', 'indicacion-borrar');
       cargar();
     } catch (err) {
       alert('No se pudo borrar: ' + (err instanceof Error ? err.message : 'error'));
@@ -1195,10 +1300,12 @@ function IndicacionesPanel({
 function NuevaVacunacionForm({
   sesion,
   animalId,
+  especieId,
   onCreada,
 }: {
   sesion: Sesion;
   animalId: string;
+  especieId: string;
   onCreada: () => void;
 }) {
   const [producto, setProducto] = useState('');
@@ -1218,6 +1325,7 @@ function NuevaVacunacionForm({
       if (proximaDosis) data.proximaDosis = proximaDosis;
       if (loteProducto) data.loteProducto = loteProducto;
       await api.registrarVacunacion(sesion, data);
+      api.registrarEvento(sesion, 'accion', 'vacunacion-crear');
       onCreada();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
@@ -1230,7 +1338,13 @@ function NuevaVacunacionForm({
     <form className="card form-grid" onSubmit={guardar}>
       <label className="span-2">
         Producto
-        <input value={producto} onChange={(e) => setProducto(e.target.value)} required />
+        <BuscadorCatalogoVacunas
+          sesion={sesion}
+          especieId={especieId}
+          valor={producto}
+          onCambiar={setProducto}
+          placeholder="Buscar en el catálogo común o escribir uno nuevo…"
+        />
       </label>
       <label>
         Fecha de aplicación

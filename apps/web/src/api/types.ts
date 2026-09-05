@@ -26,6 +26,7 @@ export interface Animal {
   estado: string;
   datosEspecificos?: Record<string, unknown>;
   personaId?: string | null;
+  fotoUrl?: string | null;
 }
 
 export interface Persona {
@@ -53,6 +54,7 @@ export interface Consulta {
   temperaturaC?: string | null;
   observaciones?: string | null;
   veterinarioId?: string | null;
+  costo?: string | null;
 }
 
 // --- Macros (Fase B, §3.1: bloques de texto predefinidos por categoría) ---
@@ -112,6 +114,7 @@ export interface ConsultaResumen {
   motivo?: string | null;
   diagnostico?: string | null;
   pesoKg?: string | null;
+  costo?: string | null;
   animalId: string;
   pacienteNombre?: string | null;
 }
@@ -125,6 +128,14 @@ export interface Vacunacion {
   proximaDosis?: string | null; // 'YYYY-MM-DD'
   loteProducto?: string | null;
   veterinarioId?: string | null;
+}
+
+/** Fila del catálogo de referencia por especie (vacunas/antiparasitarios comunes) — sólo asiste el alta. */
+export interface ItemCatalogoVacunas {
+  id: string;
+  especieId: string;
+  categoria: string;
+  nombre: string;
 }
 
 export interface RecordatorioVacuna {
@@ -322,6 +333,14 @@ export interface Producto {
   precioCompra?: string | null;
 }
 
+/** Fila del catálogo de referencia de SENASA (F4.1) — no es un `Producto` propio, sólo asiste el alta. */
+export interface ProductoSenasa {
+  id: string;
+  certificado: string;
+  nombreComercial: string;
+  empresa: string | null;
+}
+
 export interface StockItem {
   productoId: string;
   nombre: string;
@@ -429,4 +448,16 @@ export interface Egreso {
   concepto: string;
   monto: string;
   createdAt: string;
+}
+
+export interface EstadisticasCaja {
+  desde: string;
+  hasta: string;
+  totalCobros: number;
+  totalEgresos: number;
+  neto: number;
+  cantidadCobros: number;
+  cantidadCajas: number;
+  porMetodoPago: Array<{ metodoPago: string; total: number }>;
+  porDia: Array<{ fecha: string; totalCobros: number; totalEgresos: number }>;
 }
