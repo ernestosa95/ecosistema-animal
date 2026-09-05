@@ -1,8 +1,8 @@
 import type { Sesion, Especie, Animal, Consulta, Persona, Turno,
-  EstadoTurno, RecordatorioVacuna, Vacunacion, Establecimiento, Existencia, CategoriaHacienda,
-  Movimiento, Evento, Producto, StockItem, MovimientoStock,
+  EstadoTurno, RecordatorioVacuna, Vacunacion, ItemCatalogoVacunas, Establecimiento, Existencia, CategoriaHacienda,
+  Movimiento, Evento, Producto, ProductoSenasa, StockItem, MovimientoStock,
   ResumenDashboard, MensajePlataforma, Macro, CategoriaMacro, Indicacion, ConsultaResumen,
-  Caja, Cobro, Egreso, EstadoAuditoriaCaja, AnimalCampo, Hallazgo, ToroVirtual, Muestra, EvaluacionAndrologica,
+  Caja, Cobro, Egreso, EstadisticasCaja, EstadoAuditoriaCaja, AnimalCampo, Hallazgo, ToroVirtual, Muestra, EvaluacionAndrologica,
   Potrero, PlantillaTareas, ProtocoloIatf, Tarea, EstadoTarea } from './types';
 
 const API = (import.meta.env.VITE_API_URL as string) || 'http://localhost:3000';
@@ -76,6 +76,26 @@ async function pedir(s: Sesion, path: string, options: RequestInit = {}): Promis
   return handle(res2);
 }
 
+/** Como `pedir`, pero para `multipart/form-data` — sin forzar Content-Type (el browser arma el boundary solo). */
+async function pedirArchivo(s: Sesion, path: string, form: FormData): Promise<any> {
+  const headersArchivo = (sesion: Sesion): Record<string, string> => {
+    const h: Record<string, string> = {};
+    if (sesion.token) h['Authorization'] = `Bearer ${sesion.token}`;
+    if (sesion.organizacionId) h['X-Organizacion-Id'] = sesion.organizacionId;
+    return h;
+  };
+  const res = await fetch(`${API}${path}`, { method: 'POST', headers: headersArchivo(s), body: form });
+  if (res.status !== 401 || !s.refreshToken) return handle(res);
+
+  const tokens = await refrescarTokens(s.refreshToken);
+  if (!tokens) return handle(res);
+
+  _onRefresco?.(tokens);
+  const sNueva: Sesion = { ...s, token: tokens.accessToken, refreshToken: tokens.refreshToken };
+  const res2 = await fetch(`${API}${path}`, { method: 'POST', headers: headersArchivo(sNueva), body: form });
+  return handle(res2);
+}
+
 export interface RegisterData {
   email: string;
   password: string;
@@ -85,6 +105,15 @@ export interface RegisterData {
 }
 
 export const api = {
+  /**
+   * Analítica de uso (a pedido del super-admin, ver AdminPage.tsx →
+   * "Analítica"): fire-and-forget, nunca debe romper la UI si falla — de
+   * ahí el `.catch` silencioso y que la función no devuelva la promesa.
+   */
+  registrarEvento(s: Sesion, tipo: 'pantalla' | 'accion', nombre: string): void {
+    pedir(s, '/analitica/eventos', { method: 'POST', body: JSON.stringify({ tipo, nombre }) }).catch(() => {});
+  },
+
   register(data: RegisterData): Promise<{ accessToken: string; refreshToken: string }> {
     return fetch(`${API}/auth/register`, {
       method: 'POST',
@@ -108,6 +137,23 @@ export const api = {
     }).then(handle);
   },
 
+  /** "Olvidé mi contraseña" — siempre resuelve igual, exista o no el email (no filtra cuentas). */
+  olvidePassword(email: string): Promise<{ ok: true }> {
+    return fetch(`${API}/auth/forgot-password`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ email }),
+    }).then(handle);
+  },
+
+  resetearPasswordConToken(token: string, password: string): Promise<{ ok: true }> {
+    return fetch(`${API}/auth/reset-password`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ token, password }),
+    }).then(handle);
+  },
+
   especies(s: Sesion): Promise<Especie[]> {
     return pedir(s, '/especies');
   },
@@ -126,6 +172,12 @@ export const api = {
 
   actualizarAnimal(s: Sesion, id: string, data: Record<string, unknown>): Promise<Animal> {
     return pedir(s, `/animales/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  },
+
+  subirFotoAnimal(s: Sesion, id: string, foto: Blob): Promise<Animal> {
+    const form = new FormData();
+    form.append('foto', foto, 'foto.jpg');
+    return pedirArchivo(s, `/animales/${id}/foto`, form);
   },
 
   personas(s: Sesion): Promise<Persona[]> {
@@ -200,12 +252,26 @@ export const api = {
     return pedir(s, `/vacunaciones/recordatorios?dias=${dias}`);
   },
 
+  descartarRecordatorioVacuna(s: Sesion, id: string): Promise<{ ok: boolean }> {
+    return pedir(s, `/vacunaciones/${id}/descartar-recordatorio`, { method: 'PATCH' });
+  },
+
   vacunacionesDeAnimal(s: Sesion, animalId: string): Promise<Vacunacion[]> {
     return pedir(s, `/vacunaciones/animal/${animalId}`);
   },
 
   registrarVacunacion(s: Sesion, data: Record<string, unknown>): Promise<Vacunacion> {
     return pedir(s, '/vacunaciones', { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  /** Catálogo de referencia (vacunas/antiparasitarios comunes) filtrado por especie — sólo asiste el alta. */
+  catalogoVacunas(s: Sesion, especieId: string): Promise<ItemCatalogoVacunas[]> {
+    return pedir(s, `/hce/catalogo-vacunas?especieId=${especieId}`);
+  },
+
+  /** Catálogo de referencia (diagnósticos comunes) filtrado por especie — sólo asiste el campo del mismo nombre. */
+  catalogoDiagnosticos(s: Sesion, especieId: string): Promise<ItemCatalogoVacunas[]> {
+    return pedir(s, `/hce/catalogo-diagnosticos?especieId=${especieId}`);
   },
 
   veterinarios(s: Sesion): Promise<Veterinario[]> {
@@ -270,6 +336,18 @@ export const api = {
     return pedir(s, '/usuarios');
   },
 
+  /** Alta de un miembro de la propia organización (propietario/admin) — respeta el cupo del plan. */
+  agregarMiembro(s: Sesion, data: {
+    email: string; roles: string[]; nombre?: string; apellido?: string; password?: string;
+  }): Promise<{ creado: boolean; roles: string[]; usuario: { id: string; email: string; nombre: string | null; apellido: string | null } }> {
+    return pedir(s, '/usuarios', { method: 'POST', body: JSON.stringify(data) });
+  },
+
+  /** Cupo por rol del plan de la organización + cuántos hay usados hoy. */
+  limitesPlan(s: Sesion): Promise<Record<string, { limite: number | null; usados: number }>> {
+    return pedir(s, '/usuarios/limites-plan');
+  },
+
   resetearPassword(s: Sesion, usuarioId: string, nuevaPassword?: string): Promise<ResetPasswordResultado> {
     return pedir(s, `/usuarios/${usuarioId}/password`, {
       method: 'PATCH',
@@ -292,6 +370,11 @@ export const api = {
 
   actualizarProducto(s: Sesion, id: string, data: Record<string, unknown>): Promise<Producto> {
     return pedir(s, `/farmacia/productos/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+  },
+
+  /** Buscador contra el catálogo de referencia de SENASA (F4.1) — sólo asiste el alta de un producto. */
+  buscarVademecumSenasa(s: Sesion, termino: string): Promise<ProductoSenasa[]> {
+    return pedir(s, `/farmacia/vademecum-senasa?buscar=${encodeURIComponent(termino)}`);
   },
 
   stock(s: Sesion): Promise<StockItem[]> {
@@ -347,6 +430,15 @@ export const api = {
 
   auditarCaja(s: Sesion, id: string, data: { estadoAuditoria: string; observaciones?: string }): Promise<Caja> {
     return pedir(s, `/caja/cajas/${id}/auditoria`, { method: 'PATCH', body: JSON.stringify(data) });
+  },
+
+  /** Totales del período (últimos 30 días si no se pasan fechas) — análisis rápido para propietario/gerente. */
+  estadisticasCaja(s: Sesion, desde?: string, hasta?: string): Promise<EstadisticasCaja> {
+    const q = new URLSearchParams();
+    if (desde) q.set('desde', desde);
+    if (hasta) q.set('hasta', hasta);
+    const qs = q.toString();
+    return pedir(s, `/caja/cajas/estadisticas${qs ? `?${qs}` : ''}`);
   },
 
   crearCobro(s: Sesion, data: Record<string, unknown>): Promise<Cobro> {

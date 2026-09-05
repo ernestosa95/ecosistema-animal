@@ -175,6 +175,7 @@ function PersonaFila({
     try {
       const r = await api.generarAccesoPortal(sesion, persona.id);
       setPortalUrl(r.portalUrl);
+      api.registrarEvento(sesion, 'accion', 'portal-generar-acceso');
     } catch (err) {
       setErrorPortal(err instanceof Error ? err.message : 'No se pudo generar el acceso');
     } finally {
@@ -274,8 +275,10 @@ function DuenoForm({
       data.domicilio = domicilio || undefined;
       if (esEdicion && inicial) {
         await api.actualizarPersona(sesion, inicial.id, data);
+        api.registrarEvento(sesion, 'accion', 'dueno-editar');
       } else {
         await api.crearPersona(sesion, data);
+        api.registrarEvento(sesion, 'accion', 'dueno-crear');
       }
       onGuardado();
     } catch (err) {

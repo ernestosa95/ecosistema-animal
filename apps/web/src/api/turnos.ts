@@ -105,6 +105,16 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
   return manejarRespuesta(res2);
 }
 
+/**
+ * Analítica de uso (mismo endpoint que `api.registrarEvento` de client.ts,
+ * duplicado acá porque este archivo mantiene su propia sesión — ver
+ * comentario de arriba) — fire-and-forget, nunca debe romper la UI.
+ */
+export function registrarEvento(tipo: 'pantalla' | 'accion', nombre: string): void {
+  if (!_sesion) return;
+  request('/analitica/eventos', { method: 'POST', body: JSON.stringify({ tipo, nombre }) }).catch(() => {});
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Tipos que usa la UI
 // ─────────────────────────────────────────────────────────────────────────
@@ -242,14 +252,17 @@ function mapTurno(r: any, cat: Awaited<ReturnType<typeof catalogos>>): Turno {
 // ─────────────────────────────────────────────────────────────────────────
 // Endpoints de turnos
 // ─────────────────────────────────────────────────────────────────────────
-export async function listarTurnos(fecha: string): Promise<Turno[]> {
+/** Sin `hasta`, trae sólo el día de `fecha`. Con `hasta`, trae el rango [fecha, hasta] completo. */
+export async function listarTurnos(fecha: string, hasta?: string): Promise<Turno[]> {
   const cat = await catalogos();
-  const desde = `${fecha}T00:00:00`;
-  const hasta = `${fecha}T23:59:59`;
+  const desdeISO = `${fecha}T00:00:00`;
+  const hastaISO = `${hasta ?? fecha}T23:59:59`;
   const rows: any[] = await request(
-    `/turnos?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`,
+    `/turnos?desde=${encodeURIComponent(desdeISO)}&hasta=${encodeURIComponent(hastaISO)}`,
   );
-  return rows.map((r) => mapTurno(r, cat)).sort((a, b) => a.hora.localeCompare(b.hora));
+  return rows
+    .map((r) => mapTurno(r, cat))
+    .sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
 }
 
 /** Cuenta turnos por día en un rango (para marcar el calendario). 1 sola request, sin enriquecer. */

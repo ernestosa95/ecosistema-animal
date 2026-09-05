@@ -8,9 +8,12 @@ import {
   listarGrupos, crearGrupo, actualizarGrupo, eliminarGrupo,
   listarPlanes, crearPlan, actualizarPlan, eliminarPlan,
   listarMensajesAdmin, crearMensaje, eliminarMensaje,
+  resumenPagos, gananciasPorPeriodo, listarPagosOrg, registrarPago, resumenAnalitica,
   type Organizacion, type Miembro, type Grupo, type Plan, type MensajeAdmin, type DestinatarioTipo,
+  type ResumenPagoOrg, type GananciasPeriodo, type Pago, type ResumenAnalitica,
 } from '../api/admin';
 import { listarSolicitudes, aprobarSolicitud, rechazarSolicitud, type Solicitud } from '../api/solicitudes';
+import { InfoRoles } from '../components/InfoRoles';
 
 const ROLES: Array<{ v: string; label: string }> = [
   { v: 'veterinario', label: 'Veterinario' },
@@ -27,6 +30,16 @@ function etiquetaSoluciones(o: { huellaActiva: boolean; troperaActiva: boolean }
   if (o.huellaActiva) return 'Huella';
   if (o.troperaActiva) return 'Tropera';
   return 'sin soluciones';
+}
+
+/** Chip con color puntual (activo/inactivo, vencido, contador de pendientes) sobre la clase global `.chip`. */
+function EstadoChip({ texto, tono = 'advertencia' }: { texto: string; tono?: 'advertencia' | 'peligro' | 'ok' }) {
+  const paleta = tono === 'peligro'
+    ? { background: 'var(--danger-bg)', color: 'var(--danger)' }
+    : tono === 'ok'
+      ? { background: 'rgba(92, 138, 78, 0.14)', color: 'var(--verde-dark)' }
+      : { background: 'var(--advertencia-bg)', color: 'var(--advertencia)' };
+  return <span className="chip" style={paleta}>{texto}</span>;
 }
 
 export default function AdminPage() {
@@ -51,35 +64,85 @@ function Login({ onOk }: { onOk: () => void }) {
   }
 
   return (
-    <Shell>
-      <div className="adm-loginbox">
-        <h2>Administración de plataforma</h2>
-        <p className="adm-sub">Ingresá con tu cuenta de super-admin.</p>
-        <div className="adm-field"><label>Email</label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-        <div className="adm-field"><label>Contraseña</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && entrar()} /></div>
-        {error && <div className="adm-error">{error}</div>}
-        <button className="adm-btn primary" style={{ width: '100%' }} disabled={cargando} onClick={entrar}>
+    <div className="login-wrap">
+      <div className="card login-card">
+        <div className="brand brand-lg">
+          <span className="brand-dot" />
+          Ecosistema · Administración
+        </div>
+        <h1>Ingresar</h1>
+        <p className="muted" style={{ marginTop: '-0.5rem', marginBottom: '1rem' }}>
+          Ingresá con tu cuenta de super-admin.
+        </p>
+        <label>
+          Email
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        </label>
+        <label>
+          Contraseña
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && entrar()}
+          />
+        </label>
+        {error && <div className="alerta">{error}</div>}
+        <button className="btn" style={{ width: '100%' }} disabled={cargando} onClick={entrar}>
           {cargando ? 'Ingresando…' : 'Ingresar'}
         </button>
       </div>
-    </Shell>
+    </div>
   );
 }
 
 // ── Panel principal ───────────────────────────────────────────────────────
-type Seccion = 'organizaciones' | 'planes' | 'grupos' | 'mensajes';
+type Seccion = 'home' | 'organizaciones' | 'planes' | 'grupos' | 'mensajes' | 'analitica';
+
+const SECCIONES_NAV: Array<{ id: Seccion; titulo: string; icono: string }> = [
+  {
+    id: 'home',
+    titulo: 'Home',
+    icono: '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline>',
+  },
+  {
+    id: 'organizaciones',
+    titulo: 'Organizaciones',
+    icono: '<rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect>',
+  },
+  {
+    id: 'planes',
+    titulo: 'Planes',
+    icono: '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line>',
+  },
+  {
+    id: 'grupos',
+    titulo: 'Grupos',
+    icono: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>',
+  },
+  {
+    id: 'mensajes',
+    titulo: 'Mensajes',
+    icono: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path>',
+  },
+  {
+    id: 'analitica',
+    titulo: 'Analítica',
+    icono: '<line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line>',
+  },
+];
 
 function Panel({ onSalir }: { onSalir: () => void }) {
-  const [seccion, setSeccion] = useState<Seccion>('organizaciones');
+  const [seccion, setSeccion] = useState<Seccion>('home');
   const [orgs, setOrgs] = useState<Organizacion[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [planes, setPlanes] = useState<Plan[]>([]);
   const [sel, setSel] = useState<Organizacion | null>(null);
+  const [busquedaOrg, setBusquedaOrg] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
+  const [pagosResumen, setPagosResumen] = useState<ResumenPagoOrg[]>([]);
+  const [ganancias, setGanancias] = useState<GananciasPeriodo | null>(null);
 
   async function cargarOrgs() {
     setCargando(true); setError(null);
@@ -90,50 +153,73 @@ function Panel({ onSalir }: { onSalir: () => void }) {
         : (e.message ?? 'Error al cargar'));
     } finally { setCargando(false); }
   }
+  function cargarPagos() {
+    resumenPagos().then(setPagosResumen).catch(() => {});
+    gananciasPorPeriodo().then(setGanancias).catch(() => {});
+  }
   useEffect(() => {
     cargarOrgs();
+    cargarPagos();
     listarGrupos().then(setGrupos).catch(() => {});
     listarPlanes().then(setPlanes).catch(() => {});
   }, []);
 
   return (
-    <Shell onSalir={onSalir}>
-      <div className="adm-secnav">
-        {(['organizaciones', 'planes', 'grupos', 'mensajes'] as const).map((s) => (
-          <button
-            key={s}
-            className={`adm-secbtn ${seccion === s ? 'active' : ''}`}
-            onClick={() => setSeccion(s)}
-          >
-            {s === 'organizaciones' ? 'Organizaciones' : s === 'planes' ? 'Planes' : s === 'grupos' ? 'Grupos' : 'Mensajes'}
-          </button>
-        ))}
-      </div>
+    <Shell onSalir={onSalir} seccion={seccion} onSeccion={setSeccion}>
+      {error && <div className="alerta" style={{ marginBottom: 12 }}>{error}</div>}
 
-      {error && <div className="adm-error" style={{ marginBottom: 12 }}>{error}</div>}
+      {seccion === 'home' && (
+        <Home resumen={pagosResumen} ganancias={ganancias} onPagoRegistrado={cargarPagos} />
+      )}
 
       {seccion === 'organizaciones' && (
         <>
-          <Solicitudes orgs={orgs} />
-          <div className="adm-cols">
-            <div className="adm-col">
-              <h3>Organizaciones</h3>
-              {cargando ? <p className="adm-muted">Cargando…</p> : (
-                <>
-                  <div className="adm-list">
-                    {orgs.length === 0 && <p className="adm-muted">Todavía no hay organizaciones.</p>}
-                    {orgs.map((o) => (
-                      <button key={o.id} className={`adm-item ${sel?.id === o.id ? 'active' : ''}`} onClick={() => setSel(o)}>
-                        <b>{o.nombre}</b><span>{o.activo === false ? 'inactiva' : etiquetaSoluciones(o)}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <NuevaOrg onCreada={(o) => { setOrgs((prev) => [...prev, o].sort((a, b) => a.nombre.localeCompare(b.nombre))); setSel(o); }} />
-                </>
+          <Solicitudes orgs={orgs} planes={planes} onCambio={() => { cargarOrgs(); cargarPagos(); }} />
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 320px', minWidth: 0 }}>
+              <NuevaOrg onCreada={(o) => { setOrgs((prev) => [...prev, o].sort((a, b) => a.nombre.localeCompare(b.nombre))); setSel(o); setBusquedaOrg(''); }} />
+
+              <h3 style={{ marginTop: '1.25rem' }}>Organizaciones</h3>
+              {cargando ? <p className="muted">Cargando…</p> : (
+                <div className="card">
+                  <input
+                    type="search"
+                    value={busquedaOrg}
+                    onChange={(e) => setBusquedaOrg(e.target.value)}
+                    placeholder="Buscar organización…"
+                    style={{ marginBottom: '0.75rem' }}
+                  />
+                  {(() => {
+                    const q = busquedaOrg.trim().toLowerCase();
+                    const filtradas = q ? orgs.filter((o) => o.nombre.toLowerCase().includes(q)) : orgs;
+                    if (orgs.length === 0) return <p className="muted">Todavía no hay organizaciones.</p>;
+                    if (filtradas.length === 0) return <p className="muted">Sin resultados para "{busquedaOrg}".</p>;
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                        {filtradas.map((o) => (
+                          <button
+                            key={o.id}
+                            className="dropdown-item"
+                            style={{
+                              display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%',
+                              background: sel?.id === o.id ? 'var(--huella-bg)' : undefined,
+                            }}
+                            onClick={() => setSel(o)}
+                          >
+                            <b>{o.nombre}</b>
+                            <span className="muted" style={{ fontSize: '0.78rem', textTransform: 'capitalize' }}>
+                              {o.activo === false ? 'inactiva' : etiquetaSoluciones(o)}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
               )}
             </div>
 
-            <div className="adm-col">
+            <div style={{ flex: '1 1 380px', minWidth: 0 }}>
               {sel ? (
                 <Miembros
                   org={sel}
@@ -142,7 +228,7 @@ function Panel({ onSalir }: { onSalir: () => void }) {
                   onOrgActualizada={cargarOrgs}
                   onOrgEliminada={() => { cargarOrgs(); setSel(null); }}
                 />
-              ) : <p className="adm-muted">Elegí una organización para ver y agregar sus miembros.</p>}
+              ) : <p className="muted">Elegí una organización para ver y agregar sus miembros.</p>}
             </div>
           </div>
         </>
@@ -151,7 +237,159 @@ function Panel({ onSalir }: { onSalir: () => void }) {
       {seccion === 'planes' && <Planes planes={planes} onCambio={() => listarPlanes().then(setPlanes)} />}
       {seccion === 'grupos' && <Grupos grupos={grupos} onCambio={() => listarGrupos().then(setGrupos)} />}
       {seccion === 'mensajes' && <Mensajes orgs={orgs} grupos={grupos} />}
+      {seccion === 'analitica' && <Analitica />}
     </Shell>
+  );
+}
+
+// ── Home: pago por organización + ganancias acumuladas ─────────────────────
+function formatoMes(periodo: string): string {
+  const [año, mes] = periodo.slice(0, 7).split('-');
+  const nombres = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  return `${nombres[Number(mes) - 1]} ${año}`;
+}
+
+function Home({ resumen, ganancias, onPagoRegistrado }: {
+  resumen: ResumenPagoOrg[]; ganancias: GananciasPeriodo | null; onPagoRegistrado: () => void;
+}) {
+  const [orgPago, setOrgPago] = useState<ResumenPagoOrg | null>(null);
+  const hoy = new Date();
+
+  return (
+    <div>
+      <h3>Home</h3>
+      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <div style={{ flex: '2 1 480px', minWidth: 0 }} className="card">
+          <h4 className="form-titulo">Pago por organización</h4>
+          {resumen.length === 0 && <p className="muted">Todavía no hay organizaciones.</p>}
+          {resumen.length > 0 && (
+            <table className="tabla">
+              <thead>
+                <tr>
+                  <th>Organización</th>
+                  <th>Activación</th>
+                  <th>Próximo vencimiento</th>
+                  <th>Este mes</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {resumen.map((o) => {
+                  const vencido = new Date(o.proximoVencimiento) < hoy;
+                  return (
+                    <tr key={o.id}>
+                      <td><b>{o.nombre}</b>{!o.activo && <> <EstadoChip texto="inactiva" tono="peligro" /></>}</td>
+                      <td className="muted">{o.fechaActivacion ? o.fechaActivacion.slice(0, 10) : 'sin definir'}</td>
+                      <td>
+                        {o.proximoVencimiento.slice(0, 10)}
+                        {vencido && !o.pagoEsteMes && <> <EstadoChip texto="vencido" tono="peligro" /></>}
+                      </td>
+                      <td>
+                        {o.pagoEsteMes
+                          ? <EstadoChip texto="pagó" tono="ok" />
+                          : <EstadoChip texto="pendiente" tono="peligro" />}
+                      </td>
+                      <td>
+                        <button className="btn-ghost" onClick={() => setOrgPago(o)}>Registrar pago</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div style={{ flex: '1 1 260px', minWidth: 0 }} className="card">
+          <h4 className="form-titulo">Ganancias acumuladas</h4>
+          {!ganancias || ganancias.porPeriodo.length === 0
+            ? <p className="muted">Todavía no hay pagos registrados.</p>
+            : (
+              <>
+                <p style={{ fontSize: '1.4rem', fontWeight: 700, margin: '0 0 0.75rem' }}>
+                  ${ganancias.totalAcumulado.toLocaleString('es-AR')}
+                  <span className="muted" style={{ fontSize: '0.8rem', fontWeight: 400 }}> total histórico</span>
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  {ganancias.porPeriodo.slice(0, 12).map((p) => (
+                    <div key={p.periodo} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.88rem' }}>
+                      <span className="muted" style={{ textTransform: 'capitalize' }}>{formatoMes(p.periodo)}</span>
+                      <b>${Number(p.total).toLocaleString('es-AR')}</b>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+        </div>
+      </div>
+
+      {orgPago && (
+        <RegistrarPagoModal org={orgPago} onClose={() => setOrgPago(null)} onGuardado={() => { setOrgPago(null); onPagoRegistrado(); }} />
+      )}
+    </div>
+  );
+}
+
+function RegistrarPagoModal({ org, onClose, onGuardado }: {
+  org: ResumenPagoOrg; onClose: () => void; onGuardado: () => void;
+}) {
+  const [monto, setMonto] = useState('');
+  const [medioPago, setMedioPago] = useState('');
+  const [observaciones, setObservaciones] = useState('');
+  const [historial, setHistorial] = useState<Pago[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+
+  useEffect(() => { listarPagosOrg(org.id).then(setHistorial).catch(() => {}); }, [org.id]);
+
+  async function guardar() {
+    const n = Number(monto);
+    if (!monto.trim() || !Number.isFinite(n) || n <= 0) { setError('Ingresá un monto válido'); return; }
+    setGuardando(true); setError(null);
+    try {
+      await registrarPago(org.id, { monto: n, medioPago: medioPago.trim() || undefined, observaciones: observaciones.trim() || undefined });
+      onGuardado();
+    } catch (e: any) { setError(e.message ?? 'No se pudo registrar el pago'); }
+    finally { setGuardando(false); }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
+        <h4 className="form-titulo">Registrar pago — {org.nombre}</h4>
+        <label>
+          Monto
+          <input type="number" min={0} value={monto} onChange={(e) => setMonto(e.target.value)} placeholder="Ej: 15000" autoFocus />
+        </label>
+        <label>
+          Medio de pago (opcional)
+          <input value={medioPago} onChange={(e) => setMedioPago(e.target.value)} placeholder="Ej: transferencia" />
+        </label>
+        <label>
+          Observaciones (opcional)
+          <input value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
+        </label>
+        <p className="muted" style={{ fontSize: '0.82rem' }}>Se registra para el mes calendario en curso.</p>
+        {historial.length > 0 && (
+          <div style={{ marginBottom: '0.75rem' }}>
+            <p className="muted" style={{ fontSize: '0.82rem', marginBottom: '0.25rem' }}>Pagos anteriores</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', maxHeight: 120, overflowY: 'auto' }}>
+              {historial.slice(0, 6).map((p) => (
+                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                  <span className="muted">{formatoMes(p.periodo)}</span>
+                  <span>${Number(p.monto).toLocaleString('es-AR')}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {error && <div className="alerta">{error}</div>}
+        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+          <button className="btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn" disabled={guardando} onClick={guardar}>{guardando ? 'Guardando…' : 'Guardar pago'}</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -176,27 +414,29 @@ function NuevaOrg({ onCreada }: { onCreada: (o: Organizacion) => void }) {
   }
 
   return (
-    <div className="adm-formcard">
-      <h4>Nueva organización</h4>
-      <div className="adm-field"><label>Nombre</label>
-        <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Veterinaria San Roque" /></div>
-      <div className="adm-field">
-        <label>Soluciones habilitadas</label>
-        <div className="adm-roles-checks">
-          <label className="adm-check">
-            <input type="checkbox" checked={huellaActiva} onChange={(e) => setHuellaActiva(e.target.checked)} />
-            Huella
-          </label>
-          <label className="adm-check">
-            <input type="checkbox" checked={troperaActiva} onChange={(e) => setTroperaActiva(e.target.checked)} />
-            Tropera
-          </label>
-        </div>
+    <div className="card">
+      <h4 className="form-titulo">Nueva organización</h4>
+      <label>
+        Nombre
+        <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Veterinaria San Roque" />
+      </label>
+      <label>Soluciones habilitadas</label>
+      <div className="check-fila" style={{ marginBottom: '0.75rem' }}>
+        <label>
+          <input type="checkbox" checked={huellaActiva} onChange={(e) => setHuellaActiva(e.target.checked)} />
+          Huella
+        </label>
+        <label>
+          <input type="checkbox" checked={troperaActiva} onChange={(e) => setTroperaActiva(e.target.checked)} />
+          Tropera
+        </label>
       </div>
-      <div className="adm-field"><label>CUIT (opcional)</label>
-        <input value={cuit} onChange={(e) => setCuit(e.target.value)} /></div>
-      {error && <div className="adm-error">{error}</div>}
-      <button className="adm-btn primary" disabled={cargando} onClick={crear}>
+      <label>
+        CUIT (opcional)
+        <input value={cuit} onChange={(e) => setCuit(e.target.value)} />
+      </label>
+      {error && <div className="alerta">{error}</div>}
+      <button className="btn" disabled={cargando} onClick={crear}>
         {cargando ? 'Creando…' : 'Crear organización'}
       </button>
     </div>
@@ -258,49 +498,51 @@ function Miembros({ org, grupos, planes, onOrgActualizada, onOrgEliminada }: {
 
   return (
     <>
-      <h3>{org.nombre} {!activa && <span className="adm-tag-off">inactiva</span>}</h3>
+      <h3>{org.nombre} {!activa && <EstadoChip texto="inactiva" tono="peligro" />}</h3>
 
-      <div className="adm-lifebar">
-        <button className="adm-btn ghost" disabled={accion === 'activo'} onClick={toggleActivo}>
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+        <button className="btn-ghost" disabled={accion === 'activo'} onClick={toggleActivo}>
           {activa ? 'Desactivar' : 'Reactivar'}
         </button>
-        <button className="adm-btn ghost" disabled={accion === 'export'} onClick={exportar}>
+        <button className="btn-ghost" disabled={accion === 'export'} onClick={exportar}>
           {accion === 'export' ? 'Exportando…' : 'Exportar datos'}
         </button>
-        <button className="adm-btn danger" onClick={() => setConfirmarEliminar(true)}>Eliminar</button>
+        <button className="btn-danger" onClick={() => setConfirmarEliminar(true)}>Eliminar</button>
       </div>
 
-      {error && <div className="adm-error">{error}</div>}
+      {error && <div className="alerta">{error}</div>}
 
       <SolucionesOrg org={org} onActualizada={onOrgActualizada} />
 
       <AccesoOrg org={org} grupos={grupos} planes={planes} onActualizada={onOrgActualizada} />
 
-      <h4 className="adm-h4">Miembros</h4>
-      {cargando ? <p className="adm-muted">Cargando…</p> : (
-        <div className="adm-list">
-          {miembros.length === 0 && <p className="adm-muted">Sin miembros todavía.</p>}
+      <h4 className="dato-label" style={{ marginTop: '1.25rem' }}>Miembros</h4>
+      {cargando ? <p className="muted">Cargando…</p> : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1rem' }}>
+          {miembros.length === 0 && <p className="muted">Sin miembros todavía.</p>}
           {miembros.map((m) => (
-            <div key={m.membresiaId} className="adm-miembro-block">
-              <div className="adm-miembro">
+            <div key={m.membresiaId}>
+              <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <div>
                   <b>
                     {[m.nombre, m.apellido].filter(Boolean).join(' ') || m.email}
-                    {!m.activo && <span className="adm-tag-off"> inactivo</span>}
+                    {!m.activo && <> <EstadoChip texto="inactivo" tono="peligro" /></>}
                   </b>
-                  <span>{m.email}</span>
+                  <div className="muted" style={{ fontSize: '0.85rem' }}>{m.email}</div>
                 </div>
-                <div className="adm-miembro-acc">
-                  {m.roles.map((r) => <span key={r} className="adm-rol">{rolLabel(r)}</span>)}
-                  <button className="adm-mini" onClick={() => setEditandoRoles(editandoRoles === m.membresiaId ? null : m.membresiaId)}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  {m.roles.map((r) => <span key={r} className="chip">{rolLabel(r)}</span>)}
+                  <button className="btn-ghost" onClick={() => setEditandoRoles(editandoRoles === m.membresiaId ? null : m.membresiaId)}>
                     {editandoRoles === m.membresiaId ? 'Cancelar' : 'Editar roles'}
                   </button>
-                  <button className="adm-mini" onClick={() => toggleMiembro(m)}>{m.activo ? 'Desactivar' : 'Activar'}</button>
-                  <button className="adm-mini danger" onClick={() => quitar(m)}>Quitar</button>
+                  <button className="btn-ghost" onClick={() => toggleMiembro(m)}>{m.activo ? 'Desactivar' : 'Activar'}</button>
+                  <button className="btn-ghost" style={{ color: 'var(--danger)', borderColor: '#fca5a5' }} onClick={() => quitar(m)}>Quitar</button>
                 </div>
               </div>
               {editandoRoles === m.membresiaId && (
-                <RolesCheckboxes valorInicial={m.roles} onGuardar={(roles) => guardarRoles(m, roles)} />
+                <div style={{ marginTop: '0.4rem' }}>
+                  <RolesCheckboxes valorInicial={m.roles} onGuardar={(roles) => guardarRoles(m, roles)} />
+                </div>
               )}
             </div>
           ))}
@@ -336,21 +578,21 @@ function EliminarModal({ org, onClose, onEliminada }: {
   }
 
   return (
-    <div className="adm-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="adm-modal">
+    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-panel" style={{ maxWidth: 440 }}>
         <h2>Eliminar organización</h2>
-        <p className="adm-sub">
+        <p className="muted">
           Esto borra <b>{org.nombre}</b> y <b>todos</b> sus registros (dueños, animales,
           historia, turnos). No se puede deshacer. Exportá los datos antes si los necesitás.
         </p>
-        <div className="adm-field">
-          <label>Escribí el nombre para confirmar</label>
+        <label>
+          Escribí el nombre para confirmar
           <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={org.nombre} />
-        </div>
-        {error && <div className="adm-error">{error}</div>}
-        <div className="adm-mactions">
-          <button className="adm-btn ghost" onClick={onClose}>Cancelar</button>
-          <button className="adm-btn danger" disabled={!coincide || borrando} onClick={eliminar}>
+        </label>
+        {error && <div className="alerta">{error}</div>}
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+          <button className="btn-ghost" style={{ flex: 1 }} onClick={onClose}>Cancelar</button>
+          <button className="btn-danger" style={{ flex: 1 }} disabled={!coincide || borrando} onClick={eliminar}>
             {borrando ? 'Eliminando…' : 'Eliminar definitivamente'}
           </button>
         </div>
@@ -362,9 +604,9 @@ function EliminarModal({ org, onClose, onEliminada }: {
 /** Checkboxes de roles apilables (controlado), reusado en alta de miembro y edición de roles existentes. */
 function RolesFieldset({ roles, onToggle }: { roles: string[]; onToggle: (v: string) => void }) {
   return (
-    <div className="adm-roles-checks">
+    <div className="check-fila" style={{ flexWrap: 'wrap', marginBottom: '0.5rem' }}>
       {ROLES.map((r) => (
-        <label key={r.v} className="adm-check">
+        <label key={r.v}>
           <input type="checkbox" checked={roles.includes(r.v)} onChange={() => onToggle(r.v)} />
           {r.label}
         </label>
@@ -383,9 +625,9 @@ function RolesCheckboxes({ valorInicial, onGuardar, textoBoton = 'Guardar roles'
   const toggle = (v: string) => setRoles((prev) => (prev.includes(v) ? prev.filter((r) => r !== v) : [...prev, v]));
 
   return (
-    <div className="adm-formcard">
+    <div className="card">
       <RolesFieldset roles={roles} onToggle={toggle} />
-      <button className="adm-btn primary" disabled={roles.length === 0} onClick={() => onGuardar(roles)}>
+      <button className="btn" disabled={roles.length === 0} onClick={() => onGuardar(roles)}>
         {textoBoton}
       </button>
     </div>
@@ -422,27 +664,33 @@ function AgregarMiembroForm({ org, onAgregado }: { org: Organizacion; onAgregado
   }
 
   return (
-    <div className="adm-formcard">
-      <h4>Agregar miembro</h4>
-      <div className="adm-field"><label>Email</label>
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="vet@ejemplo.com" /></div>
-      <div className="adm-field">
-        <label>Roles <span className="adm-hint">(puede tener más de uno)</span></label>
-        <RolesFieldset roles={roles} onToggle={toggleRol} />
+    <div className="card">
+      <h4 className="form-titulo">Agregar miembro</h4>
+      <label>
+        Email
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="vet@ejemplo.com" />
+      </label>
+      <label>
+        Roles <span className="muted" style={{ fontWeight: 400 }}>(puede tener más de uno)</span>
+      </label>
+      <RolesFieldset roles={roles} onToggle={toggleRol} />
+      <div className="form-grid">
+        <label>
+          Nombre
+          <input value={nombre} onChange={(e) => setNombre(e.target.value)} />
+        </label>
+        <label>
+          Apellido
+          <input value={apellido} onChange={(e) => setApellido(e.target.value)} />
+        </label>
       </div>
-      <div className="adm-row2">
-        <div className="adm-field"><label>Nombre</label>
-          <input value={nombre} onChange={(e) => setNombre(e.target.value)} /></div>
-        <div className="adm-field"><label>Apellido</label>
-          <input value={apellido} onChange={(e) => setApellido(e.target.value)} /></div>
-      </div>
-      <div className="adm-field">
-        <label>Contraseña <span className="adm-hint">(solo si el usuario es nuevo)</span></label>
+      <label>
+        Contraseña <span className="muted" style={{ fontWeight: 400 }}>(solo si el usuario es nuevo)</span>
         <input type="text" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="mínimo 6 caracteres" />
-      </div>
-      {error && <div className="adm-error">{error}</div>}
-      {msg && <div className="adm-ok">{msg}</div>}
-      <button className="adm-btn primary" disabled={cargando || !email} onClick={agregar}>
+      </label>
+      {error && <div className="alerta">{error}</div>}
+      {msg && <p style={{ color: 'var(--verde-dark)', fontSize: '0.88rem' }}>{msg}</p>}
+      <button className="btn" disabled={cargando || !email} onClick={agregar}>
         {cargando ? 'Agregando…' : 'Agregar a la organización'}
       </button>
     </div>
@@ -478,21 +726,21 @@ function SolucionesOrg({ org, onActualizada }: { org: Organizacion; onActualizad
   }
 
   return (
-    <div className="adm-formcard">
-      <h4>Soluciones</h4>
-      <div className="adm-roles-checks">
-        <label className="adm-check">
+    <div className="card" style={{ marginTop: '0.75rem' }}>
+      <h4 className="form-titulo">Soluciones</h4>
+      <div className="check-fila">
+        <label>
           <input type="checkbox" checked={huellaActiva} onChange={(e) => setHuellaActiva(e.target.checked)} />
           Huella
         </label>
-        <label className="adm-check">
+        <label>
           <input type="checkbox" checked={troperaActiva} onChange={(e) => setTroperaActiva(e.target.checked)} />
           Tropera
         </label>
       </div>
-      {error && <div className="adm-error">{error}</div>}
-      {ok && <div className="adm-ok">Soluciones actualizadas ✓</div>}
-      <button className="adm-btn primary" disabled={guardando || !huboCambio} onClick={guardar}>
+      {error && <div className="alerta">{error}</div>}
+      {ok && <p style={{ color: 'var(--verde-dark)', fontSize: '0.88rem' }}>Soluciones actualizadas ✓</p>}
+      <button className="btn" disabled={guardando || !huboCambio} onClick={guardar}>
         {guardando ? 'Guardando…' : 'Guardar soluciones'}
       </button>
     </div>
@@ -506,6 +754,7 @@ function AccesoOrg({ org, grupos, planes, onActualizada }: {
   const [grupoId, setGrupoId] = useState(org.grupoId ?? '');
   const [planId, setPlanId] = useState(org.planId ?? '');
   const [accesoHasta, setAccesoHasta] = useState(org.accesoHasta ? org.accesoHasta.slice(0, 10) : '');
+  const [fechaActivacion, setFechaActivacion] = useState(org.fechaActivacion ? org.fechaActivacion.slice(0, 10) : '');
   const [esDemo, setEsDemo] = useState(!!org.esDemo);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -516,6 +765,7 @@ function AccesoOrg({ org, grupos, planes, onActualizada }: {
     setGrupoId(org.grupoId ?? '');
     setPlanId(org.planId ?? '');
     setAccesoHasta(org.accesoHasta ? org.accesoHasta.slice(0, 10) : '');
+    setFechaActivacion(org.fechaActivacion ? org.fechaActivacion.slice(0, 10) : '');
     setEsDemo(!!org.esDemo);
     setOk(false);
   }, [org.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -529,6 +779,7 @@ function AccesoOrg({ org, grupos, planes, onActualizada }: {
         grupoId: grupoId || null,
         planId: planId || null,
         accesoHasta: accesoHasta ? new Date(accesoHasta).toISOString() : null,
+        fechaActivacion: fechaActivacion ? new Date(fechaActivacion).toISOString() : null,
         esDemo,
       });
       setOk(true);
@@ -544,41 +795,50 @@ function AccesoOrg({ org, grupos, planes, onActualizada }: {
   }
 
   return (
-    <div className="adm-formcard">
-      <h4>Acceso</h4>
-      <div className="adm-row2">
-        <div className="adm-field"><label>Grupo</label>
+    <div className="card" style={{ marginTop: '0.75rem' }}>
+      <h4 className="form-titulo">Acceso</h4>
+      <div className="form-grid">
+        <label>
+          Grupo
           <select value={grupoId} onChange={(e) => setGrupoId(e.target.value)}>
             <option value="">Sin grupo</option>
             {grupos.map((g) => <option key={g.id} value={g.id}>{g.nombre}</option>)}
-          </select></div>
-        <div className="adm-field"><label>Plan</label>
+          </select>
+        </label>
+        <label>
+          Plan
           <select value={planId} onChange={(e) => setPlanId(e.target.value)}>
             <option value="">Sin plan</option>
-            {planes.map((p) => <option key={p.id} value={p.id}>{p.nombre}{p.precio ? ` — $${p.precio}` : ''}</option>)}
-          </select></div>
-      </div>
-      <div className="adm-row2">
-        <div className="adm-field">
-          <label>Acceso habilitado hasta {vencido && <span className="adm-tag-off"> vencido</span>}</label>
+            {planes.map((p) => <option key={p.id} value={p.id}>{p.nombre}{p.precioMensual ? ` — $${p.precioMensual}/mes` : ''}</option>)}
+          </select>
+        </label>
+        <label>
+          Acceso habilitado hasta {vencido && <EstadoChip texto="vencido" tono="peligro" />}
           <input type="date" value={accesoHasta} onChange={(e) => setAccesoHasta(e.target.value)} />
-        </div>
-        <div className="adm-field">
-          <label>Es demo</label>
+        </label>
+        <label>
+          Fecha de activación
+          <input type="date" value={fechaActivacion} onChange={(e) => setFechaActivacion(e.target.value)} />
+        </label>
+        <label>
+          Es demo
           <select value={esDemo ? '1' : '0'} onChange={(e) => setEsDemo(e.target.value === '1')}>
             <option value="0">No</option>
             <option value="1">Sí</option>
           </select>
-        </div>
+        </label>
       </div>
-      <div className="adm-lifebar">
-        <button className="adm-btn ghost" onClick={() => extender(7)}>+7 días</button>
-        <button className="adm-btn ghost" onClick={() => extender(30)}>+30 días</button>
-        <button className="adm-btn ghost" onClick={() => setAccesoHasta('')}>Sin vencimiento</button>
+      <p className="muted" style={{ fontSize: '0.82rem', marginTop: '-0.25rem' }}>
+        La fecha de activación define el día del mes en que se factura (ver Home). Si queda vacía se usa la fecha de alta de la organización.
+      </p>
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+        <button className="btn-ghost" onClick={() => extender(7)}>+7 días</button>
+        <button className="btn-ghost" onClick={() => extender(30)}>+30 días</button>
+        <button className="btn-ghost" onClick={() => setAccesoHasta('')}>Sin vencimiento</button>
       </div>
-      {error && <div className="adm-error">{error}</div>}
-      {ok && <div className="adm-ok">Acceso actualizado ✓</div>}
-      <button className="adm-btn primary" disabled={guardando} onClick={guardar}>
+      {error && <div className="alerta">{error}</div>}
+      {ok && <p style={{ color: 'var(--verde-dark)', fontSize: '0.88rem' }}>Acceso actualizado ✓</p>}
+      <button className="btn" disabled={guardando} onClick={guardar}>
         {guardando ? 'Guardando…' : 'Guardar acceso'}
       </button>
     </div>
@@ -586,19 +846,87 @@ function AccesoOrg({ org, grupos, planes, onActualizada }: {
 }
 
 // ── Planes ─────────────────────────────────────────────────────────────
+/**
+ * Convierte { veterinario: "2", recepcion: "" } -> { veterinario: 2, ... }.
+ * No es opcional: siempre devuelve los 5 roles con un número — uno vacío o
+ * inválido se guarda como 0 (ese rol queda en cero miembros permitidos), no
+ * hay estado "sin límite".
+ */
+function limitesANumeros(valores: Record<string, string>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of ROLES) {
+    const v = valores[r.v] ?? '';
+    const n = Number(v);
+    out[r.v] = v.trim() !== '' && Number.isFinite(n) && n >= 0 ? n : 0;
+  }
+  return out;
+}
+
+/** Estado inicial/de reseteo: todos los roles en 0 (nada permitido salvo que se suba a mano). */
+function limitesEnCero(): Record<string, string> {
+  return Object.fromEntries(ROLES.map((r) => [r.v, '0']));
+}
+
+/** Inverso: { veterinario: 2 } -> { veterinario: "2" }, completando en "0" los roles que un plan viejo no tenía guardados. */
+function limitesAStrings(limites: Record<string, number> | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const r of ROLES) out[r.v] = String(limites?.[r.v] ?? 0);
+  return out;
+}
+
+/** Grilla de "cupo máximo por rol" — obligatorio, ningún rol queda sin definir. */
+function LimitesRolesEditor({ valores, onChange }: {
+  valores: Record<string, string>;
+  onChange: (v: Record<string, string>) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginBottom: '0.75rem' }}>
+      {ROLES.map((r) => (
+        <label key={r.v} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text)' }}>
+          {r.label}
+          <input
+            type="number"
+            required
+            min={0}
+            value={valores[r.v] ?? '0'}
+            onChange={(e) => onChange({ ...valores, [r.v]: e.target.value })}
+            style={{ width: '90px', marginTop: 0 }}
+          />
+        </label>
+      ))}
+    </div>
+  );
+}
+
 function Planes({ planes, onCambio }: { planes: Plan[]; onCambio: () => void }) {
   const [nombre, setNombre] = useState('');
-  const [precio, setPrecio] = useState('');
+  const [precioMensual, setPrecioMensual] = useState('');
+  const [precioAnual, setPrecioAnual] = useState('');
+  const [limitesRoles, setLimitesRoles] = useState<Record<string, string>>(limitesEnCero);
   const [descripcion, setDescripcion] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
 
+  const [editandoLimites, setEditandoLimites] = useState<string | null>(null);
+  const [limitesEdit, setLimitesEdit] = useState<Record<string, string>>({});
+  const [guardandoLimites, setGuardandoLimites] = useState(false);
+
   async function crear() {
     if (nombre.trim().length < 2) { setError('Poné un nombre'); return; }
+    if (precioMensual.trim() === '' || precioAnual.trim() === '') {
+      setError('El precio mensual y el precio anual son obligatorios');
+      return;
+    }
     setCargando(true); setError(null);
     try {
-      await crearPlan({ nombre: nombre.trim(), precio: precio ? Number(precio) : undefined, descripcion: descripcion.trim() || undefined });
-      setNombre(''); setPrecio(''); setDescripcion(''); onCambio();
+      await crearPlan({
+        nombre: nombre.trim(),
+        precioMensual: Number(precioMensual),
+        precioAnual: Number(precioAnual),
+        limitesRoles: limitesANumeros(limitesRoles),
+        descripcion: descripcion.trim() || undefined,
+      });
+      setNombre(''); setPrecioMensual(''); setPrecioAnual(''); setLimitesRoles(limitesEnCero()); setDescripcion(''); onCambio();
     } catch (e: any) { setError(e.message ?? 'No se pudo crear'); }
     finally { setCargando(false); }
   }
@@ -610,37 +938,112 @@ function Planes({ planes, onCambio }: { planes: Plan[]; onCambio: () => void }) 
     try { await eliminarPlan(p.id); onCambio(); }
     catch (e: any) { setError(e.message ?? 'No se pudo eliminar'); }
   }
+  function abrirEditarLimites(p: Plan) {
+    setEditandoLimites(editandoLimites === p.id ? null : p.id);
+    setLimitesEdit(limitesAStrings(p.limitesRoles));
+  }
+  async function guardarLimites(p: Plan) {
+    setGuardandoLimites(true); setError(null);
+    try {
+      await actualizarPlan(p.id, { limitesRoles: limitesANumeros(limitesEdit) });
+      setEditandoLimites(null);
+      onCambio();
+    } catch (e: any) { setError(e.message ?? 'No se pudieron guardar los límites'); }
+    finally { setGuardandoLimites(false); }
+  }
+
+  /** % de descuento del anual contra 12 meses al precio mensual — se calcula, no se carga a mano. */
+  function descuentoAnual(p: Plan): number | null {
+    const mensual = p.precioMensual ? Number(p.precioMensual) : null;
+    const anual = p.precioAnual ? Number(p.precioAnual) : null;
+    if (!mensual || !anual) return null;
+    const sinDescuento = mensual * 12;
+    if (anual >= sinDescuento) return null;
+    return Math.round((1 - anual / sinDescuento) * 100);
+  }
 
   return (
     <div>
       <h3>Planes</h3>
-      {error && <div className="adm-error">{error}</div>}
-      <div className="adm-list">
-        {planes.length === 0 && <p className="adm-muted">Todavía no hay planes.</p>}
-        {planes.map((p) => (
-          <div key={p.id} className="adm-miembro">
-            <div>
-              <b>{p.nombre} {!p.activo && <span className="adm-tag-off">inactivo</span>}</b>
-              <span>{p.precio ? `$${p.precio}` : 'Sin precio'}{p.descripcion ? ` · ${p.descripcion}` : ''}</span>
+      <InfoRoles />
+      {error && <div className="alerta">{error}</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1rem' }}>
+        {planes.length === 0 && <p className="muted">Todavía no hay planes.</p>}
+        {planes.map((p) => {
+          const descuento = descuentoAnual(p);
+          const limitesActivos = Object.entries(p.limitesRoles ?? {}).filter(([, n]) => n >= 0);
+          return (
+            <div key={p.id} className="card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <div>
+                  <b>{p.nombre} {!p.activo && <EstadoChip texto="no disponible para altas" tono="peligro" />}</b>
+                  <div className="muted" style={{ fontSize: '0.85rem' }}>
+                    {p.precioMensual ? `$${p.precioMensual}/mes` : 'Sin precio mensual'}
+                    {p.precioAnual ? ` · $${p.precioAnual}/año` : ''}
+                    {descuento != null && <> <span className="chip">-{descuento}% anual</span></>}
+                    {p.descripcion ? ` · ${p.descripcion}` : ''}
+                  </div>
+                  {limitesActivos.length > 0 && (
+                    <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                      {limitesActivos.map(([rol, n]) => (
+                        <span key={rol} className="chip">{rolLabel(rol)}: {n}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <button className="btn-ghost" onClick={() => abrirEditarLimites(p)}>
+                    {editandoLimites === p.id ? 'Cancelar' : 'Editar límites'}
+                  </button>
+                  <button className="btn-ghost" onClick={() => toggleActivo(p)} title="Un plan no disponible no puede asignarse a organizaciones nuevas, pero las que ya lo tienen no se ven afectadas">
+                    {p.activo ? 'Deshabilitar para altas nuevas' : 'Habilitar para altas nuevas'}
+                  </button>
+                  <button className="btn-ghost" style={{ color: 'var(--danger)', borderColor: '#fca5a5' }} onClick={() => eliminar(p)}>Eliminar</button>
+                </div>
+              </div>
+              {editandoLimites === p.id && (
+                <div style={{ marginTop: '0.75rem', borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
+                  <p className="muted" style={{ fontSize: '0.82rem', marginTop: 0 }}>
+                    Cupo máximo de miembros por rol en las organizaciones de este plan.
+                  </p>
+                  <LimitesRolesEditor valores={limitesEdit} onChange={setLimitesEdit} />
+                  <button className="btn" disabled={guardandoLimites} onClick={() => guardarLimites(p)}>
+                    {guardandoLimites ? 'Guardando…' : 'Guardar límites'}
+                  </button>
+                </div>
+              )}
             </div>
-            <div className="adm-miembro-acc">
-              <button className="adm-mini" onClick={() => toggleActivo(p)}>{p.activo ? 'Desactivar' : 'Activar'}</button>
-              <button className="adm-mini danger" onClick={() => eliminar(p)}>Eliminar</button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
-      <div className="adm-formcard">
-        <h4>Nuevo plan</h4>
-        <div className="adm-row2">
-          <div className="adm-field"><label>Nombre</label>
-            <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Plan Básico" /></div>
-          <div className="adm-field"><label>Precio (opcional)</label>
-            <input type="number" value={precio} onChange={(e) => setPrecio(e.target.value)} /></div>
+      <div className="card">
+        <h4 className="form-titulo">Nuevo plan</h4>
+        <label>
+          Nombre
+          <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Plan Básico" />
+        </label>
+        <div className="form-grid">
+          <label>
+            Precio mensual
+            <input type="number" required min={0} value={precioMensual} onChange={(e) => setPrecioMensual(e.target.value)} placeholder="Ej: 15000" />
+          </label>
+          <label>
+            Precio anual
+            <input type="number" required min={0} value={precioAnual} onChange={(e) => setPrecioAnual(e.target.value)} placeholder="Ej: 150000" />
+            {precioMensual && precioAnual && Number(precioAnual) < Number(precioMensual) * 12 && (
+              <span className="muted" style={{ fontWeight: 400, fontSize: '0.78rem' }}>
+                {' '}(-{Math.round((1 - Number(precioAnual) / (Number(precioMensual) * 12)) * 100)}% vs. 12 meses al precio mensual)
+              </span>
+            )}
+          </label>
         </div>
-        <div className="adm-field"><label>Descripción (opcional)</label>
-          <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} /></div>
-        <button className="adm-btn primary" disabled={cargando} onClick={crear}>
+        <label>Cupo de miembros por rol</label>
+        <LimitesRolesEditor valores={limitesRoles} onChange={setLimitesRoles} />
+        <label>
+          Descripción (opcional)
+          <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
+        </label>
+        <button className="btn" disabled={cargando} onClick={crear}>
           {cargando ? 'Creando…' : 'Crear plan'}
         </button>
       </div>
@@ -672,29 +1075,31 @@ function Grupos({ grupos, onCambio }: { grupos: Grupo[]; onCambio: () => void })
   return (
     <div>
       <h3>Grupos de organizaciones</h3>
-      <p className="adm-sub">Sirven para agrupar organizaciones (ej. "cadena de veterinarias") y poder dirigirles mensajes en conjunto.</p>
-      {error && <div className="adm-error">{error}</div>}
-      <div className="adm-list">
-        {grupos.length === 0 && <p className="adm-muted">Todavía no hay grupos.</p>}
+      <p className="muted">Sirven para agrupar organizaciones (ej. "cadena de veterinarias") y poder dirigirles mensajes en conjunto.</p>
+      {error && <div className="alerta">{error}</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1rem' }}>
+        {grupos.length === 0 && <p className="muted">Todavía no hay grupos.</p>}
         {grupos.map((g) => (
-          <div key={g.id} className="adm-miembro">
+          <div key={g.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <div>
               <b>{g.nombre}</b>
-              {g.descripcion && <span>{g.descripcion}</span>}
+              {g.descripcion && <div className="muted" style={{ fontSize: '0.85rem' }}>{g.descripcion}</div>}
             </div>
-            <div className="adm-miembro-acc">
-              <button className="adm-mini danger" onClick={() => eliminar(g)}>Eliminar</button>
-            </div>
+            <button className="btn-ghost" style={{ color: 'var(--danger)', borderColor: '#fca5a5' }} onClick={() => eliminar(g)}>Eliminar</button>
           </div>
         ))}
       </div>
-      <div className="adm-formcard">
-        <h4>Nuevo grupo</h4>
-        <div className="adm-field"><label>Nombre</label>
-          <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Cadena de veterinarias" /></div>
-        <div className="adm-field"><label>Descripción (opcional)</label>
-          <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} /></div>
-        <button className="adm-btn primary" disabled={cargando} onClick={crear}>
+      <div className="card">
+        <h4 className="form-titulo">Nuevo grupo</h4>
+        <label>
+          Nombre
+          <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Cadena de veterinarias" />
+        </label>
+        <label>
+          Descripción (opcional)
+          <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
+        </label>
+        <button className="btn" disabled={cargando} onClick={crear}>
           {cargando ? 'Creando…' : 'Crear grupo'}
         </button>
       </div>
@@ -749,54 +1154,64 @@ function Mensajes({ orgs, grupos }: { orgs: Organizacion[]; grupos: Grupo[] }) {
   return (
     <div>
       <h3>Mensajes de la plataforma</h3>
-      <p className="adm-sub">Anuncios (no chat) que se muestran como banner al loguearse — ej. avisos de precio o de funcionalidades nuevas.</p>
-      {error && <div className="adm-error">{error}</div>}
+      <p className="muted">Anuncios (no chat) que se muestran como banner al loguearse — ej. avisos de precio o de funcionalidades nuevas.</p>
+      {error && <div className="alerta">{error}</div>}
 
-      <div className="adm-formcard">
-        <h4>Nuevo mensaje</h4>
-        <div className="adm-field"><label>Título</label>
-          <input value={titulo} onChange={(e) => setTitulo(e.target.value)} /></div>
-        <div className="adm-field"><label>Cuerpo</label>
-          <input value={cuerpo} onChange={(e) => setCuerpo(e.target.value)} /></div>
-        <div className="adm-row2">
-          <div className="adm-field"><label>Destinatario</label>
+      <div className="card">
+        <h4 className="form-titulo">Nuevo mensaje</h4>
+        <label>
+          Título
+          <input value={titulo} onChange={(e) => setTitulo(e.target.value)} />
+        </label>
+        <label>
+          Cuerpo
+          <input value={cuerpo} onChange={(e) => setCuerpo(e.target.value)} />
+        </label>
+        <div className="form-grid">
+          <label>
+            Destinatario
             <select value={destinatarioTipo} onChange={(e) => setDestinatarioTipo(e.target.value as DestinatarioTipo)}>
               <option value="todas">Todas las organizaciones</option>
               <option value="organizacion">Una organización</option>
               <option value="grupo">Un grupo</option>
-            </select></div>
+            </select>
+          </label>
           {destinatarioTipo === 'organizacion' && (
-            <div className="adm-field"><label>Organización</label>
+            <label>
+              Organización
               <select value={organizacionId} onChange={(e) => setOrganizacionId(e.target.value)}>
                 <option value="">Elegir…</option>
                 {orgs.map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
-              </select></div>
+              </select>
+            </label>
           )}
           {destinatarioTipo === 'grupo' && (
-            <div className="adm-field"><label>Grupo</label>
+            <label>
+              Grupo
               <select value={grupoId} onChange={(e) => setGrupoId(e.target.value)}>
                 <option value="">Elegir…</option>
                 {grupos.map((g) => <option key={g.id} value={g.id}>{g.nombre}</option>)}
-              </select></div>
+              </select>
+            </label>
           )}
         </div>
-        <button className="adm-btn primary" disabled={cargando} onClick={enviar}>
+        <button className="btn" disabled={cargando} onClick={enviar}>
           {cargando ? 'Enviando…' : 'Enviar'}
         </button>
       </div>
 
-      <h4 className="adm-h4">Enviados</h4>
-      <div className="adm-list">
-        {items.length === 0 && <p className="adm-muted">Todavía no se envió ningún mensaje.</p>}
+      <h4 className="dato-label" style={{ marginTop: '1.25rem' }}>Enviados</h4>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+        {items.length === 0 && <p className="muted">Todavía no se envió ningún mensaje.</p>}
         {items.map((m) => (
-          <div key={m.id} className="adm-miembro">
+          <div key={m.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <div>
               <b>{m.titulo}</b>
-              <span>{destinoLabel(m)} · {new Date(m.publicadoEn).toLocaleDateString()}</span>
+              <div className="muted" style={{ fontSize: '0.85rem' }}>
+                {destinoLabel(m)} · {new Date(m.publicadoEn).toLocaleDateString()}
+              </div>
             </div>
-            <div className="adm-miembro-acc">
-              <button className="adm-mini danger" onClick={() => eliminar(m)}>Eliminar</button>
-            </div>
+            <button className="btn-ghost" style={{ color: 'var(--danger)', borderColor: '#fca5a5' }} onClick={() => eliminar(m)}>Eliminar</button>
           </div>
         ))}
       </div>
@@ -804,8 +1219,142 @@ function Mensajes({ orgs, grupos }: { orgs: Organizacion[]; grupos: Grupo[] }) {
   );
 }
 
+// ── Analítica de uso ──────────────────────────────────────────────────────
+/** Qué pantallas y acciones usan más los clientes — eventos que dispara `api.registrarEvento()` en la app (App.tsx, HuellaHomeSection.tsx, ...). */
+function Analitica() {
+  const hace30Dias = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const [desde, setDesde] = useState(hace30Dias);
+  const [hasta, setHasta] = useState(new Date().toISOString().slice(0, 10));
+  const [datos, setDatos] = useState<ResumenAnalitica | null>(null);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  async function buscar() {
+    setCargando(true);
+    setError(null);
+    try {
+      setDatos(await resumenAnalitica(desde, `${hasta}T23:59:59`));
+    } catch (e: any) { setError(e.message ?? 'Error al cargar'); }
+    finally { setCargando(false); }
+  }
+
+  useEffect(() => {
+    buscar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div>
+      <div className="page-head"><h1>Analítica de uso</h1></div>
+      <p className="muted" style={{ marginTop: '-0.5rem', marginBottom: '1rem' }}>
+        Qué pantallas y acciones usan más los clientes — sólo un punteo inicial de lo instrumentado hoy
+        (Home y sus accesos rápidos, más las pantallas de la app), no todavía toda la plataforma.
+      </p>
+      <div className="card form-grid" style={{ marginBottom: '1rem' }}>
+        <label>
+          Desde
+          <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
+        </label>
+        <label>
+          Hasta
+          <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} />
+        </label>
+        <div className="span-2">
+          <button className="btn" type="button" onClick={buscar} disabled={cargando}>
+            {cargando ? 'Buscando…' : 'Actualizar'}
+          </button>
+        </div>
+      </div>
+
+      {error && <div className="alerta">{error}</div>}
+
+      {datos && (
+        <>
+          <div className="card ficha-datos" style={{ marginBottom: '1rem' }}>
+            <div className="dato">
+              <span className="dato-label">Eventos totales</span>
+              <strong>{datos.total}</strong>
+            </div>
+            <div className="dato">
+              <span className="dato-label">Pantallas distintas</span>
+              <strong>{datos.pantallas.length}</strong>
+            </div>
+            <div className="dato">
+              <span className="dato-label">Acciones distintas</span>
+              <strong>{datos.acciones.length}</strong>
+            </div>
+            <div className="dato">
+              <span className="dato-label">Organizaciones activas</span>
+              <strong>{datos.porOrganizacion.length}</strong>
+            </div>
+          </div>
+
+          <div className="layout-2col">
+            <div className="layout-main">
+              <h2 className="form-titulo">Pantallas más visitadas</h2>
+              {datos.pantallas.length === 0 ? (
+                <p className="muted">Sin datos en este rango.</p>
+              ) : (
+                <div className="card">
+                  <table className="tabla">
+                    <thead>
+                      <tr><th>Pantalla</th><th>Vistas</th></tr>
+                    </thead>
+                    <tbody>
+                      {datos.pantallas.map((p) => (
+                        <tr key={p.nombre}><td>{p.nombre}</td><td>{p.cantidad}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            <div className="layout-side">
+              <h2 className="form-titulo">Acciones más usadas</h2>
+              {datos.acciones.length === 0 ? (
+                <p className="muted">Sin datos en este rango.</p>
+              ) : (
+                <div className="card">
+                  <table className="tabla">
+                    <thead>
+                      <tr><th>Acción</th><th>Usos</th></tr>
+                    </thead>
+                    <tbody>
+                      {datos.acciones.map((a) => (
+                        <tr key={a.nombre}><td>{a.nombre}</td><td>{a.cantidad}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <h2 className="form-titulo" style={{ marginTop: '1.5rem' }}>Organizaciones más activas</h2>
+          {datos.porOrganizacion.length === 0 ? (
+            <p className="muted">Sin datos en este rango.</p>
+          ) : (
+            <div className="card">
+              <table className="tabla">
+                <thead>
+                  <tr><th>Organización</th><th>Eventos</th></tr>
+                </thead>
+                <tbody>
+                  {datos.porOrganizacion.map((o) => (
+                    <tr key={o.organizacionId}><td>{o.organizacionNombre}</td><td>{o.cantidad}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Bandeja de solicitudes ────────────────────────────────────────────────
-function Solicitudes({ orgs }: { orgs: Organizacion[] }) {
+function Solicitudes({ orgs, planes, onCambio }: { orgs: Organizacion[]; planes: Plan[]; onCambio: () => void }) {
   const [items, setItems] = useState<Solicitud[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -818,21 +1367,35 @@ function Solicitudes({ orgs }: { orgs: Organizacion[] }) {
   }
   useEffect(() => { cargar(); }, []);
 
+  // Al resolver una solicitud (aprobar crea una organización nueva, con su
+  // plan y fecha de activación ya aplicados) hay que refrescar tanto esta
+  // bandeja como la lista de organizaciones/Home del padre — si no, la
+  // organización recién creada no aparece hasta recargar la página entera
+  // (Panel sólo carga orgs/pagos una vez, al montar).
+  function resuelta() {
+    cargar();
+    onCambio();
+  }
+
   if (cargando) return null;
-  if (error) return <div className="adm-error" style={{ marginBottom: 12 }}>{error}</div>;
+  if (error) return <div className="alerta" style={{ marginBottom: 12 }}>{error}</div>;
   if (items.length === 0) return null;
 
   return (
-    <div className="adm-solbox">
-      <h3>Solicitudes pendientes <span className="adm-badge">{items.length}</span></h3>
-      <div className="adm-list">
-        {items.map((s) => <SolicitudCard key={s.id} s={s} orgs={orgs} onResuelta={cargar} />)}
+    <div style={{ marginBottom: '1.25rem' }}>
+      <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        Solicitudes pendientes <EstadoChip texto={String(items.length)} />
+      </h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+        {items.map((s) => <SolicitudCard key={s.id} s={s} orgs={orgs} planes={planes} onResuelta={resuelta} />)}
       </div>
     </div>
   );
 }
 
-function SolicitudCard({ s, orgs, onResuelta }: { s: Solicitud; orgs: Organizacion[]; onResuelta: () => void }) {
+function SolicitudCard({ s, orgs, planes, onResuelta }: {
+  s: Solicitud; orgs: Organizacion[]; planes: Plan[]; onResuelta: () => void;
+}) {
   const [orgId, setOrgId] = useState('');
   const [rol, setRol] = useState('veterinario');
   const [error, setError] = useState<string | null>(null);
@@ -853,152 +1416,135 @@ function SolicitudCard({ s, orgs, onResuelta }: { s: Solicitud; orgs: Organizaci
   }
 
   return (
-    <div className="adm-solcard">
-      <div className="adm-solhead">
+    <div className="card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
         <div>
           <b>{s.nombre} {s.apellido}</b>
-          <span>{s.email}{s.telefono ? ` · ${s.telefono}` : ''}{s.dni ? ` · DNI ${s.dni}` : ''}</span>
+          <div className="muted" style={{ fontSize: '0.85rem' }}>
+            {s.email}{s.telefono ? ` · ${s.telefono}` : ''}{s.dni ? ` · DNI ${s.dni}` : ''}
+          </div>
         </div>
-        <span className="adm-rol">{s.tipo === 'crear' ? 'Crear' : 'Unirse'}</span>
+        <span className="chip">{s.tipo === 'crear' ? 'Crear' : 'Unirse'}</span>
       </div>
-      <div className="adm-soldesc">
+      <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>
         {s.tipo === 'crear'
           ? <>Quiere crear <b>{s.nombreOrganizacion}</b> ({s.tipoOrganizacion})</>
           : <>Quiere unirse a <b>{s.organizacionSolicitada}</b></>}
-      </div>
+      </p>
+      {s.tipo === 'crear' && (
+        <p className="muted" style={{ fontSize: '0.85rem', marginTop: '0.15rem' }}>
+          Plan solicitado: <b>{planes.find((p) => p.id === s.planId)?.nombre ?? '—'}</b>
+        </p>
+      )}
       {s.tipo === 'crear' && (s.direccionOrganizacion || s.localidadOrganizacion || s.provinciaOrganizacion || s.telefonoOrganizacion || s.emailOrganizacion) && (
-        <div className="adm-soldesc" style={{ color: '#6b7280' }}>
+        <p className="muted" style={{ fontSize: '0.85rem', marginTop: '0.25rem' }}>
           {[s.direccionOrganizacion, s.localidadOrganizacion, s.provinciaOrganizacion].filter(Boolean).join(', ')}
           {s.telefonoOrganizacion ? ` · Tel: ${s.telefonoOrganizacion}` : ''}
           {s.emailOrganizacion ? ` · ${s.emailOrganizacion}` : ''}
-        </div>
+        </p>
       )}
-      <div className="adm-soldesc" style={{ color: '#6b7280' }}>
+      <p className="muted" style={{ fontSize: '0.85rem', marginTop: '0.25rem' }}>
         {s.terminosAceptadosEn
           ? `Aceptó los términos el ${new Date(s.terminosAceptadosEn).toLocaleDateString()} (v${s.terminosVersion ?? '?'})`
           : 'No hay registro de aceptación de términos'}
-      </div>
+      </p>
 
       {s.tipo === 'unirse' && (
-        <div className="adm-row2" style={{ marginTop: 8 }}>
-          <div className="adm-field" style={{ margin: 0 }}>
-            <label>Organización destino</label>
+        <div className="form-grid" style={{ marginTop: '0.5rem' }}>
+          <label>
+            Organización destino
             <select value={orgId} onChange={(e) => setOrgId(e.target.value)}>
               <option value="">Elegir…</option>
               {orgs.map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
             </select>
-          </div>
-          <div className="adm-field" style={{ margin: 0 }}>
-            <label>Rol</label>
+          </label>
+          <label>
+            Rol
             <select value={rol} onChange={(e) => setRol(e.target.value)}>
               <option value="veterinario">Veterinario</option>
               <option value="recepcion">Administrativa / Recepción</option>
               <option value="admin">Administrador</option>
             </select>
-          </div>
+          </label>
         </div>
       )}
 
-      {error && <div className="adm-error">{error}</div>}
-      <div className="adm-solactions">
-        <button className="adm-btn ghost" disabled={trabajando} onClick={rechazar}>Rechazar</button>
-        <button className="adm-btn primary" disabled={trabajando} onClick={aprobar}>Aprobar</button>
+      {error && <div className="alerta">{error}</div>}
+      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+        <button className="btn-ghost" disabled={trabajando} onClick={rechazar}>Rechazar</button>
+        <button className="btn" disabled={trabajando} onClick={aprobar}>Aprobar</button>
       </div>
     </div>
   );
 }
 
-// ── Shell + estilos ───────────────────────────────────────────────────────
-function Shell({ children, onSalir }: { children: React.ReactNode; onSalir?: () => void }) {
+// ── Shell (nav rail + contenido, mismo patrón que App.tsx) ─────────────────
+function IconoRail({ paths }: { paths: string }) {
   return (
-    <div className="adm-root">
-      <style>{CSS}</style>
-      <div className="adm-topbar">
-        <svg width="24" height="24" viewBox="0 0 100 100"><g fill="#fff">
-          <ellipse cx="50" cy="66" rx="22" ry="18" /><ellipse cx="24" cy="44" rx="8.5" ry="11" />
-          <ellipse cx="41" cy="30" rx="8.5" ry="12" /><ellipse cx="59" cy="30" rx="8.5" ry="12" />
-          <ellipse cx="76" cy="44" rx="8.5" ry="11" /></g></svg>
-        <span>Ecosistema · Administración</span>
-        {onSalir && <button className="adm-salir" onClick={onSalir}>Salir</button>}
-      </div>
-      <div className="adm-wrap">{children}</div>
-    </div>
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      dangerouslySetInnerHTML={{ __html: paths }}
+    />
   );
 }
 
-const CSS = `
-.adm-root{--teal:#0E7C6B;--teal-dark:#0A5C50;--ink:#17302C;--muted:#6B807B;--line:#DCE6E3;--bg:#F3F8F6;
-  min-height:100vh;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-.adm-root *{box-sizing:border-box}
-.adm-topbar{background:var(--teal);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:8px;font-weight:800;font-size:17px;position:sticky;top:0;z-index:10}
-.adm-salir{margin-left:auto;background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:9px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer}
-.adm-wrap{max-width:960px;margin:0 auto;padding:18px 14px 60px}
-.adm-cols{display:flex;gap:16px;align-items:flex-start}
-@media(max-width:760px){.adm-cols{flex-direction:column}}
-.adm-col{flex:1;min-width:0;width:100%}
-.adm-col h3{margin:6px 0 10px;font-size:16px}
-.adm-h4{margin:14px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
-.adm-list{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
-.adm-item{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid var(--line);border-radius:11px;padding:11px 13px;cursor:pointer;text-align:left;color:var(--ink)}
-.adm-item:hover{border-color:var(--teal)}
-.adm-item.active{border-color:var(--teal);box-shadow:0 0 0 1px var(--teal)}
-.adm-item span{font-size:12px;color:var(--muted);text-transform:capitalize}
-.adm-miembro{display:flex;justify-content:space-between;align-items:center;background:#fff;border:1px solid var(--line);border-radius:11px;padding:10px 13px}
-.adm-miembro b{display:block;font-size:14px}
-.adm-miembro span{font-size:12px;color:var(--muted)}
-.adm-rol{font-size:11px;font-weight:800;color:var(--teal);background:#0E7C6B1a;padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:.4px}
-.adm-formcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:8px}
-.adm-formcard h4{margin:0 0 10px;font-size:14px}
-.adm-loginbox{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px;max-width:400px;margin:8vh auto 0}
-.adm-loginbox h2{margin:0 0 4px;font-size:19px}
-.adm-sub{color:var(--muted);font-size:13px;margin:0 0 16px}
-.adm-field{margin-bottom:11px}
-.adm-field label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px}
-.adm-hint{text-transform:none;font-weight:400;letter-spacing:0}
-.adm-field input,.adm-field select{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px;background:#fff;color:var(--ink)}
-.adm-field input:focus,.adm-field select:focus{outline:none;border-color:var(--teal)}
-.adm-row2{display:flex;gap:10px}.adm-row2>*{flex:1}
-.adm-btn{border:none;border-radius:11px;padding:11px 15px;font-size:14px;font-weight:700;cursor:pointer}
-.adm-btn.primary{background:var(--teal);color:#fff;margin-top:4px}
-.adm-btn.primary:hover{background:var(--teal-dark)}
-.adm-btn.primary:disabled{opacity:.5;cursor:not-allowed}
-.adm-muted{color:var(--muted);font-size:13px}
-.adm-error{background:#C0492F14;color:#C0492F;border-radius:9px;padding:9px 11px;font-size:13px;margin:6px 0}
-.adm-ok{background:#2E9E5B14;color:#2E9E5B;border-radius:9px;padding:9px 11px;font-size:13px;margin:6px 0}
-.adm-btn.ghost{background:#fff;border:1px solid var(--line);color:var(--ink)}
-.adm-solbox{margin-bottom:16px}
-.adm-solbox h3{display:flex;align-items:center;gap:8px;margin:6px 0 10px}
-.adm-badge{background:#E9A23B;color:#fff;font-size:12px;font-weight:800;border-radius:999px;padding:1px 9px}
-.adm-solcard{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-bottom:8px}
-.adm-solhead{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
-.adm-solhead b{display:block;font-size:14px}
-.adm-solhead span{font-size:12px;color:var(--muted)}
-.adm-soldesc{font-size:13px;margin-top:6px}
-.adm-solactions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
-.adm-solactions .adm-btn{padding:8px 14px;margin-top:0}
-.adm-lifebar{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 8px}
-.adm-lifebar .adm-btn{margin-top:0}
-.adm-tag-off{font-size:11px;font-weight:800;color:#C0492F;background:#C0492F14;padding:2px 8px;border-radius:999px;text-transform:uppercase;letter-spacing:.4px}
-.adm-btn.danger{background:#C0492F;color:#fff}
-.adm-btn.danger:hover{background:#a53c26}
-.adm-btn.danger:disabled{opacity:.5;cursor:not-allowed}
-.adm-miembro-acc{display:flex;align-items:center;gap:6px}
-.adm-mini{border:1px solid var(--line);background:#fff;border-radius:8px;padding:4px 9px;font-size:11.5px;cursor:pointer;color:var(--ink);font-weight:600}
-.adm-mini:hover{border-color:var(--teal)}
-.adm-mini.danger:hover{border-color:#C0492F;color:#C0492F}
-.adm-overlay{position:fixed;inset:0;background:rgba(23,48,44,.5);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
-.adm-modal{background:#fff;border-radius:16px;max-width:440px;width:100%;padding:20px}
-.adm-modal h2{margin:0 0 4px;font-size:18px}
-.adm-sub{color:var(--muted);font-size:13px;margin:0 0 14px}
-.adm-mactions{display:flex;gap:8px;margin-top:8px}
-.adm-mactions .adm-btn{flex:1;margin-top:0}
-.adm-secnav{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
-.adm-secbtn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer}
-.adm-secbtn.active{background:var(--teal);border-color:var(--teal);color:#fff}
-.adm-roles-checks{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
-.adm-check{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink);text-transform:none;letter-spacing:0}
-.adm-check input{width:auto}
-.adm-miembro-block{margin-bottom:8px}
-.adm-miembro-block .adm-miembro{margin-bottom:0}
-.adm-miembro-block .adm-formcard{margin-top:6px}
-`;
+function Shell({ children, onSalir, seccion, onSeccion }: {
+  children: React.ReactNode;
+  onSalir?: () => void;
+  seccion?: Seccion;
+  onSeccion?: (s: Seccion) => void;
+}) {
+  const tituloActivo = SECCIONES_NAV.find((s) => s.id === seccion)?.titulo;
+
+  return (
+    <div className="app app-rail">
+      {onSalir && seccion && onSeccion && (
+        <aside className="nav-rail">
+          <div className="options-group">
+            {SECCIONES_NAV.map((s) => (
+              <button
+                key={s.id}
+                className={`option-btn${seccion === s.id ? ' active' : ''}`}
+                data-title={s.titulo}
+                onClick={() => onSeccion(s.id)}
+              >
+                <IconoRail paths={s.icono} />
+              </button>
+            ))}
+          </div>
+          <div className="user-group">
+            <button className="user-btn" data-title="Salir" onClick={onSalir}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+            </button>
+          </div>
+        </aside>
+      )}
+
+      <main className="contenido-shell">
+        <div className="content-header">
+          <div className="badge-huella">
+            <span>Plataforma</span>
+            {tituloActivo && (
+              <>
+                <span className="separator">|</span>
+                <span>{tituloActivo}</span>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="contenido">{children}</div>
+      </main>
+    </div>
+  );
+}

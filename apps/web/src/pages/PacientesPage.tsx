@@ -204,6 +204,7 @@ function NuevoPacienteForm({
       if (microchip) data.microchip = microchip;
       if (Object.keys(datosEspecificos).length > 0) data.datosEspecificos = datosEspecificos;
       await api.crearAnimal(sesion, data);
+      api.registrarEvento(sesion, 'accion', 'animal-crear');
       limpiarBorrador();
       onCreado();
     } catch (err) {

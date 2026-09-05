@@ -675,6 +675,7 @@ function NuevoEstablecimientoForm({
       if (ubicacion) data.ubicacion = ubicacion;
       if (superficieHa) data.superficieHa = Number(superficieHa);
       await api.crearEstablecimiento(sesion, data);
+      api.registrarEvento(sesion, 'accion', 'tropera-establecimiento-crear');
       onCreado();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
@@ -774,6 +775,7 @@ function NuevoEventoForm({
       if (resultadoReproductivo) data.resultadoReproductivo = resultadoReproductivo;
       if (toroVirtualId) data.toroVirtualId = toroVirtualId;
       await api.crearEvento(sesion, data);
+      api.registrarEvento(sesion, 'accion', 'tropera-evento-crear');
       onCreado();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
@@ -929,6 +931,7 @@ function PotrerosSection({
       const data: Record<string, unknown> = { establecimientoId: establecimiento.id, nombre };
       if (superficieHa) data.superficieHa = Number(superficieHa);
       await api.crearPotrero(sesion, data);
+      api.registrarEvento(sesion, 'accion', 'tropera-potrero-crear');
       setNombre('');
       setSuperficieHa('');
       setMostrarForm(false);
@@ -1027,6 +1030,7 @@ function AnimalesCampoSection({
     setDandoAltaExpress(true);
     try {
       await api.crearAnimalCampo(sesion, { establecimientoId: establecimiento.id, categoria: categoriaExpress });
+      api.registrarEvento(sesion, 'accion', 'tropera-animal-alta-express');
       cargar();
     } catch (err) {
       alert('No se pudo dar de alta: ' + (err instanceof Error ? err.message : 'error'));
@@ -1190,6 +1194,7 @@ function ConciliarInline({
     setGuardando(true);
     try {
       await api.conciliarAnimalCampo(sesion, animal.id, caravana.trim());
+      api.registrarEvento(sesion, 'accion', 'tropera-animal-conciliar-caravana');
       onListo();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar');
@@ -1243,6 +1248,7 @@ function NuevoAnimalCampoForm({
       if (sexo) data.sexo = sexo;
       if (observaciones) data.observaciones = observaciones;
       await api.crearAnimalCampo(sesion, data);
+      api.registrarEvento(sesion, 'accion', 'tropera-animal-crear');
       onCreado();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
@@ -1466,6 +1472,7 @@ function EvaluacionAndrologicaSection({ sesion, animal }: { sesion: Sesion; anim
         circunferenciaEscrotalCm: Number(circunferencia),
         motilidadPorcentaje: Number(motilidad),
       });
+      api.registrarEvento(sesion, 'accion', 'tropera-evaluacion-androlgica-crear');
       setCircunferencia('');
       setMotilidad('');
       setMostrarForm(false);
@@ -1579,6 +1586,7 @@ function EditarAnimalCampoForm({
         potreroId: potreroId || null,
         observaciones: observaciones || undefined,
       });
+      api.registrarEvento(sesion, 'accion', 'tropera-animal-editar');
       onGuardado(actualizado);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
@@ -1763,6 +1771,7 @@ function NuevaMuestraForm({
       if (tipoMuestra) data.tipoMuestra = tipoMuestra;
       if (observaciones) data.observaciones = observaciones;
       await api.crearMuestra(sesion, data);
+      api.registrarEvento(sesion, 'accion', 'tropera-muestra-crear');
       onCreada();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
@@ -1839,6 +1848,7 @@ function AplicarPlantillaSection({
     setMensaje(null);
     try {
       const creados = await api.aplicarPlantillaTareas(sesion, plantillaId, animal.id, establecimiento.id);
+      api.registrarEvento(sesion, 'accion', 'tropera-plantilla-aplicar');
       setMensaje(`Se cargaron ${creados.length} eventos.`);
       onAplicada();
     } catch (err) {
@@ -1902,6 +1912,7 @@ function AplicarProtocoloSection({
         establecimientoId: establecimiento.id,
         fechaInicio,
       });
+      api.registrarEvento(sesion, 'accion', 'tropera-protocolo-aplicar');
       setTareas((prev) => [...prev, ...creadas].sort((a, b) => a.fechaProgramada.localeCompare(b.fechaProgramada)));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo aplicar el protocolo');
@@ -1913,6 +1924,7 @@ function AplicarProtocoloSection({
   async function marcar(tarea: Tarea, estado: 'completada' | 'cancelada') {
     try {
       const actualizada = await api.actualizarTarea(sesion, tarea.id, { estado });
+      api.registrarEvento(sesion, 'accion', 'tropera-tarea-marcar');
       setTareas((prev) => prev.map((t) => (t.id === tarea.id ? actualizada : t)));
     } catch (err) {
       alert('No se pudo actualizar: ' + (err instanceof Error ? err.message : 'error'));
@@ -2044,6 +2056,7 @@ function GestorPlantillas({ sesion }: { sesion: Sesion }) {
         nombre,
         items: items.map((it) => ({ tipo: it.tipo, producto: it.producto || undefined })),
       });
+      api.registrarEvento(sesion, 'accion', 'tropera-plantilla-crear');
       setNombre('');
       setItems([{ tipo: 'vacunacion', producto: '' }]);
       setMostrarForm(false);
@@ -2160,6 +2173,7 @@ function GestorProtocolos({ sesion }: { sesion: Sesion }) {
           producto: p.producto || undefined,
         })),
       });
+      api.registrarEvento(sesion, 'accion', 'tropera-protocolo-crear');
       setNombre('');
       setDescripcion('');
       setPasos([{ diaOffset: '0', descripcion: '', producto: '' }]);
@@ -2272,6 +2286,7 @@ function TareasSection({ sesion, establecimiento }: { sesion: Sesion; establecim
   async function marcar(tarea: Tarea, estado: 'completada' | 'cancelada') {
     try {
       await api.actualizarTarea(sesion, tarea.id, { estado });
+      api.registrarEvento(sesion, 'accion', 'tropera-tarea-marcar');
       cargar();
     } catch (err) {
       alert('No se pudo actualizar: ' + (err instanceof Error ? err.message : 'error'));
@@ -2377,6 +2392,7 @@ function NuevoMovimientoForm({
       if (fecha) data.fecha = fecha;
       if (observaciones) data.observaciones = observaciones;
       await api.crearMovimiento(sesion, data);
+      api.registrarEvento(sesion, 'accion', 'tropera-movimiento-crear');
       onCreado();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
@@ -2481,6 +2497,7 @@ function FilaExistencia({
         categoria: existencia.categoria,
         cantidad: Number(cantidad),
       });
+      api.registrarEvento(sesion, 'accion', 'tropera-existencia-corregir');
       onGuardada(nueva);
     } catch (err) {
       alert('No se pudo guardar: ' + (err instanceof Error ? err.message : 'error'));
@@ -2546,6 +2563,7 @@ function EditarEstablecimientoForm({
       if (ubicacion) data.ubicacion = ubicacion;
       if (superficieHa) data.superficieHa = Number(superficieHa);
       const actualizado = await api.actualizarEstablecimiento(sesion, establecimiento.id, data);
+      api.registrarEvento(sesion, 'accion', 'tropera-establecimiento-editar');
       onGuardado(actualizado);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
