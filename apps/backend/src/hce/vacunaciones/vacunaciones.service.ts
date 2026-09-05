@@ -77,10 +77,27 @@ export class VacunacionesService {
         and(
           eq(vacunaciones.organizacionId, organizacionId),
           isNull(vacunaciones.deletedAt),
+          isNull(vacunaciones.recordatorioDescartadoEn),
           isNotNull(vacunaciones.proximaDosis),
           sql`${vacunaciones.proximaDosis} <= current_date + ${dias}::int`,
         ),
       )
       .orderBy(asc(vacunaciones.proximaDosis));
+  }
+
+  /** Saca una vacuna puntual de recordatorios() sin tocar el resto de sus datos (no es un borrado). */
+  async descartarRecordatorio(organizacionId: string, id: string) {
+    const [vacunacion] = await this.db
+      .select({ id: vacunaciones.id })
+      .from(vacunaciones)
+      .where(and(eq(vacunaciones.id, id), eq(vacunaciones.organizacionId, organizacionId)))
+      .limit(1);
+    if (!vacunacion) throw new NotFoundException('Vacunación no encontrada');
+
+    await this.db
+      .update(vacunaciones)
+      .set({ recordatorioDescartadoEn: new Date(), updatedAt: new Date() })
+      .where(eq(vacunaciones.id, id));
+    return { ok: true };
   }
 }

@@ -43,6 +43,7 @@ export interface AnimalPortal {
   fechaNacimiento: string | null;
   codigoLegible: string | null;
   microchip: string | null;
+  fotoUrl?: string | null;
   datosEspecificos?: Record<string, unknown>;
   vacunaciones: VacunaPortal[];
   turnos: TurnoPortal[];
@@ -76,6 +77,22 @@ export async function solicitarTurnoPortal(
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Portal-Token': token },
     body: JSON.stringify(data),
+  });
+  return manejar(res);
+}
+
+/** Sube/reemplaza la foto de perfil de una mascota (ya comprimida por el cliente, ver utils/comprimirImagen.ts). */
+export async function subirFotoPortal(
+  token: string,
+  animalId: string,
+  foto: Blob,
+): Promise<{ ok: boolean; fotoUrl: string }> {
+  const form = new FormData();
+  form.append('foto', foto, 'foto.jpg');
+  const res = await fetch(`${API}/portal/animales/${animalId}/foto`, {
+    method: 'POST',
+    headers: { 'X-Portal-Token': token },
+    body: form,
   });
   return manejar(res);
 }

@@ -29,7 +29,7 @@ export interface TratamientoPortal {
 export interface PortalResumen {
   animal: {
     nombre: string; especie: string; raza: string; sexo: string;
-    nacimiento: string | null; codigoLegible: string; microchip: string; dueno: string;
+    nacimiento: string | null; codigoLegible: string; microchip: string; fotoUrl?: string | null; dueno: string;
   };
   vacunas: VacunaPortal[];
   consultas: ConsultaPortal[];

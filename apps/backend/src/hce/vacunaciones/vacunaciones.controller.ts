@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -49,5 +50,15 @@ export class VacunacionesController {
     @Param('animalId') animalId: string,
   ) {
     return this.vacunaciones.historiaPorAnimal(organizacionId, animalId);
+  }
+
+  /** Saca esta vacuna puntual de la lista de recordatorios (no la borra). */
+  @Patch(':id/descartar-recordatorio')
+  @Roles('propietario', 'admin', 'veterinario', 'recepcion')
+  descartarRecordatorio(
+    @CurrentOrg() organizacionId: string,
+    @Param('id') id: string,
+  ) {
+    return this.vacunaciones.descartarRecordatorio(organizacionId, id);
   }
 }

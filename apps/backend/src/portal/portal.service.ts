@@ -47,6 +47,7 @@ export class PortalService {
         codigoLegible: animales.codigoLegible,
         microchip: animales.microchip,
         datosEspecificos: animales.datosEspecificos,
+        fotoUrl: animales.fotoUrl,
         especieNombre: especies.nombre,
       })
       .from(animales)
@@ -115,6 +116,7 @@ export class PortalService {
           fechaNacimiento: a.fechaNacimiento,
           codigoLegible: a.codigoLegible,
           microchip: a.microchip,
+          fotoUrl: a.fotoUrl,
           datosEspecificos: a.datosEspecificos, // incluye raza si está cargada
           vacunaciones: vac.map((v) => ({
             nombre: v.producto, // en la base el nombre vive en "producto"
@@ -185,5 +187,33 @@ export class PortalService {
       .returning({ id: turnos.id, estado: turnos.estado });
 
     return { ok: true, turnoId: turno.id, estado: turno.estado };
+  }
+
+  /**
+   * El dueño sube/reemplaza la foto de perfil de UNA DE SUS mascotas. Misma
+   * verificación de propiedad que solicitarTurno() antes de tocar nada.
+   * `fotoUrl` ya viene resuelta (absoluta) desde el controller — el service
+   * no sabe nada de multer/filesystem.
+   */
+  async actualizarFoto(persona: PersonaCtx, animalId: string, fotoUrl: string) {
+    const [animal] = await this.db
+      .select({ id: animales.id })
+      .from(animales)
+      .where(
+        and(
+          eq(animales.id, animalId),
+          eq(animales.personaId, persona.id),
+          eq(animales.organizacionId, persona.organizacionId),
+          isNull(animales.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    if (!animal) {
+      throw new ForbiddenException('Ese paciente no está asociado a tu cuenta');
+    }
+
+    await this.db.update(animales).set({ fotoUrl, updatedAt: new Date() }).where(eq(animales.id, animalId));
+    return { ok: true, fotoUrl };
   }
 }

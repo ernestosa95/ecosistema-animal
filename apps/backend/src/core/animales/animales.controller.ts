@@ -1,12 +1,16 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   Param,
   Patch,
   Post,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { AnimalesService } from './animales.service';
 import { CreateAnimalDto } from './dto/create-animal.dto';
 import { UpdateAnimalDto } from './dto/update-animal.dto';
@@ -15,6 +19,7 @@ import { TenantGuard } from '../../common/guards/tenant.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentOrg } from '../../common/decorators/current-context.decorator';
+import { OPCIONES_FOTO_ANIMAL, fotoUrlDeArchivo } from '../../common/foto-animal-upload';
 
 /**
  * Todas las rutas requieren: token válido (JwtAuthGuard) + pertenencia a la
@@ -50,5 +55,23 @@ export class AnimalesController {
     @Body() dto: UpdateAnimalDto,
   ) {
     return this.animales.actualizar(organizacionId, id, dto);
+  }
+
+  /**
+   * STAFF — sube/reemplaza la foto de perfil del paciente desde la ficha
+   * (a diferencia de `portal/portal.controller.ts`, que es el mismo flujo
+   * pero para el dueño vía magic-link). Mismas opciones de multer
+   * compartidas (common/foto-animal-upload.ts).
+   */
+  @Post(':id/foto')
+  @Roles('propietario', 'admin', 'veterinario', 'recepcion')
+  @UseInterceptors(FileInterceptor('foto', OPCIONES_FOTO_ANIMAL))
+  subirFoto(
+    @CurrentOrg() organizacionId: string,
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('Falta el archivo de la foto');
+    return this.animales.actualizar(organizacionId, id, { fotoUrl: fotoUrlDeArchivo(file) });
   }
 }

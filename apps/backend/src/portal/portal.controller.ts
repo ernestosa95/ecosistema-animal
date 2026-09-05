@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -7,14 +8,18 @@ import {
   Param,
   Post,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { and, eq, isNull } from 'drizzle-orm';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../common/guards/tenant.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentOrg } from '../common/decorators/current-context.decorator';
+import { OPCIONES_FOTO_ANIMAL, fotoUrlDeArchivo } from '../common/foto-animal-upload';
 import { DRIZZLE, DrizzleDB } from '../database/drizzle.provider';
 import { personas } from '../database/schema';
 import { PortalGuard } from './portal.guard';
@@ -74,5 +79,18 @@ export class PortalController {
   @UseGuards(PortalGuard)
   solicitar(@Req() req: any, @Body() dto: SolicitarTurnoDto) {
     return this.portal.solicitarTurno(req.persona, dto);
+  }
+
+  /**
+   * DUEÑO — sube/reemplaza la foto de perfil de una de sus mascotas.
+   * Opciones de multer compartidas con el alta desde la ficha (staff) — ver
+   * common/foto-animal-upload.ts.
+   */
+  @Post('animales/:animalId/foto')
+  @UseGuards(PortalGuard)
+  @UseInterceptors(FileInterceptor('foto', OPCIONES_FOTO_ANIMAL))
+  async subirFoto(@Req() req: any, @Param('animalId') animalId: string, @UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('Falta el archivo de la foto');
+    return this.portal.actualizarFoto(req.persona, animalId, fotoUrlDeArchivo(file));
   }
 }

@@ -28,6 +28,9 @@ apps/backend/.data/
 # Drizzle (temporales; las migraciones SÍ se versionan)
 .drizzle/
 
+# Archivos subidos por usuarios (filesystem local, sin storage externo)
+apps/backend/uploads/
+
 # Logs
 logs/
 *.log
