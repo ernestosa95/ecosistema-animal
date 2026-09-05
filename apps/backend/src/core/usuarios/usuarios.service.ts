@@ -2,13 +2,16 @@ import {
   Injectable,
   Inject,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import * as bcrypt from 'bcryptjs';
 import { DRIZZLE, DrizzleDB } from '../../database/drizzle.provider';
-import { membresias, usuarios } from '../../database/schema';
+import { membresias, usuarios, organizaciones, planes } from '../../database/schema';
+import { verificarLimitesRoles } from '../../common/verificar-limites-roles';
+import { AgregarMiembroDto } from './dto/agregar-miembro.dto';
 
 /** Roles habilitados para atender (para el selector de "profesional" del turno). */
 type Rol = 'propietario' | 'admin' | 'capataz' | 'veterinario' | 'recepcion';
@@ -114,5 +117,96 @@ export class UsuariosService {
       temporal: generada,
       password: generada ? password : undefined,
     };
+  }
+
+  /**
+   * Alta de un miembro por un propietario/admin de la propia organización
+   * (self-service — antes esto sólo existía vía `/admin` para el super-admin
+   * de plataforma). Mismo criterio que `AdminService.agregarMiembro()`:
+   * reutiliza el usuario si el email ya existe, respeta el cupo por rol del
+   * plan (`verificarLimitesRoles`).
+   */
+  async agregarMiembro(organizacionId: string, dto: AgregarMiembroDto) {
+    await verificarLimitesRoles(this.db, organizacionId, null, dto.roles);
+
+    let [usuario] = await this.db
+      .select()
+      .from(usuarios)
+      .where(eq(usuarios.email, dto.email))
+      .limit(1);
+
+    let creado = false;
+    if (!usuario) {
+      if (!dto.password) {
+        throw new BadRequestException('El usuario es nuevo: hay que definir una contraseña');
+      }
+      const passwordHash = await bcrypt.hash(dto.password, 10);
+      [usuario] = await this.db
+        .insert(usuarios)
+        .values({ email: dto.email, passwordHash, nombre: dto.nombre, apellido: dto.apellido })
+        .returning();
+      creado = true;
+    }
+
+    const [ya] = await this.db
+      .select({ id: membresias.id })
+      .from(membresias)
+      .where(and(eq(membresias.usuarioId, usuario.id), eq(membresias.organizacionId, organizacionId)))
+      .limit(1);
+    if (ya) throw new ConflictException('El usuario ya es miembro de esta organización');
+
+    await this.db.insert(membresias).values({
+      usuarioId: usuario.id,
+      organizacionId,
+      roles: dto.roles as Rol[],
+    });
+
+    return {
+      creado,
+      roles: dto.roles,
+      usuario: { id: usuario.id, email: usuario.email, nombre: usuario.nombre, apellido: usuario.apellido },
+    };
+  }
+
+  /**
+   * Cupo por rol del plan de la organización + cuántos miembros activos hay
+   * hoy de cada uno — para que la propia organización sepa, sin pasar por
+   * /admin, cuántos usuarios más puede dar de alta de cada rol (usado por el
+   * wizard de configuración rápida). Un rol sin límite en el plan (o sin
+   * plan asignado) figura con `limite: null` (sin tope).
+   */
+  async limitesPlan(organizacionId: string) {
+    const ROLES = ['propietario', 'admin', 'capataz', 'veterinario', 'recepcion'] as const;
+    const [org] = await this.db
+      .select({ planId: organizaciones.planId })
+      .from(organizaciones)
+      .where(eq(organizaciones.id, organizacionId))
+      .limit(1);
+
+    let limites: Record<string, number> = {};
+    if (org?.planId) {
+      const [plan] = await this.db
+        .select({ limitesRoles: planes.limitesRoles })
+        .from(planes)
+        .where(eq(planes.id, org.planId))
+        .limit(1);
+      limites = (plan?.limitesRoles ?? {}) as Record<string, number>;
+    }
+
+    const resultado: Record<string, { limite: number | null; usados: number }> = {};
+    for (const rol of ROLES) {
+      const actuales = await this.db
+        .select({ id: membresias.id })
+        .from(membresias)
+        .where(
+          and(
+            eq(membresias.organizacionId, organizacionId),
+            eq(membresias.activo, true),
+            sql`${rol} = ANY(${membresias.roles})`,
+          ),
+        );
+      resultado[rol] = { limite: limites[rol] ?? null, usados: actuales.length };
+    }
+    return resultado;
   }
 }

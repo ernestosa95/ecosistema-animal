@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { Miembro, ResetPasswordResultado } from '../api/client';
 import type { Sesion } from '../api/types';
+import { FormAltaMiembro, type LimitesPlan } from '../components/FormAltaMiembro';
+import { GestionAgendas } from './turnos/GestionAgendas';
 
 const ETIQUETAS_ROL: Record<string, string> = {
   propietario: 'Propietario',
@@ -13,9 +15,12 @@ const ETIQUETAS_ROL: Record<string, string> = {
 
 export function UsuariosPage({ sesion }: { sesion: Sesion }) {
   const [miembros, setMiembros] = useState<Miembro[]>([]);
+  const [limites, setLimites] = useState<LimitesPlan | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [abiertoId, setAbiertoId] = useState<string | null>(null);
+  const [mostrarAlta, setMostrarAlta] = useState(false);
+  const [mostrarAgendas, setMostrarAgendas] = useState(false);
 
   async function cargar() {
     setCargando(true);
@@ -31,6 +36,7 @@ export function UsuariosPage({ sesion }: { sesion: Sesion }) {
 
   useEffect(() => {
     cargar();
+    api.limitesPlan(sesion).then(setLimites).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -38,8 +44,25 @@ export function UsuariosPage({ sesion }: { sesion: Sesion }) {
     <div>
       <div className="page-head">
         <h1>Usuarios</h1>
+        <div className="acciones">
+          <button className="btn-ghost" onClick={() => setMostrarAgendas(true)}>⚙ Agendas</button>
+          <button className="btn" onClick={() => setMostrarAlta((v) => !v)}>
+            {mostrarAlta ? 'Cancelar' : '+ Nuevo usuario'}
+          </button>
+        </div>
       </div>
-      <p className="muted">Personal de tu organización. Sólo propietario/admin pueden resetear contraseñas.</p>
+      <p className="muted">Personal de tu organización. Sólo propietario/admin pueden agregar usuarios o resetear contraseñas.</p>
+
+      {mostrarAlta && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <h4 className="form-titulo">Nuevo usuario</h4>
+          <FormAltaMiembro
+            sesion={sesion}
+            limites={limites}
+            onCreado={() => { setMostrarAlta(false); cargar(); api.limitesPlan(sesion).then(setLimites).catch(() => {}); }}
+          />
+        </div>
+      )}
 
       {error && <div className="alerta">{error}</div>}
 
@@ -71,6 +94,8 @@ export function UsuariosPage({ sesion }: { sesion: Sesion }) {
           </table>
         </div>
       )}
+
+      {mostrarAgendas && <GestionAgendas onClose={() => setMostrarAgendas(false)} />}
     </div>
   );
 }
@@ -103,6 +128,7 @@ function FilaMiembro({
     setGuardando(true);
     try {
       const r = await api.resetearPassword(sesion, miembro.usuarioId, nuevaPassword.trim() || undefined);
+      api.registrarEvento(sesion, 'accion', 'usuario-resetear-password');
       setResultado(r);
       setNuevaPassword('');
     } catch (err) {

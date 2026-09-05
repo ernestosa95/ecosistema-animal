@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { UsuariosService } from './usuarios.service';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { AgregarMiembroDto } from './dto/agregar-miembro.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../common/guards/tenant.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -19,6 +20,23 @@ export class UsuariosController {
   @Get()
   listar(@CurrentOrg() organizacionId: string, @Query('rol') rol?: string) {
     return this.usuarios.listarMiembros(organizacionId, rol);
+  }
+
+  /** Cupo por rol del plan + cuántos hay usados hoy (para el wizard de configuración rápida). */
+  @Get('limites-plan')
+  limitesPlan(@CurrentOrg() organizacionId: string) {
+    return this.usuarios.limitesPlan(organizacionId);
+  }
+
+  /**
+   * Alta de un miembro de la propia organización. Solo propietario/admin.
+   * RolesGuard corre después de TenantGuard (usa req.roles).
+   */
+  @Post()
+  @Roles('propietario', 'admin')
+  @UseGuards(RolesGuard)
+  agregarMiembro(@CurrentOrg() organizacionId: string, @Body() dto: AgregarMiembroDto) {
+    return this.usuarios.agregarMiembro(organizacionId, dto);
   }
 
   /**
