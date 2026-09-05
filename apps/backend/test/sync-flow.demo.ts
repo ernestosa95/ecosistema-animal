@@ -15,6 +15,7 @@ import { randomUUID } from 'crypto';
 import * as core from '../src/database/schema/core';
 import * as hce from '../src/database/schema/hce';
 import * as tropera from '../src/database/schema/tropera';
+import * as farmacia from '../src/database/schema/farmacia';
 import { pull, push } from '../src/sync/sync.core';
 import { validarCodigoLegible } from '../src/core/animales/codigo-legible.util';
 
@@ -35,7 +36,7 @@ async function main() {
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), nombre text NOT NULL,
       huella_activa boolean NOT NULL DEFAULT true, tropera_activa boolean NOT NULL DEFAULT false, cuit text, direccion text, localidad text, provincia text, telefono text, email text,
       activo boolean NOT NULL DEFAULT true,
-      grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, es_demo boolean NOT NULL DEFAULT false,
+      grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, fecha_activacion timestamptz, es_demo boolean NOT NULL DEFAULT false,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
     CREATE TABLE core.usuarios (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text NOT NULL UNIQUE, password_hash text NOT NULL,
@@ -64,13 +65,13 @@ async function main() {
       organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
       animal_id uuid NOT NULL REFERENCES core.animales(id), veterinario_id uuid REFERENCES core.usuarios(id),
       fecha timestamptz NOT NULL DEFAULT now(), motivo text, anamnesis text, examen_fisico text,
-      diagnostico text, tratamiento text, peso_kg numeric(6,2), temperatura_c numeric(4,1), observaciones text,
+      diagnostico text, tratamiento text, peso_kg numeric(6,2), temperatura_c numeric(4,1), observaciones text, costo numeric(12,2),
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
     CREATE TABLE hce.vacunaciones (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
       animal_id uuid NOT NULL REFERENCES core.animales(id), veterinario_id uuid REFERENCES core.usuarios(id),
-      producto text, vademecum_id uuid, fecha date NOT NULL DEFAULT current_date, proxima_dosis date, lote_producto text,
+      producto text, vademecum_id uuid, fecha date NOT NULL DEFAULT current_date, proxima_dosis date, lote_producto text, recordatorio_descartado_en timestamptz,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
     CREATE TABLE hce.turnos (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -165,9 +166,35 @@ async function main() {
       hallazgo_id uuid REFERENCES tropera.hallazgos(id), resultado_reproductivo text,
       toro_virtual_id uuid REFERENCES tropera.toros_virtuales(id),
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+
+    CREATE SCHEMA farmacia;
+    CREATE TYPE farmacia.tipo_movimiento_stock AS ENUM ('compra','uso','vencimiento','merma','venta');
+    CREATE TABLE farmacia.productos (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      nombre text NOT NULL, presentacion text, unidad text, categoria text,
+      es_medicamento boolean NOT NULL DEFAULT false, es_fraccionable boolean NOT NULL DEFAULT false,
+      concentracion numeric(10,3), unidad_concentracion text, dosis_sugerida_mg_kg numeric(10,3),
+      precio numeric(12,2), precio_compra numeric(12,2),
+      activo boolean NOT NULL DEFAULT true,
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+    CREATE TABLE farmacia.stock (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      producto_id uuid NOT NULL REFERENCES farmacia.productos(id) ON DELETE CASCADE,
+      cantidad integer NOT NULL DEFAULT 0,
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+    CREATE TABLE farmacia.movimientos_stock (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      producto_id uuid NOT NULL REFERENCES farmacia.productos(id) ON DELETE CASCADE,
+      tipo farmacia.tipo_movimiento_stock NOT NULL, cantidad integer NOT NULL,
+      fecha date NOT NULL DEFAULT current_date, observaciones text,
+      consulta_id uuid REFERENCES hce.consultas(id), usuario_id uuid,
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
   `);
 
-  const db = drizzle(client, { schema: { ...core, ...hce, ...tropera } });
+  const db = drizzle(client, { schema: { ...core, ...hce, ...tropera, ...farmacia } });
 
   // Seed: dos organizaciones + una especie compartida.
   const [orgA] = await db.insert(core.organizaciones).values({ nombre: 'Clínica A' }).returning();
@@ -348,6 +375,47 @@ async function main() {
     p5.changes.hallazgos.created.length === 1 &&
     p5.changes.toros_virtuales.created.length === 1
   ));
+
+  console.log('13) Farmacia: push de producto + compra ajusta stock (venta offline, F.Home mobile)');
+  const productoId = randomUUID();
+  await push(db, orgA.id, {
+    productos: { created: [{ id: productoId, nombre: 'Amoxicilina 500mg', precio: '1200.00' }], updated: [], deleted: [] },
+  });
+  const movCompraStockId = randomUUID();
+  await push(db, orgA.id, {
+    movimientos_stock: {
+      created: [{ id: movCompraStockId, producto_id: productoId, tipo: 'compra', cantidad: 20, fecha: '2026-09-02' }],
+      updated: [], deleted: [],
+    },
+  });
+  const stockDespuesCompra = await db.select().from(farmacia.stock).where(eq(farmacia.stock.productoId, productoId));
+  check('la compra offline creó la fila de stock', stockDespuesCompra.length === 1);
+  check('stock quedó en 20 tras la compra', stockDespuesCompra[0]?.cantidad === 20);
+
+  console.log('14) Farmacia: venta offline resta stock; venta que dejaría negativo se rechaza sin romper el lote');
+  await push(db, orgA.id, {
+    movimientos_stock: {
+      created: [{ id: randomUUID(), producto_id: productoId, tipo: 'venta', cantidad: 5, fecha: '2026-09-02' }],
+      updated: [], deleted: [],
+    },
+  });
+  const stockTrasVenta = await db.select().from(farmacia.stock).where(eq(farmacia.stock.productoId, productoId));
+  check('la venta offline restó del stock (20-5=15)', stockTrasVenta[0]?.cantidad === 15);
+
+  let ventaRechazada = false;
+  try {
+    await push(db, orgA.id, {
+      movimientos_stock: {
+        created: [{ id: randomUUID(), producto_id: productoId, tipo: 'venta', cantidad: 999, fecha: '2026-09-02' }],
+        updated: [], deleted: [],
+      },
+    });
+  } catch {
+    ventaRechazada = true;
+  }
+  check('la venta que dejaría stock negativo se rechaza', ventaRechazada);
+  const stockSinCambios = await db.select().from(farmacia.stock).where(eq(farmacia.stock.productoId, productoId));
+  check('el stock no cambió tras el rechazo', stockSinCambios[0]?.cantidad === 15);
 
   console.log(`\nRESULTADO: ${ok} OK, ${fail} fallas`);
   await client.close();

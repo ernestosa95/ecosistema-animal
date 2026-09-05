@@ -32,7 +32,7 @@ async function main() {
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), nombre text NOT NULL,
       huella_activa boolean NOT NULL DEFAULT true, tropera_activa boolean NOT NULL DEFAULT false, cuit text, direccion text, localidad text, provincia text, telefono text, email text,
       activo boolean NOT NULL DEFAULT true,
-      grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, es_demo boolean NOT NULL DEFAULT false,
+      grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, fecha_activacion timestamptz, es_demo boolean NOT NULL DEFAULT false,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz
     );
     CREATE TABLE core.usuarios (
@@ -56,7 +56,7 @@ async function main() {
       organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
       animal_id uuid NOT NULL REFERENCES core.animales(id), veterinario_id uuid REFERENCES core.usuarios(id),
       fecha timestamptz NOT NULL DEFAULT now(), motivo text, anamnesis text, examen_fisico text,
-      diagnostico text, tratamiento text, peso_kg numeric(6,2), temperatura_c numeric(4,1), observaciones text,
+      diagnostico text, tratamiento text, peso_kg numeric(6,2), temperatura_c numeric(4,1), observaciones text, costo numeric(12,2),
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz
     );
     CREATE TABLE farmacia.productos (
@@ -74,7 +74,7 @@ async function main() {
       organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
       producto_id uuid NOT NULL REFERENCES farmacia.productos(id) ON DELETE CASCADE,
       cantidad integer NOT NULL DEFAULT 0,
-      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz
     );
     CREATE TYPE farmacia.tipo_movimiento_stock AS ENUM ('compra','uso','vencimiento','merma','venta');
     CREATE TABLE farmacia.movimientos_stock (
@@ -84,7 +84,7 @@ async function main() {
       tipo farmacia.tipo_movimiento_stock NOT NULL, cantidad integer NOT NULL,
       fecha date NOT NULL DEFAULT current_date, observaciones text,
       consulta_id uuid REFERENCES hce.consultas(id), usuario_id uuid,
-      created_at timestamptz NOT NULL DEFAULT now()
+      created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz
     );
   `);
 

@@ -32,7 +32,7 @@ async function main() {
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), nombre text NOT NULL,
       huella_activa boolean NOT NULL DEFAULT true, tropera_activa boolean NOT NULL DEFAULT false, cuit text, direccion text, localidad text, provincia text, telefono text, email text,
       activo boolean NOT NULL DEFAULT true,
-      grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, es_demo boolean NOT NULL DEFAULT false,
+      grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, fecha_activacion timestamptz, es_demo boolean NOT NULL DEFAULT false,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz
     );
     CREATE TABLE core.especies (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), codigo text NOT NULL UNIQUE, nombre text NOT NULL);
@@ -54,7 +54,7 @@ async function main() {
       veterinario_id uuid,
       fecha timestamptz NOT NULL DEFAULT now(),
       motivo text, anamnesis text, examen_fisico text, diagnostico text, tratamiento text,
-      peso_kg numeric(6,2), temperatura_c numeric(4,1), observaciones text,
+      peso_kg numeric(6,2), temperatura_c numeric(4,1), observaciones text, costo numeric(12,2),
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz
     );
     CREATE TABLE farmacia.productos (

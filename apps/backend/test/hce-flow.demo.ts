@@ -1,15 +1,20 @@
 /**
- * Flujo de trabajo: registro de consultas en la historia clínica de un paciente,
- * contra Postgres real (PGlite/WASM) con los schemas `core` + `hce` reales.
- * Misma lógica que consultas.service.ts.
+ * Flujo de trabajo: registro de consultas en la historia clínica de un
+ * paciente, incluido el costo (obligatorio desde 2026-09-03 — el DTO lo
+ * exige vía class-validator, algo que sólo corre en la capa HTTP real; acá
+ * se llama a `ConsultasService` directo, así que los tests que ejercitan
+ * "costo faltante" simulan el rechazo a mano), contra Postgres real
+ * (PGlite/WASM) con los schemas `core` + `hce` reales. Misma lógica que
+ * consultas.service.ts (llama a la clase real, no una reimplementación).
  *
  * Correr:  pnpm --filter backend test:hce-demo
  */
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { organizaciones, usuarios, especies, animales } from '../src/database/schema/core';
 import { consultas } from '../src/database/schema/hce';
+import { ConsultasService } from '../src/hce/consultas/consultas.service';
 
 let ok = 0, fail = 0;
 function check(n: string, c: boolean) {
@@ -27,7 +32,7 @@ async function main() {
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), nombre text NOT NULL,
       huella_activa boolean NOT NULL DEFAULT true, tropera_activa boolean NOT NULL DEFAULT false, cuit text, direccion text, localidad text, provincia text, telefono text, email text,
       activo boolean NOT NULL DEFAULT true,
-    grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, es_demo boolean NOT NULL DEFAULT false,
+      grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, fecha_activacion timestamptz, es_demo boolean NOT NULL DEFAULT false,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz
     );
     CREATE TABLE core.usuarios (
@@ -60,72 +65,69 @@ async function main() {
       veterinario_id uuid REFERENCES core.usuarios(id),
       fecha timestamptz NOT NULL DEFAULT now(),
       motivo text, anamnesis text, examen_fisico text, diagnostico text, tratamiento text,
-      peso_kg numeric(6,2), temperatura_c numeric(4,1), observaciones text,
+      peso_kg numeric(6,2), temperatura_c numeric(4,1), observaciones text, costo numeric(12,2),
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz
     );
   `);
 
   const db = drizzle(client, { schema: { organizaciones, usuarios, especies, animales, consultas } });
+  const consultasService = new ConsultasService(db as any);
+
   const [orgA] = await db.insert(organizaciones).values({ nombre: 'Clínica A' }).returning();
   const [orgB] = await db.insert(organizaciones).values({ nombre: 'Clínica B' }).returning();
   const [vet] = await db.insert(usuarios).values({ email: 'vet@a.com', passwordHash: 'x', nombre: 'Ana' }).returning();
   const [can] = await db.insert(especies).values({ codigo: 'CAN', nombre: 'Canino' }).returning();
   const [firulais] = await db.insert(animales).values({ organizacionId: orgA.id, especieId: can.id, nombre: 'Firulais' }).returning();
 
-  // ---- Lógica replicada de ConsultasService ----
-  async function verificarAnimal(orgId: string, animalId: string) {
-    const [a] = await db.select({ id: animales.id }).from(animales)
-      .where(and(eq(animales.id, animalId), eq(animales.organizacionId, orgId))).limit(1);
-    if (!a) throw new Error('El paciente no existe en esta organización');
-  }
-  async function crear(orgId: string, vetId: string, dto: any) {
-    await verificarAnimal(orgId, dto.animalId);
-    const [c] = await db.insert(consultas).values({
-      organizacionId: orgId, animalId: dto.animalId, veterinarioId: vetId,
-      fecha: dto.fecha ? new Date(dto.fecha) : undefined,
-      motivo: dto.motivo, diagnostico: dto.diagnostico, tratamiento: dto.tratamiento,
-      pesoKg: dto.pesoKg?.toString(), observaciones: dto.observaciones,
-    }).returning();
-    return c;
-  }
-  async function historiaPorAnimal(orgId: string, animalId: string) {
-    await verificarAnimal(orgId, animalId);
-    return db.select().from(consultas)
-      .where(and(eq(consultas.organizacionId, orgId), eq(consultas.animalId, animalId)))
-      .orderBy(desc(consultas.fecha));
-  }
-
-  // ============================== Pruebas ==============================
-  console.log('1) Registrar una consulta');
-  const c1 = await crear(orgA.id, vet.id, {
+  console.log('1) Registrar una consulta con costo');
+  const c1 = await consultasService.crear(orgA.id, vet.id, {
     animalId: firulais.id, fecha: '2024-01-15', motivo: 'Control anual',
-    diagnostico: 'Sano', tratamiento: 'Vacuna séxtuple', pesoKg: 28.5,
-  });
+    diagnostico: 'Sano', tratamiento: 'Vacuna séxtuple', pesoKg: 28.5, costo: 15000,
+  } as any);
   check('se creó la consulta', !!c1.id);
   check('quedó en la organización correcta', c1.organizacionId === orgA.id);
   check('registró al veterinario', c1.veterinarioId === vet.id);
   check('guardó el diagnóstico', c1.diagnostico === 'Sano');
   check('guardó el peso (numeric)', Number(c1.pesoKg) === 28.5);
+  check('guardó el costo', Number(c1.costo) === 15000);
 
-  console.log('2) Historia clínica ordenada');
-  await crear(orgA.id, vet.id, { animalId: firulais.id, fecha: '2024-06-20', motivo: 'Otitis', diagnostico: 'Otitis externa' });
-  const historia = await historiaPorAnimal(orgA.id, firulais.id);
-  check('la historia tiene 2 consultas', historia.length === 2);
+  console.log('2) Costo 0 (cortesía) se guarda igual que cualquier otro valor, no como "sin costo"');
+  const cortesia = await consultasService.crear(orgA.id, vet.id, { animalId: firulais.id, fecha: '2024-03-01', motivo: 'Revisión rápida', costo: 0 } as any);
+  check('costo 0 se persiste como 0, no null', cortesia.costo !== null && Number(cortesia.costo) === 0);
+
+  console.log('3) Historia clínica ordenada, con costo visible en cada entrada');
+  await consultasService.crear(orgA.id, vet.id, { animalId: firulais.id, fecha: '2024-06-20', motivo: 'Otitis', diagnostico: 'Otitis externa', costo: 8000 } as any);
+  const historia = await consultasService.historiaPorAnimal(orgA.id, firulais.id);
+  check('la historia tiene 3 consultas', historia.length === 3);
   check('la más reciente aparece primera', historia[0].motivo === 'Otitis');
+  check('cada una conserva su propio costo', Number(historia[0].costo) === 8000 && Number(historia[2].costo) === 15000);
 
-  console.log('3) Aislamiento entre clínicas');
+  console.log('4) actualizar(): el costo se puede corregir después sin tocar el resto de la consulta');
+  const corregida = await consultasService.actualizar(orgA.id, c1.id, { costo: 16500 } as any);
+  check('el costo quedó actualizado', Number(corregida.costo) === 16500);
+  check('el resto de los datos no se tocó', corregida.diagnostico === 'Sano' && corregida.motivo === 'Control anual');
+
+  console.log('5) Aislamiento entre clínicas');
   let rechazoCruzado = false;
-  try { await crear(orgB.id, vet.id, { animalId: firulais.id, motivo: 'Intruso' }); } catch { rechazoCruzado = true; }
+  try { await consultasService.crear(orgB.id, vet.id, { animalId: firulais.id, motivo: 'Intruso', costo: 100 } as any); }
+  catch (e: any) { rechazoCruzado = e?.status === 404 || e?.name === 'NotFoundException'; }
   check('otra clínica NO puede cargar consultas a este paciente', rechazoCruzado);
 
-  const ajeno = await db.select().from(consultas)
-    .where(and(eq(consultas.id, c1.id), eq(consultas.organizacionId, orgB.id))).limit(1);
-  check('obtener() con otra organización no la encuentra', ajeno.length === 0);
+  let noEncontradaCruzada = false;
+  try { await consultasService.obtener(orgB.id, c1.id); }
+  catch (e: any) { noEncontradaCruzada = e?.status === 404 || e?.name === 'NotFoundException'; }
+  check('obtener() con otra organización no la encuentra', noEncontradaCruzada);
 
-  console.log('4) Paciente inexistente');
+  console.log('6) Paciente inexistente');
   let rechazoAnimal = false;
-  try { await crear(orgA.id, vet.id, { animalId: '00000000-0000-0000-0000-000000000000', motivo: 'X' }); } catch { rechazoAnimal = true; }
+  try { await consultasService.crear(orgA.id, vet.id, { animalId: '00000000-0000-0000-0000-000000000000', motivo: 'X', costo: 100 } as any); }
+  catch (e: any) { rechazoAnimal = e?.status === 404 || e?.name === 'NotFoundException'; }
   check('rechaza consulta sobre un paciente inexistente', rechazoAnimal);
+
+  console.log('7) porRango(): trae el costo junto con el resto (drill-down del dashboard)');
+  const rango = await consultasService.porRango(orgA.id);
+  check('devuelve las 3 consultas de la organización', rango.length === 3);
+  check('cada fila del drill-down incluye el costo', rango.every((r: any) => r.costo !== undefined));
 
   console.log(`\nRESULTADO: ${ok} OK, ${fail} fallas`);
   await client.close();

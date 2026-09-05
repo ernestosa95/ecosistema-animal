@@ -32,7 +32,7 @@ await client.exec(`
     huella_activa boolean NOT NULL DEFAULT true, tropera_activa boolean NOT NULL DEFAULT false,
     cuit text, direccion text, localidad text, provincia text, telefono text, email text,
     activo boolean NOT NULL DEFAULT true,
-    grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, es_demo boolean NOT NULL DEFAULT false,
+    grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, fecha_activacion timestamptz, es_demo boolean NOT NULL DEFAULT false,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     deleted_at timestamptz
