@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSesion } from './auth/useSesion';
 import { api, configurarRefrescoSesion } from './api/client';
 import { LoginPage } from './pages/LoginPage';
+import { LandingPage } from './pages/LandingPage';
 import { PacientesPage } from './pages/PacientesPage';
 import { PacienteDetallePage } from './pages/PacienteDetallePage';
 import { PersonasPage } from './pages/PersonasPage';
@@ -21,6 +22,7 @@ import { HuellaHomeSection } from './pages/HuellaHomeSection';
 import { MensajesBanner } from './components/MensajesBanner';
 import { Omnibox } from './components/Omnibox';
 import { TutorialGuiado } from './components/TutorialGuiado';
+import { WizardConfiguracionRapida } from './components/WizardConfiguracionRapida';
 import { configurarSesionTurnos, configurarRefrescoSesionTurnos, type Turno } from './api/turnos';
 import type { Animal, Persona, Sesion } from './api/types';
 import {
@@ -112,6 +114,32 @@ function marcarTutorialVisto(usuarioId?: string): void {
   }
 }
 
+// Wizard de configuración rápida: mismo criterio que el tutorial (una sola
+// vez por usuario, localStorage), pero sólo para quien es propietario — es
+// quien queda a cargo de una organización recién aprobada (ver
+// SolicitudesService.aprobar(), siempre crea la membresía como
+// "propietario"). A diferencia del tutorial, bloquea el resto de la app
+// mientras está activo (ver el `return` temprano más abajo).
+const CLAVE_WIZARD = 'ecosistema.wizard.visto';
+
+function wizardYaVisto(usuarioId?: string): boolean {
+  if (!usuarioId) return true;
+  try {
+    return localStorage.getItem(`${CLAVE_WIZARD}.${usuarioId}`) === '1';
+  } catch {
+    return true;
+  }
+}
+
+function marcarWizardVisto(usuarioId?: string): void {
+  if (!usuarioId) return;
+  try {
+    localStorage.setItem(`${CLAVE_WIZARD}.${usuarioId}`, '1');
+  } catch {
+    // localStorage no disponible (modo privado, etc.) — no es crítico.
+  }
+}
+
 function IconoRail({ paths }: { paths: string }) {
   return (
     <svg
@@ -162,6 +190,15 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Analítica de uso (AdminPage.tsx → "Analítica"): una pantalla por cada
+  // cambio de `vista.nombre` — centralizado acá en vez de instrumentar cada
+  // página por separado, ya que `vista` es la única fuente de verdad de
+  // "en qué pantalla está el usuario" en toda la app.
+  useEffect(() => {
+    if (sesion && vista) api.registrarEvento(sesion, 'pantalla', vista.nombre);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sesion, vista?.nombre]);
+
   // Al iniciar sesión → solución y pantalla de inicio según rol. Al cerrar → reset.
   useEffect(() => {
     if (sesion && vista === null) {
@@ -174,7 +211,19 @@ export default function App() {
   }, [sesion]);
 
   if (!sesion) {
-    return <LoginPage onSesion={iniciar} />;
+    // La landing pública (campañas de marketing) vive en '/', el login/alta
+    // de cuenta en '/login' — sus botones navegan ahí (ver LandingPage.tsx).
+    if (window.location.pathname === '/login') return <LoginPage onSesion={iniciar} />;
+    return <LandingPage />;
+  }
+
+  if (sesion.roles.includes('propietario') && !wizardYaVisto(miUsuarioId)) {
+    return (
+      <WizardConfiguracionRapida
+        sesion={sesion}
+        onFinalizar={() => { marcarWizardVisto(miUsuarioId); setVista(homeDe(sesion.roles, solucionInicial(sesion))); }}
+      />
+    );
   }
 
   const disponibles = solucionesDisponibles(sesion);
@@ -355,7 +404,6 @@ export default function App() {
             <HuellaHomeSection
               sesion={sesion}
               onAbrirPaciente={(animal, opts) => irA({ nombre: 'detalle', animal, ...opts })}
-              onIrACaja={() => irA({ nombre: 'caja' })}
               onIrATurnos={() => irA({ nombre: 'turnos' })}
             />
           )}
