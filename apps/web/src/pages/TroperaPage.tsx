@@ -2011,7 +2011,7 @@ function PlantillasYProtocolosSection({ sesion }: { sesion: Sesion }) {
       <div className="page-head">
         <h2>Plantillas y protocolos (catálogos)</h2>
       </div>
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+      <div className="tabs-secciones">
         <button className={seccion === 'plantillas' ? 'btn' : 'btn-ghost'} onClick={() => setSeccion('plantillas')}>
           Plantillas de tareas
         </button>

@@ -235,6 +235,96 @@ h2 {
   padding: 0.5rem;
   z-index: 999;
 }
+/* --- Nav rail en mobile: de riel vertical de iconos a barra horizontal ---
+   Dos problemas reales en un celular (confirmado con capturas a 390px de
+   ancho): el riel vertical de 80px fijos se comía ~1/4 de la pantalla de
+   forma permanente, y los labels de cada ítem sólo se mostraban en
+   `:hover` (el `::after` de abajo) — que no existe al tacto, así que cada
+   ítem quedaba como un ícono sin ninguna forma de saber qué es sin tocarlo
+   y navegar a ciegas. Se resuelve pasando el riel a una barra arriba,
+   angosta, con el label siempre visible debajo del ícono (mismo
+   `data-title` que ya usa el tooltip de desktop, sin tocar el JSX) y
+   scrolleable horizontalmente si no entran todos los ítems. */
+@media (max-width: 720px) {
+  .app-rail {
+    flex-direction: column;
+  }
+  .nav-rail {
+    width: 100%;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    padding: 0.5rem 0.6rem;
+    gap: 0.35rem;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .solutions-group {
+    flex-direction: row;
+    width: auto;
+    flex-shrink: 0;
+    padding: 0 0.6rem 0 0;
+    margin: 0 0.6rem 0 0;
+    border-bottom: none;
+    border-right: 2px solid var(--border);
+  }
+  .solution-btn {
+    width: 38px;
+    height: 38px;
+  }
+  .options-group {
+    flex: 1;
+    flex-direction: row;
+    width: auto;
+    gap: 0.3rem;
+  }
+  .option-btn {
+    width: auto;
+    height: auto;
+    flex-shrink: 0;
+    flex-direction: column;
+    gap: 0.15rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 10px;
+  }
+  /* El label deja de ser un tooltip flotante (posicionado, oculto salvo
+     :hover) y pasa a ser una leyenda chica siempre visible debajo del
+     ícono — mismo contenido (`data-title`), sólo cambia cómo se muestra. */
+  .option-btn::after {
+    content: attr(data-title);
+    position: static;
+    opacity: 1;
+    pointer-events: none;
+    transform: none;
+    background: none;
+    color: inherit;
+    padding: 0;
+    font-size: 0.62rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .user-group {
+    flex-shrink: 0;
+    width: auto;
+    padding: 0 0 0 0.6rem;
+    margin: 0;
+    border-top: none;
+    border-left: 2px solid var(--border);
+  }
+  .user-dropdown {
+    left: auto;
+    right: 0;
+    bottom: auto;
+    top: 100%;
+    margin-top: 6px;
+  }
+  .contenido-shell {
+    padding: 1.1rem 1rem;
+  }
+}
+
 .dropdown-rol {
   font-size: 0.72rem;
   text-transform: capitalize;
@@ -415,6 +505,7 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 1rem;
   margin: 1.5rem 0 0.85rem;
 }
@@ -460,6 +551,11 @@ h2 {
   border-radius: 14px;
   padding: 1.1rem 1.25rem;
   box-shadow: var(--sombra-suave);
+  /* Red de seguridad genérica: una tabla con muchas columnas (o cualquier
+     otro contenido ancho) scrollea DENTRO de la card en vez de desbordar
+     la página entera — crítico en mobile, no cambia nada en desktop
+     porque ahí nunca llega a activarse. */
+  overflow-x: auto;
 }
 
 /* --- Login --- */
@@ -756,7 +852,19 @@ textarea:focus {
 .acciones {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.75rem;
+}
+
+/* --- Fila de pestañas de sección (Caja del día/Auditoría/Honorarios/...,
+   Tropera: existencias/movimientos/eventos/...) — antes era un <div> con
+   estilo inline repetido en cada página, sin wrap: en mobile los botones
+   de más a la derecha quedaban directamente fuera de la pantalla. */
+.tabs-secciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
 }
 .form-titulo {
   font-weight: 600;

@@ -30,7 +30,7 @@ export function CajaPage({ sesion }: { sesion: Sesion }) {
       </div>
 
       {esGerencia && (
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+        <div className="tabs-secciones">
           <button
             className={seccion === 'mostrador' ? 'btn' : 'btn-ghost'}
             onClick={() => setSeccion('mostrador')}
