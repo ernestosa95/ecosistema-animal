@@ -3,6 +3,13 @@ import { getToken } from './admin';
 
 const BASE = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
+export interface PlanPublico {
+  id: string; nombre: string;
+  precioMensual?: string | null; precioAnual?: string | null;
+  limitesRoles: Record<string, number>;
+  descripcion?: string | null;
+}
+
 export interface Solicitud {
   id: string;
   tipo: 'crear' | 'unirse';
@@ -12,6 +19,7 @@ export interface Solicitud {
   dni?: string;
   email: string;
   telefono?: string;
+  planId?: string | null;
   nombreOrganizacion?: string;
   tipoOrganizacion?: string;
   direccionOrganizacion?: string;
@@ -25,21 +33,26 @@ export interface Solicitud {
   createdAt?: string;
 }
 
-// ── Público (sin token): enviar una solicitud de registro ────────────────
+// ── Público (sin token): planes para elegir + enviar una solicitud de registro ──
+export async function listarPlanesPublicos(): Promise<PlanPublico[]> {
+  const res = await fetch(`${BASE}/solicitudes/planes`);
+  if (!res.ok) throw new Error('No se pudieron cargar los planes');
+  return res.json();
+}
+
 export async function crearSolicitud(d: {
-  tipo: 'crear' | 'unirse';
   nombre: string; apellido: string; email: string; password: string;
   terminosAceptados: boolean;
-  telefono?: string; dni?: string;
-  nombreOrganizacion?: string; tipoOrganizacion?: string;
+  telefono: string; dni: string;
+  planId: string;
+  nombreOrganizacion: string; tipoOrganizacion?: string;
   direccionOrganizacion?: string; localidadOrganizacion?: string; provinciaOrganizacion?: string;
   telefonoOrganizacion?: string; emailOrganizacion?: string;
-  organizacionSolicitada?: string;
 }): Promise<{ ok: boolean; id: string }> {
   const res = await fetch(`${BASE}/solicitudes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(d),
+    body: JSON.stringify({ tipo: 'crear', ...d }),
   });
   if (!res.ok) throw new Error((await res.text().catch(() => '')) || 'No se pudo enviar la solicitud');
   return res.json();

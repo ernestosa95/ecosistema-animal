@@ -1,8 +1,12 @@
-import { Equals, IsEmail, IsIn, IsOptional, IsString, MinLength, ValidateIf } from 'class-validator';
+import { Equals, IsEmail, IsIn, IsOptional, IsString, IsUUID, MinLength, ValidateIf } from 'class-validator';
 
 export class CrearSolicitudDto {
-  @IsIn(['crear', 'unirse'])
-  tipo!: 'crear' | 'unirse';
+  // El form público ya sólo ofrece "crear cuenta nueva" — 'unirse' (unirse a
+  // una organización existente) se sacó de la UI, pero el campo se deja
+  // fijo en 'crear' (en vez de borrarlo del DTO/schema) para no romper
+  // solicitudes 'unirse' que ya estén pendientes de aprobación.
+  @IsIn(['crear'])
+  tipo!: 'crear';
 
   // Checkbox obligatorio del form de alta — @Equals(true) rechaza tanto
   // `false` como que falte el campo directamente.
@@ -21,16 +25,24 @@ export class CrearSolicitudDto {
   @IsString() @MinLength(8)
   password!: string;
 
-  @IsOptional() @IsString()
-  telefono?: string;
+  // Datos filiatorios de quien solicita la cuenta — antes opcionales, ahora
+  // obligatorios (a pedido del negocio: hace falta poder contactar/
+  // identificar a quien pide el alta antes de aprobarla).
+  @IsString() @MinLength(6)
+  telefono!: string;
 
-  @IsOptional() @IsString()
-  dni?: string;
+  @IsString() @MinLength(6)
+  dni!: string;
 
-  // Requerido solo si tipo = 'crear'
-  @ValidateIf((o) => o.tipo === 'crear')
+  // Plan al que se quiere unir la organización — obligatorio (tipo siempre
+  // es 'crear' ahora). Se valida que exista y esté disponible para altas
+  // nuevas en SolicitudesService.crear() (mismo criterio que AdminService.
+  // setAcceso() usa para asignaciones manuales).
+  @IsUUID()
+  planId!: string;
+
   @IsString() @MinLength(2)
-  nombreOrganizacion?: string;
+  nombreOrganizacion!: string;
 
   @IsOptional() @IsIn(['clinica', 'establecimiento', 'mixta'])
   tipoOrganizacion?: string;

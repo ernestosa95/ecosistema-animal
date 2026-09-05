@@ -6,9 +6,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDB } from '../database/drizzle.provider';
-import { solicitudes, usuarios, organizaciones, membresias } from '../database/schema';
+import { solicitudes, usuarios, organizaciones, membresias, planes } from '../database/schema';
 import { CrearSolicitudDto } from './dto/crear-solicitud.dto';
 import { AprobarSolicitudDto, RechazarSolicitudDto } from './dto/aprobar-solicitud.dto';
 
@@ -39,6 +39,7 @@ const CAMPOS = {
   dni: solicitudes.dni,
   email: solicitudes.email,
   telefono: solicitudes.telefono,
+  planId: solicitudes.planId,
   nombreOrganizacion: solicitudes.nombreOrganizacion,
   tipoOrganizacion: solicitudes.tipoOrganizacion,
   direccionOrganizacion: solicitudes.direccionOrganizacion,
@@ -82,6 +83,14 @@ export class SolicitudesService {
       throw new ConflictException('Ya hay una solicitud pendiente con ese email');
     }
 
+    const [plan] = await this.db
+      .select({ activo: planes.activo })
+      .from(planes)
+      .where(and(eq(planes.id, dto.planId), isNull(planes.deletedAt)))
+      .limit(1);
+    if (!plan) throw new NotFoundException('Plan no encontrado');
+    if (!plan.activo) throw new BadRequestException('Este plan no está disponible para nuevas organizaciones');
+
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const [sol] = await this.db
       .insert(solicitudes)
@@ -93,20 +102,36 @@ export class SolicitudesService {
         email: dto.email,
         passwordHash,
         telefono: dto.telefono,
-        nombreOrganizacion: dto.tipo === 'crear' ? dto.nombreOrganizacion : null,
-        tipoOrganizacion: dto.tipo === 'crear' ? (dto.tipoOrganizacion ?? 'clinica') : null,
-        direccionOrganizacion: dto.tipo === 'crear' ? dto.direccionOrganizacion : null,
-        localidadOrganizacion: dto.tipo === 'crear' ? dto.localidadOrganizacion : null,
-        provinciaOrganizacion: dto.tipo === 'crear' ? dto.provinciaOrganizacion : null,
-        telefonoOrganizacion: dto.tipo === 'crear' ? dto.telefonoOrganizacion : null,
-        emailOrganizacion: dto.tipo === 'crear' ? dto.emailOrganizacion : null,
-        organizacionSolicitada: dto.tipo === 'unirse' ? dto.organizacionSolicitada : null,
+        planId: dto.planId,
+        nombreOrganizacion: dto.nombreOrganizacion,
+        tipoOrganizacion: dto.tipoOrganizacion ?? 'clinica',
+        direccionOrganizacion: dto.direccionOrganizacion,
+        localidadOrganizacion: dto.localidadOrganizacion,
+        provinciaOrganizacion: dto.provinciaOrganizacion,
+        telefonoOrganizacion: dto.telefonoOrganizacion,
+        emailOrganizacion: dto.emailOrganizacion,
         terminosAceptadosEn: new Date(),
         terminosVersion: TERMINOS_VERSION,
       })
       .returning({ id: solicitudes.id });
 
     return { ok: true, id: sol.id };
+  }
+
+  /** Planes disponibles para elegir en el form público de alta (sólo los habilitados para altas nuevas). */
+  planesDisponibles() {
+    return this.db
+      .select({
+        id: planes.id,
+        nombre: planes.nombre,
+        precioMensual: planes.precioMensual,
+        precioAnual: planes.precioAnual,
+        limitesRoles: planes.limitesRoles,
+        descripcion: planes.descripcion,
+      })
+      .from(planes)
+      .where(and(eq(planes.activo, true), isNull(planes.deletedAt)))
+      .orderBy(asc(planes.precioMensual));
   }
 
   /** Bandeja del admin: solicitudes por estado ('pendiente' por defecto, 'todas' para todo). */
@@ -157,6 +182,12 @@ export class SolicitudesService {
             provincia: sol.provinciaOrganizacion,
             telefono: sol.telefonoOrganizacion,
             email: sol.emailOrganizacion,
+            // El plan elegido al solicitar la cuenta pasa directo a la
+            // organización, y queda activada (para el cálculo de "próximo
+            // vencimiento" de /admin) desde el momento en que se aprueba,
+            // no desde que se cargó la solicitud.
+            planId: sol.planId,
+            fechaActivacion: new Date(),
           })
           .returning();
         await tx.insert(membresias).values({
