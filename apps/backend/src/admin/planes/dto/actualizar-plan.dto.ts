@@ -1,4 +1,4 @@
-import { IsBoolean, IsNumber, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsNumber, IsObject, IsOptional, IsString, Min, MinLength } from 'class-validator';
 
 export class ActualizarPlanDto {
   @IsOptional()
@@ -9,7 +9,17 @@ export class ActualizarPlanDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
-  precio?: number | null;
+  precioMensual?: number | null;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  precioAnual?: number | null;
+
+  /** Cupo máximo por rol, ej. { veterinario: 2, recepcion: 1 }. Un rol ausente = sin límite. */
+  @IsOptional()
+  @IsObject()
+  limitesRoles?: Record<string, number>;
 
   @IsOptional()
   @IsString()

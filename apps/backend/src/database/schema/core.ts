@@ -59,6 +59,12 @@ export const organizaciones = core.table('organizaciones', {
   // Control de acceso de la plataforma: null = sin vencimiento (todas las
   // organizaciones existentes antes de esta columna no se ven afectadas).
   accesoHasta: timestamp('acceso_hasta', { withTimezone: true }),
+  // Fecha en que la organización empezó a operar (no siempre coincide con
+  // createdAt: puede aprobarse un alta y activarse recién unos días después).
+  // Es la base del cálculo de "próximo vencimiento" en /admin — se factura
+  // todos los meses el mismo día-del-mes que esta fecha. null = todavía sin
+  // definir (AdminService cae a createdAt para no bloquear el cálculo).
+  fechaActivacion: timestamp('fecha_activacion', { withTimezone: true }),
   esDemo: boolean('es_demo').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -74,6 +80,11 @@ export const usuarios = core.table('usuarios', {
   dni: text('dni'),
   emailVerificado: boolean('email_verificado').notNull().default(false),
   ultimoLogin: timestamp('ultimo_login', { withTimezone: true }),
+  // Invalida cualquier token de "olvidé mi contraseña" emitido antes de este
+  // momento (se compara contra el `iat` del JWT) — sin esto, un link de reset
+  // viejo seguiría sirviendo para siempre ya que ese token es stateless
+  // (mismo patrón que `PortalTokenService`, sin tabla propia).
+  passwordChangedAt: timestamp('password_changed_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
@@ -165,6 +176,11 @@ export const solicitudes = core.table('solicitudes', {
   telefono: text('telefono'),
   nombreOrganizacion: text('nombre_organizacion'),
   tipoOrganizacion: text('tipo_organizacion'),
+  // Plan elegido al solicitar la cuenta — referencia lógica a
+  // plataforma.planes, sin FK real (mismo motivo que organizaciones.planId:
+  // plataforma.ts ya importa de core.ts). Se traslada tal cual a
+  // organizaciones.planId al aprobar (ver SolicitudesService.aprobar()).
+  planId: uuid('plan_id'),
   // Datos de la institución/campo, sólo relevantes si tipo = 'crear' — se
   // trasladan tal cual a core.organizaciones al aprobar la solicitud.
   direccionOrganizacion: text('direccion_organizacion'),

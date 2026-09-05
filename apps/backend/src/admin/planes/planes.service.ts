@@ -20,7 +20,13 @@ export class PlanesService {
   async crear(dto: CrearPlanDto) {
     const [plan] = await this.db
       .insert(planes)
-      .values({ nombre: dto.nombre, precio: dto.precio?.toString(), descripcion: dto.descripcion })
+      .values({
+        nombre: dto.nombre,
+        precioMensual: dto.precioMensual?.toString(),
+        precioAnual: dto.precioAnual?.toString(),
+        limitesRoles: dto.limitesRoles ?? {},
+        descripcion: dto.descripcion,
+      })
       .returning();
     return plan;
   }
@@ -31,7 +37,9 @@ export class PlanesService {
       .update(planes)
       .set({
         ...(dto.nombre !== undefined && { nombre: dto.nombre }),
-        ...(dto.precio !== undefined && { precio: dto.precio?.toString() ?? null }),
+        ...(dto.precioMensual !== undefined && { precioMensual: dto.precioMensual?.toString() ?? null }),
+        ...(dto.precioAnual !== undefined && { precioAnual: dto.precioAnual?.toString() ?? null }),
+        ...(dto.limitesRoles !== undefined && { limitesRoles: dto.limitesRoles }),
         ...(dto.descripcion !== undefined && { descripcion: dto.descripcion }),
         ...(dto.activo !== undefined && { activo: dto.activo }),
         updatedAt: new Date(),

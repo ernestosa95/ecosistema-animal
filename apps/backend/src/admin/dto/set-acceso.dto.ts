@@ -14,6 +14,10 @@ export class SetAccesoDto {
   accesoHasta?: string | null;
 
   @IsOptional()
+  @IsISO8601()
+  fechaActivacion?: string | null;
+
+  @IsOptional()
   @IsBoolean()
   esDemo?: boolean;
 }

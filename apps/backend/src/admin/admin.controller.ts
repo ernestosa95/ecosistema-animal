@@ -6,16 +6,19 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SuperAdminGuard } from '../common/guards/super-admin.guard';
+import { CurrentUser } from '../common/decorators/current-context.decorator';
 import { AdminService } from './admin.service';
 import { CrearOrganizacionDto } from './dto/crear-organizacion.dto';
 import { AgregarMiembroDto } from './dto/agregar-miembro.dto';
 import { SetRolesDto } from './dto/set-roles.dto';
 import { SetAccesoDto } from './dto/set-acceso.dto';
 import { SetSolucionesDto } from './dto/set-soluciones.dto';
+import { RegistrarPagoDto } from './dto/registrar-pago.dto';
 
 /** Todas las rutas requieren usuario autenticado + super-admin de plataforma. */
 @Controller('admin')
@@ -41,6 +44,31 @@ export class AdminController {
   @Patch('organizaciones/:id/acceso')
   setAcceso(@Param('id') id: string, @Body() dto: SetAccesoDto) {
     return this.admin.setAcceso(id, dto);
+  }
+
+  @Get('resumen-pagos')
+  resumenPagos() {
+    return this.admin.resumenPagos();
+  }
+
+  @Get('pagos/ganancias')
+  gananciasPorPeriodo() {
+    return this.admin.gananciasPorPeriodo();
+  }
+
+  @Get('analitica')
+  resumenAnalitica(@Query('desde') desde?: string, @Query('hasta') hasta?: string) {
+    return this.admin.resumenAnalitica(desde, hasta);
+  }
+
+  @Get('organizaciones/:id/pagos')
+  listarPagos(@Param('id') id: string) {
+    return this.admin.listarPagos(id);
+  }
+
+  @Post('organizaciones/:id/pagos')
+  registrarPago(@Param('id') id: string, @Body() dto: RegistrarPagoDto, @CurrentUser() user: { sub: string }) {
+    return this.admin.registrarPago(id, dto, user?.sub);
   }
 
   @Patch('organizaciones/:id/soluciones')
