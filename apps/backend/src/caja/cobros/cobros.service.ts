@@ -1,24 +1,33 @@
-import { BadRequestException, Injectable, Inject, NotFoundException } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { and, desc, eq, gte, isNotNull, lte } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDB } from '../../database/drizzle.provider';
 import { cajas, cobros, productos, consultas } from '../../database/schema';
 import { CreateCobroDto } from './dto/create-cobro.dto';
 import { LiquidarHonorariosDto } from './dto/liquidar-honorarios.dto';
+import { CajasService } from '../cajas/cajas.service';
 
 @Injectable()
 export class CobrosService {
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DrizzleDB,
+    private readonly cajasService: CajasService,
+  ) {}
 
-  /** Registra un ingreso en la caja abierta de la organización. Rechaza si no hay ninguna abierta. */
+  /**
+   * Registra un ingreso. Primero normaliza el día (si quedó una caja abierta
+   * de ayer sin cerrar, la cierra sola y la deja en revisión — no bloquea
+   * al que está cobrando). Si después de eso no hay ninguna caja abierta, la
+   * abre sola (apertura rápida con el primer cobro/venta del día — antes
+   * esto rechazaba con "abrí la caja primero" y obligaba a ir a la pestaña
+   * Caja a mano). `CajasService.abrir()` es el mismo método que usa el
+   * endpoint `POST /caja/cajas`, sólo que acá se llama directo, sin pasar
+   * por su `RolesGuard` — quien puede cobrar (propietario/admin/recepción,
+   * según el guard de este controller) ya es de por sí quien puede abrir caja.
+   */
   async crear(organizacionId: string, usuarioId: string, dto: CreateCobroDto) {
-    const [caja] = await this.db
-      .select({ id: cajas.id })
-      .from(cajas)
-      .where(and(eq(cajas.organizacionId, organizacionId), eq(cajas.estado, 'abierta')))
-      .limit(1);
-    if (!caja) {
-      throw new BadRequestException('No hay una caja abierta. Abrí la caja del día antes de cobrar.');
-    }
+    await this.cajasService.normalizarDelDia(organizacionId, usuarioId);
+    const caja = (await this.cajasService.actual(organizacionId))
+      ?? (await this.cajasService.abrir(organizacionId, usuarioId, {}));
 
     if (dto.productoId) {
       const [producto] = await this.db

@@ -3,13 +3,26 @@ import { and, desc, eq } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDB } from '../../database/drizzle.provider';
 import { cajas, egresos } from '../../database/schema';
 import { CreateEgresoDto } from './dto/create-egreso.dto';
+import { CajasService } from '../cajas/cajas.service';
 
 @Injectable()
 export class EgresosService {
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DrizzleDB,
+    private readonly cajasService: CajasService,
+  ) {}
 
-  /** Registra un egreso en la caja abierta — "aislado" de los ingresos (§2.6), nunca se listan juntos. */
+  /**
+   * Registra un egreso en la caja abierta — "aislado" de los ingresos
+   * (§2.6), nunca se listan juntos. Primero normaliza el día (si la caja
+   * abierta quedó de ayer sin cerrar, se cierra sola en revisión) para no
+   * imputarle por error un egreso de hoy a la caja de otro día — a
+   * diferencia de los cobros, un egreso sigue sin abrir una caja nueva por
+   * sí solo si no queda ninguna abierta.
+   */
   async crear(organizacionId: string, usuarioId: string, dto: CreateEgresoDto) {
+    await this.cajasService.normalizarDelDia(organizacionId, usuarioId);
+
     const [caja] = await this.db
       .select({ id: cajas.id })
       .from(cajas)

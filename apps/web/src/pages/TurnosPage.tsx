@@ -6,15 +6,19 @@ import {
   listarTurnos, crearTurno, confirmarTurno, reprogramarTurno,
   cancelarTurno, atenderTurno, buscarAnimales, contarTurnosPorDia,
   listarEspecies, listarDuenos, listarAgendas, slotsDisponibles, crearPacienteRapido,
+  registrarEvento,
   type Turno, type EstadoTurno, type AnimalOpcion,
   type EspecieOpcion, type DuenoOpcion, type Agenda, type Slot,
 } from '../api/turnos';
-import { GestionAgendas } from './turnos/GestionAgendas';
 import { Overlay, Field } from './turnos/ui';
 
 // ── Config visual ────────────────────────────────────────────────────────────
+// Mismas 8 especies sembradas en core.especies (seed-especies.mjs) — antes
+// faltaban Porcino/Ovino/Caprino acá (caían al genérico 🐾 sin importar la
+// especie real) y sobraba "Conejo", que no existe como especie del sistema.
 const ESPECIES: Record<string, string> = {
-  Canino: '🐕', Felino: '🐈', Equino: '🐎', Bovino: '🐄', Ave: '🦜', Conejo: '🐇',
+  Canino: '🐕', Felino: '🐈', Equino: '🐎', Bovino: '🐄', Ave: '🦜',
+  Porcino: '🐖', Ovino: '🐑', Caprino: '🐐',
 };
 const ESTADOS: Record<EstadoTurno, { label: string; color: string }> = {
   solicitado:   { label: 'Solicitado',   color: '#E9A23B' },
@@ -46,6 +50,7 @@ const addMonths = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth()
 const pad2 = (n: number) => String(n).padStart(2, '0');
 const fechaLarga = (d: Date) =>
   d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+const fechaCorta = (d: Date) => d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
 
 type Modal =
   | { tipo: 'reprogramar'; turno: Turno }
@@ -64,13 +69,14 @@ interface Props {
 
 export default function TurnosPage({ onAtender, miVeterinarioId, soloMiosInicial = false }: Props) {
   const [fecha, setFecha] = useState<Date>(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; });
+  // null = un solo día (fecha). Con valor = rango [fecha, fechaHasta] completo.
+  const [fechaHasta, setFechaHasta] = useState<Date | null>(null);
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<'todos' | EstadoTurno>('todos');
   const [soloMios, setSoloMios] = useState<boolean>(soloMiosInicial);
   const [modal, setModal] = useState<Modal>(null);
-  const [mostrarAgendas, setMostrarAgendas] = useState(false);
   const [ocupado, setOcupado] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   // Calendario del mes: mes visible + conteo de turnos por día.
@@ -79,14 +85,21 @@ export default function TurnosPage({ onAtender, miVeterinarioId, soloMiosInicial
 
   async function cargar() {
     setCargando(true); setError(null);
-    try { setTurnos(await listarTurnos(iso(fecha))); }
+    try { setTurnos(await listarTurnos(iso(fecha), fechaHasta ? iso(fechaHasta) : undefined)); }
     catch (e: any) { setError(e.message ?? 'No se pudieron cargar los turnos'); }
     finally { setCargando(false); }
   }
-  useEffect(() => { cargar(); /* eslint-disable-next-line */ }, [fecha]);
+  useEffect(() => { cargar(); /* eslint-disable-next-line */ }, [fecha, fechaHasta]);
 
   // Al cambiar de día (flechas, "Hoy", input) el calendario sigue al mes del día.
   useEffect(() => { setMesView(primerDia(fecha)); }, [fecha]);
+
+  /** Navegar por día (flechas/Hoy/calendario) siempre vuelve a un solo día — el rango es una elección explícita con "hasta". */
+  function irADia(d: Date) {
+    d.setHours(0, 0, 0, 0);
+    setFecha(d);
+    setFechaHasta(null);
+  }
 
   async function cargarMes(mv: Date) {
     const anio = mv.getFullYear(); const mes = mv.getMonth();
@@ -99,17 +112,21 @@ export default function TurnosPage({ onAtender, miVeterinarioId, soloMiosInicial
 
   function avisar(msg: string) { setToast(msg); setTimeout(() => setToast(null), 2600); }
 
-  async function correr(fn: () => Promise<any>, msg?: string) {
+  async function correr(fn: () => Promise<any>, msg?: string, nombreEvento?: string) {
     if (ocupado) return;
     setOcupado(true);
-    try { await fn(); await cargar(); await cargarMes(mesView); if (msg) avisar(msg); }
+    try {
+      await fn();
+      if (nombreEvento) registrarEvento('accion', nombreEvento);
+      await cargar(); await cargarMes(mesView); if (msg) avisar(msg);
+    }
     catch (e: any) { avisar(e.message ?? 'Ocurrió un error'); }
     finally { setOcupado(false); }
   }
 
   function onAccion(t: Turno, a: string) {
-    if (a === 'confirmar') correr(() => confirmarTurno(t.id), `Turno de ${t.paciente} confirmado`);
-    else if (a === 'atender') correr(async () => { await atenderTurno(t.id); onAtender?.(t); }, `${t.paciente} atendido`);
+    if (a === 'confirmar') correr(() => confirmarTurno(t.id), `Turno de ${t.paciente} confirmado`, 'turno-confirmar');
+    else if (a === 'atender') correr(async () => { await atenderTurno(t.id); onAtender?.(t); }, `${t.paciente} atendido`, 'turno-atender');
     else if (a === 'cancelar') setModal({ tipo: 'cancelar', turno: t });
     else if (a === 'reprogramar') setModal({ tipo: 'reprogramar', turno: t });
   }
@@ -132,15 +149,35 @@ export default function TurnosPage({ onAtender, miVeterinarioId, soloMiosInicial
           {/* Filtros de fecha */}
           <div className="hu-card-block">
             <div className="hu-daterow">
-              <button className="hu-nav" onClick={() => setFecha(addDays(fecha, -1))} aria-label="Día anterior">‹</button>
-              <div className="hu-datelabel">{fechaLarga(fecha)}</div>
-              <button className="hu-nav" onClick={() => setFecha(addDays(fecha, 1))} aria-label="Día siguiente">›</button>
-              <button className="hu-btn ghost" onClick={() => { const d = new Date(); d.setHours(0, 0, 0, 0); setFecha(d); }}>Hoy</button>
-              <input
-                type="date"
-                value={iso(fecha)}
-                onChange={e => e.target.value && setFecha(new Date(e.target.value + 'T00:00:00'))}
-              />
+              <button className="hu-nav" onClick={() => irADia(addDays(fecha, -1))} aria-label="Día anterior">‹</button>
+              <div className="hu-datelabel">
+                {fechaHasta ? `${fechaCorta(fecha)} – ${fechaCorta(fechaHasta)}` : fechaLarga(fecha)}
+              </div>
+              <button className="hu-nav" onClick={() => irADia(addDays(fecha, 1))} aria-label="Día siguiente">›</button>
+              <button className="hu-btn ghost" onClick={() => irADia(new Date())}>Hoy</button>
+              <div className="hu-rango">
+                <input
+                  type="date"
+                  value={iso(fecha)}
+                  onChange={e => {
+                    if (!e.target.value) return;
+                    const nueva = new Date(e.target.value + 'T00:00:00');
+                    setFecha(nueva);
+                    if (fechaHasta && fechaHasta < nueva) setFechaHasta(null);
+                  }}
+                />
+                <span className="hu-rango-sep">– hasta (opcional):</span>
+                <input
+                  type="date"
+                  className="hu-hasta"
+                  value={fechaHasta ? iso(fechaHasta) : ''}
+                  min={iso(fecha)}
+                  onChange={e => setFechaHasta(e.target.value ? new Date(e.target.value + 'T00:00:00') : null)}
+                />
+                {fechaHasta && (
+                  <button className="hu-nav" title="Volver a un solo día" onClick={() => setFechaHasta(null)}>×</button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -153,7 +190,6 @@ export default function TurnosPage({ onAtender, miVeterinarioId, soloMiosInicial
               <div className="hu-stat hu-kpi-d"><b style={{ color: ESTADOS.atendido.color }}>{cuenta('atendido')}</b><span>atendidos</span></div>
               <div className="hu-kpi-actions">
                 <button className="hu-btn primary hu-btn-full" data-tour="turnos-nuevo" onClick={() => setModal({ tipo: 'nuevo' })}>＋ Nuevo turno</button>
-                <button className="hu-btn ghost" onClick={() => setMostrarAgendas(true)}>⚙ Agendas</button>
               </div>
             </div>
           </div>
@@ -179,11 +215,11 @@ export default function TurnosPage({ onAtender, miVeterinarioId, soloMiosInicial
               ) : error ? (
                 <div className="hu-empty hu-error">{error}</div>
               ) : delDia.length === 0 ? (
-                <div className="hu-empty">No hay turnos para este día{filtro !== 'todos' ? ' con ese filtro' : ''}.</div>
+                <div className="hu-empty">No hay turnos para {fechaHasta ? 'este rango' : 'este día'}{filtro !== 'todos' ? ' con ese filtro' : ''}.</div>
               ) : (
                 <div className="hu-list">
                   {delDia.map(t => (
-                    <TurnoCard key={t.id} t={t} disabled={ocupado} onAccion={onAccion} />
+                    <TurnoCard key={t.id} t={t} disabled={ocupado} onAccion={onAccion} mostrarFecha={!!fechaHasta} />
                   ))}
                 </div>
               )}
@@ -198,7 +234,7 @@ export default function TurnosPage({ onAtender, miVeterinarioId, soloMiosInicial
             selected={fecha}
             counts={mesCounts}
             onMes={setMesView}
-            onPick={(d) => { d.setHours(0, 0, 0, 0); setFecha(d); }}
+            onPick={irADia}
           />
           <div className="hu-card-block hu-dispcard">
             <h3 className="hu-disp-titulo">Disponibilidad del día</h3>
@@ -214,27 +250,25 @@ export default function TurnosPage({ onAtender, miVeterinarioId, soloMiosInicial
         <ModalReprogramar turno={modal.turno} onClose={() => setModal(null)}
           onOk={(f, h) => {
             const turno = modal.turno; setModal(null);
-            correr(() => reprogramarTurno(turno.id, { fecha: f, hora: h }), 'Turno reprogramado');
-            setFecha(new Date(f + 'T00:00:00'));
+            correr(() => reprogramarTurno(turno.id, { fecha: f, hora: h }), 'Turno reprogramado', 'turno-reprogramar');
+            irADia(new Date(f + 'T00:00:00'));
           }} />
       )}
       {modal?.tipo === 'cancelar' && (
         <ModalCancelar turno={modal.turno} onClose={() => setModal(null)}
           onOk={(motivo) => {
             const turno = modal.turno; setModal(null);
-            correr(() => cancelarTurno(turno.id, motivo), 'Turno cancelado');
+            correr(() => cancelarTurno(turno.id, motivo), 'Turno cancelado', 'turno-cancelar');
           }} />
       )}
       {modal?.tipo === 'nuevo' && (
         <ModalNuevo fechaDefault={iso(fecha)} onClose={() => setModal(null)}
           onOk={(data) => {
             setModal(null);
-            correr(() => crearTurno(data), 'Turno creado');
-            setFecha(new Date(data.fecha + 'T00:00:00'));
+            correr(() => crearTurno(data), 'Turno creado', 'turno-crear');
+            irADia(new Date(data.fecha + 'T00:00:00'));
           }} />
       )}
-
-      {mostrarAgendas && <GestionAgendas onClose={() => setMostrarAgendas(false)} />}
 
       {toast && <div className="hu-toast">{toast}</div>}
     </div>
@@ -291,13 +325,16 @@ function MesCalendario({ mesView, selected, counts, onMes, onPick }: {
 }
 
 // ── Card de turno ─────────────────────────────────────────────────────────────
-function TurnoCard({ t, disabled, onAccion }: {
-  t: Turno; disabled: boolean; onAccion: (t: Turno, a: string) => void;
+function TurnoCard({ t, disabled, onAccion, mostrarFecha }: {
+  t: Turno; disabled: boolean; onAccion: (t: Turno, a: string) => void; mostrarFecha?: boolean;
 }) {
   const est = ESTADOS[t.estado];
   return (
     <div className="hu-turno">
-      <div className="hu-thora">{t.hora}</div>
+      <div className="hu-thora">
+        {mostrarFecha && <span className="hu-tfecha">{fechaCorta(new Date(t.fecha + 'T00:00:00'))}</span>}
+        {t.hora}
+      </div>
       <div className="hu-tmain">
         <div className="hu-tpac">
           {ESPECIES[t.especie] || '🐾'} {t.paciente}
@@ -708,11 +745,14 @@ const CSS = `
 /* Filtros de fecha */
 .hu-daterow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .hu-daterow input[type=date] { width:auto; padding:.5rem .6rem; border:1px solid var(--hu-border);
-  border-radius:8px; background:#fff; color:var(--hu-text); margin-left:auto; }
+  border-radius:8px; background:#fff; color:var(--hu-text); }
 .hu-nav { width:34px; height:34px; border-radius:8px; border:1px solid var(--hu-border);
   background:#fff; font-size:1.2rem; line-height:1; cursor:pointer; color:var(--hu-text); flex:0 0 auto; }
 .hu-nav:hover { background:#f0f3f2; }
 .hu-datelabel { font-weight:600; text-transform:capitalize; min-width:150px; }
+.hu-rango { display:flex; align-items:center; gap:6px; margin-left:auto; }
+.hu-rango-sep { color:var(--hu-muted); font-size:.85rem; }
+.hu-tfecha { display:block; font-size:.72rem; font-weight:600; color:var(--hu-muted); text-transform:uppercase; }
 
 /* Calendario del mes (ocupa todo el ancho de la columna accesoria) */
 .hu-cal { background:var(--hu-card); border:1px solid var(--hu-border); border-radius:12px;
@@ -782,7 +822,7 @@ const CSS = `
 .hu-list { display:flex; flex-direction:column; gap:8px; }
 .hu-turno { display:flex; align-items:center; gap:12px; background:var(--hu-card);
   border:1px solid var(--hu-border); border-radius:10px; padding:10px 14px; }
-.hu-thora { font-variant-numeric:tabular-nums; font-weight:700; font-size:1rem; width:46px; color:var(--hu-teal); }
+.hu-thora { font-variant-numeric:tabular-nums; font-weight:700; font-size:1rem; width:58px; color:var(--hu-teal); }
 .hu-tmain { flex:1 1 auto; min-width:0; }
 .hu-tpac { font-weight:600; }
 .hu-tdueno { color:var(--hu-muted); font-weight:400; }

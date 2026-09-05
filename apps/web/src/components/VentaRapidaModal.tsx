@@ -9,22 +9,20 @@ import type { Sesion, Producto, StockItem } from '../api/types';
  * flujo que `NuevoCobroForm` en `CajaPage.tsx` (cobro + baja de stock tipo
  * 'venta'), reimplementado acá porque ese formulario no está exportado y
  * trae campos propios de Caja (veterinario a cargo) que este acceso rápido
- * no necesita. Requiere una caja abierta, igual que el cobro real.
+ * no necesita. Ya no exige una caja previamente abierta: si no hay una, el
+ * backend la abre sola con este mismo cobro (`CobrosService.crear()`).
  */
 export function VentaRapidaModal({
   sesion,
   onCancelar,
-  onIrACaja,
   onCompletada,
 }: {
   sesion: Sesion;
   onCancelar: () => void;
-  onIrACaja: () => void;
   onCompletada: () => void;
 }) {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [stock, setStock] = useState<StockItem[]>([]);
-  const [cajaAbierta, setCajaAbierta] = useState<boolean | null>(null);
   const [nombreProducto, setNombreProducto] = useState('');
   const [cantidad, setCantidad] = useState('1');
   // Precio unitario (por la unidad del producto, ej. por kg) — se precarga
@@ -41,10 +39,6 @@ export function VentaRapidaModal({
   useEffect(() => {
     api.productos(sesion).then(setProductos).catch(() => {});
     api.stock(sesion).then(setStock).catch(() => {});
-    api
-      .cajaActual(sesion)
-      .then((c) => setCajaAbierta(!!c))
-      .catch(() => setCajaAbierta(false));
   }, [sesion]);
 
   const productoSel = productos.find((p) => p.nombre === nombreProducto) ?? null;
@@ -105,6 +99,7 @@ export function VentaRapidaModal({
           // La venta ya se registró — no bloquea el flujo si esto falla.
         }
       }
+      api.registrarEvento(sesion, 'accion', 'stock-venta');
       setOk(true);
       setTimeout(onCompletada, 900);
     } catch (err) {
@@ -124,14 +119,7 @@ export function VentaRapidaModal({
           </button>
         </div>
 
-        {cajaAbierta === false ? (
-          <>
-            <p className="muted">No hay una caja abierta. Abrí la caja del día antes de registrar una venta.</p>
-            <button className="btn" onClick={onIrACaja}>
-              Ir a Caja
-            </button>
-          </>
-        ) : ok ? (
+        {ok ? (
           <p className="muted">Venta registrada ✓</p>
         ) : (
           <form className="form-grid" onSubmit={guardar} style={{ marginTop: '0.75rem' }}>
@@ -192,7 +180,7 @@ export function VentaRapidaModal({
 
             {error && <div className="alerta span-2">{error}</div>}
             <div className="span-2">
-              <button className="btn" type="submit" disabled={guardando || !productoSel || cajaAbierta === null}>
+              <button className="btn" type="submit" disabled={guardando || !productoSel}>
                 {guardando ? 'Guardando…' : 'Registrar venta'}
               </button>
             </div>

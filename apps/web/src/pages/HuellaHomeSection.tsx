@@ -7,7 +7,8 @@ import { DrawerTabla } from '../components/DrawerTabla';
 import { SeleccionarAnimalModal } from '../components/SeleccionarAnimalModal';
 import { VentaRapidaModal } from '../components/VentaRapidaModal';
 import { NuevoTurnoRapidoModal } from '../components/NuevoTurnoRapidoModal';
-import { tieneAlguno, ROLES_CLINICO, ROLES_CAJA, ROLES_TURNERO } from '../nav/config';
+import { IngresoStockModal } from '../components/IngresoStockModal';
+import { tieneAlguno, ROLES_CLINICO, ROLES_CAJA, ROLES_TURNERO, ROLES_ATIENDEN, ROLES_FARMACIA } from '../nav/config';
 import type { ColumnaExport } from '../utils/columnasTabla';
 
 function inicioDeMesISO(): string {
@@ -42,7 +43,7 @@ interface Drill<T> {
   filas: T[];
 }
 
-type AccesoRapido = 'consulta' | 'vacuna' | 'venta' | 'turno' | null;
+type AccesoRapido = 'consulta' | 'vacuna' | 'venta' | 'turno' | 'ingreso-stock' | null;
 
 /**
  * Home de Huella: ¾ izquierda = centro de operaciones (accesos rápidos a
@@ -55,12 +56,10 @@ type AccesoRapido = 'consulta' | 'vacuna' | 'venta' | 'turno' | null;
 export function HuellaHomeSection({
   sesion,
   onAbrirPaciente,
-  onIrACaja,
   onIrATurnos,
 }: {
   sesion: Sesion;
   onAbrirPaciente: (animal: Animal, opts?: { abrirConsulta?: boolean; abrirVacuna?: boolean }) => void;
-  onIrACaja: () => void;
   onIrATurnos: () => void;
 }) {
   const [resumen, setResumen] = useState<ResumenDashboard | null>(null);
@@ -70,6 +69,12 @@ export function HuellaHomeSection({
   const [drill, setDrill] = useState<Drill<any> | null>(null);
   const [cargandoDrill, setCargandoDrill] = useState(false);
   const [accesoAbierto, setAccesoAbierto] = useState<AccesoRapido>(null);
+
+  /** Registra la analítica de uso del acceso rápido y abre el modal correspondiente. */
+  function abrirAcceso(acceso: Exclude<AccesoRapido, null>) {
+    api.registrarEvento(sesion, 'accion', `home-${acceso}`);
+    setAccesoAbierto(acceso);
+  }
   const [turnosHoy, setTurnosHoy] = useState<Turno[]>([]);
   const [cargandoTurnos, setCargandoTurnos] = useState(true);
 
@@ -190,8 +195,24 @@ export function HuellaHomeSection({
     }
   }
 
+  /** Marca el turno como atendido y abre la ficha del paciente con "Nueva consulta" ya abierta — mismo flujo que TurnosPage.tsx. */
+  async function atenderTurno(t: Turno, e: React.MouseEvent) {
+    e.stopPropagation();
+    try {
+      api.registrarEvento(sesion, 'accion', 'home-atender-turno');
+      await api.cambiarEstadoTurno(sesion, t.id, { estado: 'atendido' });
+      cargarTurnosHoy();
+      const animal = await api.obtenerAnimal(sesion, t.animalId);
+      onAbrirPaciente(animal, { abrirConsulta: true });
+    } catch (e2) {
+      alert('No se pudo marcar el turno como atendido: ' + (e2 instanceof Error ? e2.message : 'error'));
+    }
+  }
+
   const puedeClinico = tieneAlguno(sesion.roles, ROLES_CLINICO);
   const puedeVender = tieneAlguno(sesion.roles, ROLES_CAJA);
+  const puedeAtender = tieneAlguno(sesion.roles, ROLES_ATIENDEN);
+  const puedeFarmacia = tieneAlguno(sesion.roles, ROLES_FARMACIA);
 
   if (error) return <div className="alerta">{error}</div>;
   if (!resumen) return <p className="muted">Cargando…</p>;
@@ -208,28 +229,28 @@ export function HuellaHomeSection({
             <h2 className="form-titulo">Centro de operaciones</h2>
             <div className="centro-operaciones">
               {puedeClinico && (
-                <button className="operacion-btn" onClick={() => setAccesoAbierto('consulta')}>
+                <button className="operacion-btn" onClick={() => abrirAcceso('consulta')}>
                   <span className="operacion-btn-icono">🩺</span>
                   <span className="operacion-btn-titulo">Nueva consulta</span>
                   <span className="operacion-btn-sub">Elegí (o creá) el paciente y cargá la consulta.</span>
                 </button>
               )}
               {puedeClinico && (
-                <button className="operacion-btn" onClick={() => setAccesoAbierto('vacuna')}>
+                <button className="operacion-btn" onClick={() => abrirAcceso('vacuna')}>
                   <span className="operacion-btn-icono">💉</span>
                   <span className="operacion-btn-titulo">Registro de vacuna</span>
                   <span className="operacion-btn-sub">Elegí (o creá) el paciente y registrá la aplicación.</span>
                 </button>
               )}
               {puedeVender && (
-                <button className="operacion-btn" onClick={() => setAccesoAbierto('venta')}>
+                <button className="operacion-btn" onClick={() => abrirAcceso('venta')}>
                   <span className="operacion-btn-icono">🛒</span>
                   <span className="operacion-btn-titulo">Venta común</span>
                   <span className="operacion-btn-sub">Vendé un producto del stock de Farmacia.</span>
                 </button>
               )}
               {puedeAgendar && (
-                <button className="operacion-btn" onClick={() => setAccesoAbierto('turno')}>
+                <button className="operacion-btn" onClick={() => abrirAcceso('turno')}>
                   <span className="operacion-btn-icono">📅</span>
                   <span className="operacion-btn-titulo">Nuevo turno</span>
                   <span className="operacion-btn-sub">Elegí (o creá) el paciente y sacá el turno.</span>
@@ -262,6 +283,7 @@ export function HuellaHomeSection({
                           <th>Dueño</th>
                           <th>Motivo</th>
                           <th>Estado</th>
+                          {puedeAtender && <th />}
                         </tr>
                       </thead>
                       <tbody>
@@ -274,6 +296,15 @@ export function HuellaHomeSection({
                             <td>
                               <span className="chip">{ESTADO_TURNO_LABEL[t.estado] ?? t.estado}</span>
                             </td>
+                            {puedeAtender && (
+                              <td>
+                                {(t.estado === 'confirmado' || t.estado === 'reprogramado') && (
+                                  <button type="button" className="btn-ghost" onClick={(e) => atenderTurno(t, e)}>
+                                    Atender
+                                  </button>
+                                )}
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>
@@ -297,6 +328,13 @@ export function HuellaHomeSection({
               <span className="dato-label">Vacunas por vencer (30 días)</span>
               <strong style={{ fontSize: '1.6rem' }}>{resumen.clinica.vacunasPorVencer}</strong>
             </button>
+            {puedeFarmacia && (
+              <button className="operacion-btn" onClick={() => abrirAcceso('ingreso-stock')}>
+                <span className="operacion-btn-icono">📦</span>
+                <span className="operacion-btn-titulo">Ingreso de stock</span>
+                <span className="operacion-btn-sub">Registrá una compra a proveedor.</span>
+              </button>
+            )}
           </div>
         </div>
       ) : (
@@ -317,10 +355,6 @@ export function HuellaHomeSection({
         <VentaRapidaModal
           sesion={sesion}
           onCancelar={() => setAccesoAbierto(null)}
-          onIrACaja={() => {
-            setAccesoAbierto(null);
-            onIrACaja();
-          }}
           onCompletada={() => setAccesoAbierto(null)}
         />
       )}
@@ -333,6 +367,14 @@ export function HuellaHomeSection({
             setAccesoAbierto(null);
             cargarTurnosHoy();
           }}
+        />
+      )}
+
+      {accesoAbierto === 'ingreso-stock' && (
+        <IngresoStockModal
+          sesion={sesion}
+          onCancelar={() => setAccesoAbierto(null)}
+          onCompletado={() => setAccesoAbierto(null)}
         />
       )}
 

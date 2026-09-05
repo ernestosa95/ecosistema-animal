@@ -50,6 +50,7 @@ export class ConsultasService {
         pesoKg: dto.pesoKg?.toString(),
         temperaturaC: dto.temperaturaC?.toString(),
         observaciones: dto.observaciones,
+        costo: dto.costo.toString(),
       })
       .returning();
 
@@ -88,6 +89,7 @@ export class ConsultasService {
         motivo: consultas.motivo,
         diagnostico: consultas.diagnostico,
         pesoKg: consultas.pesoKg,
+        costo: consultas.costo,
         animalId: consultas.animalId,
         pacienteNombre: animales.nombre,
       })
@@ -130,6 +132,7 @@ export class ConsultasService {
         ...(dto.pesoKg !== undefined && { pesoKg: dto.pesoKg.toString() }),
         ...(dto.temperaturaC !== undefined && { temperaturaC: dto.temperaturaC.toString() }),
         ...(dto.observaciones !== undefined && { observaciones: dto.observaciones }),
+        ...(dto.costo !== undefined && { costo: dto.costo.toString() }),
         updatedAt: new Date(),
       })
       .where(and(eq(consultas.id, id), eq(consultas.organizacionId, organizacionId)))

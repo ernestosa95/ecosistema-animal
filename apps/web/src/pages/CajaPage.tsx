@@ -6,7 +6,7 @@
 // cálculo automático de comisión, egresos sin categorías.
 import { useEffect, useState } from 'react';
 import { api, type Veterinario } from '../api/client';
-import type { Sesion, Caja, Cobro, Egreso, Producto, EstadoAuditoriaCaja } from '../api/types';
+import type { Sesion, Caja, Cobro, Egreso, Producto, EstadoAuditoriaCaja, EstadisticasCaja } from '../api/types';
 
 const ROLES_AUDITORIA_HONORARIOS = new Set(['propietario', 'admin']);
 
@@ -17,7 +17,7 @@ const ESTADO_AUDITORIA_LABEL: Record<EstadoAuditoriaCaja, string> = {
   rechazado: 'Rechazado',
 };
 
-type Seccion = 'mostrador' | 'auditoria' | 'honorarios';
+type Seccion = 'mostrador' | 'auditoria' | 'honorarios' | 'estadisticas';
 
 export function CajaPage({ sesion }: { sesion: Sesion }) {
   const esGerencia = sesion.roles.some((r) => ROLES_AUDITORIA_HONORARIOS.has(r));
@@ -49,12 +49,19 @@ export function CajaPage({ sesion }: { sesion: Sesion }) {
           >
             Honorarios
           </button>
+          <button
+            className={seccion === 'estadisticas' ? 'btn' : 'btn-ghost'}
+            onClick={() => setSeccion('estadisticas')}
+          >
+            Estadísticas
+          </button>
         </div>
       )}
 
       {seccion === 'mostrador' && <Mostrador sesion={sesion} />}
       {seccion === 'auditoria' && esGerencia && <AuditoriaCierres sesion={sesion} />}
       {seccion === 'honorarios' && esGerencia && <Honorarios sesion={sesion} />}
+      {seccion === 'estadisticas' && esGerencia && <Estadisticas sesion={sesion} />}
     </div>
   );
 }
@@ -256,6 +263,7 @@ function AbrirCajaForm({ sesion, onAbierta }: { sesion: Sesion; onAbierta: () =>
     setGuardando(true);
     try {
       await api.abrirCaja(sesion, Number(montoInicial || 0));
+      api.registrarEvento(sesion, 'accion', 'caja-abrir');
       onAbierta();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo abrir la caja');
@@ -332,6 +340,7 @@ function NuevoCobroForm({
         data.cantidad = Number(cantidad);
       }
       await api.crearCobro(sesion, data);
+      api.registrarEvento(sesion, 'accion', 'cobro-crear');
 
       if (productoId && Number(cantidad) > 0) {
         try {
@@ -432,6 +441,7 @@ function NuevoEgresoForm({ sesion, onCreado }: { sesion: Sesion; onCreado: () =>
     setGuardando(true);
     try {
       await api.crearEgreso(sesion, { concepto, monto: Number(monto) });
+      api.registrarEvento(sesion, 'accion', 'egreso-crear');
       setConcepto('');
       setMonto('');
       onCreado();
@@ -489,6 +499,7 @@ function CerrarCajaForm({
         montoDeclarado: Number(montoDeclarado),
         observaciones: observaciones || undefined,
       });
+      api.registrarEvento(sesion, 'accion', 'caja-cerrar');
       onCerrada(cerrada);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo cerrar la caja');
@@ -660,6 +671,7 @@ function AuditarCajaForm({
     setGuardando(true);
     try {
       await api.auditarCaja(sesion, caja.id, { estadoAuditoria, observaciones: observaciones || undefined });
+      api.registrarEvento(sesion, 'accion', 'caja-auditar');
       onListo();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar');
@@ -740,6 +752,7 @@ function Honorarios({ sesion }: { sesion: Sesion }) {
     setLiquidando(true);
     try {
       await api.liquidarHonorarios(sesion, { veterinarioId, desde, hasta: `${hasta}T23:59:59` });
+      api.registrarEvento(sesion, 'accion', 'honorarios-liquidar');
       buscar();
     } catch (err) {
       alert('No se pudo liquidar: ' + (err instanceof Error ? err.message : 'error'));
@@ -828,6 +841,130 @@ function Honorarios({ sesion }: { sesion: Sesion }) {
               </button>
             </div>
           )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Totales del período para un análisis rápido — cobros/egresos/neto, por método de pago y por día. */
+function Estadisticas({ sesion }: { sesion: Sesion }) {
+  const hace30Dias = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const [desde, setDesde] = useState(hace30Dias);
+  const [hasta, setHasta] = useState(new Date().toISOString().slice(0, 10));
+  const [datos, setDatos] = useState<EstadisticasCaja | null>(null);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  async function buscar() {
+    setCargando(true);
+    setError(null);
+    try {
+      setDatos(await api.estadisticasCaja(sesion, desde, `${hasta}T23:59:59`));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cargar');
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  useEffect(() => {
+    buscar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div>
+      <div className="card form-grid" style={{ marginBottom: '1rem' }}>
+        <label>
+          Desde
+          <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
+        </label>
+        <label>
+          Hasta
+          <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} />
+        </label>
+        <div className="span-2">
+          <button className="btn" type="button" onClick={buscar} disabled={cargando}>
+            {cargando ? 'Buscando…' : 'Actualizar'}
+          </button>
+        </div>
+      </div>
+
+      {error && <div className="alerta">{error}</div>}
+
+      {datos && (
+        <>
+          <div className="card ficha-datos" style={{ marginBottom: '1rem' }}>
+            <div className="dato">
+              <span className="dato-label">Cobros</span>
+              <strong>${datos.totalCobros.toFixed(2)}</strong>
+            </div>
+            <div className="dato">
+              <span className="dato-label">Egresos</span>
+              <strong>${datos.totalEgresos.toFixed(2)}</strong>
+            </div>
+            <div className="dato">
+              <span className="dato-label">Neto</span>
+              <strong style={{ color: datos.neto >= 0 ? 'var(--verde)' : 'var(--danger)' }}>
+                ${datos.neto.toFixed(2)}
+              </strong>
+            </div>
+            <div className="dato">
+              <span className="dato-label">Cobros cargados</span>
+              <strong>{datos.cantidadCobros}</strong>
+            </div>
+            <div className="dato">
+              <span className="dato-label">Cajas abiertas en el rango</span>
+              <strong>{datos.cantidadCajas}</strong>
+            </div>
+          </div>
+
+          <div className="layout-2col">
+            <div className="layout-main">
+              <h2 className="form-titulo">Por día</h2>
+              {datos.porDia.length === 0 ? (
+                <p className="muted">Sin movimientos en este rango.</p>
+              ) : (
+                <div className="card">
+                  <table className="tabla">
+                    <thead>
+                      <tr>
+                        <th>Día</th>
+                        <th>Cobros</th>
+                        <th>Egresos</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {datos.porDia.map((d) => (
+                        <tr key={d.fecha}>
+                          <td>{new Date(`${d.fecha}T00:00:00`).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
+                          <td>${d.totalCobros.toFixed(2)}</td>
+                          <td>${d.totalEgresos.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="layout-side">
+              <h2 className="form-titulo">Por método de pago</h2>
+              {datos.porMetodoPago.length === 0 ? (
+                <p className="muted">Sin cobros en este rango.</p>
+              ) : (
+                <div className="card">
+                  {datos.porMetodoPago.map((m) => (
+                    <div key={m.metodoPago} className="dato" style={{ marginBottom: '0.5rem' }}>
+                      <span className="dato-label" style={{ textTransform: 'capitalize' }}>{m.metodoPago}</span>
+                      <strong>${m.total.toFixed(2)}</strong>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </>
       )}
     </div>

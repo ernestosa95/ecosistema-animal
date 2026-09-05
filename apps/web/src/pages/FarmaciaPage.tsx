@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { Sesion, Producto, StockItem, MovimientoStock, TipoMovimientoStock } from '../api/types';
 import { SelectorBusqueda } from '../components/SelectorBusqueda';
+import { BuscadorSenasa } from '../components/BuscadorSenasa';
+import { IngresoStockForm } from '../components/IngresoStockForm';
 
 const ETIQUETAS_TIPO_MOVIMIENTO: Record<TipoMovimientoStock, string> = {
   compra: 'Compra',
@@ -143,7 +145,7 @@ export function FarmaciaPage({ sesion }: { sesion: Sesion }) {
       )}
 
       {mostrarIngreso && (
-        <IngresoForm
+        <IngresoStockForm
           sesion={sesion}
           productos={productos}
           onCreado={() => {
@@ -235,6 +237,7 @@ function NuevoProductoForm({ sesion, onCreado }: { sesion: Sesion; onCreado: () 
       if (esMedicamento && unidadConcentracion) data.unidadConcentracion = unidadConcentracion;
       if (esMedicamento && dosisSugeridaMgKg) data.dosisSugeridaMgKg = Number(dosisSugeridaMgKg);
       await api.crearProducto(sesion, data);
+      api.registrarEvento(sesion, 'accion', 'producto-crear');
       onCreado();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
@@ -247,7 +250,7 @@ function NuevoProductoForm({ sesion, onCreado }: { sesion: Sesion; onCreado: () 
     <form className="card form-grid" onSubmit={guardar}>
       <label className="span-2">
         Nombre
-        <input value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+        <BuscadorSenasa sesion={sesion} valor={nombre} onCambiar={setNombre} placeholder="Buscar en el vademécum SENASA…" />
       </label>
       <label>
         Presentación (opcional)
@@ -335,179 +338,6 @@ function NuevoProductoForm({ sesion, onCreado }: { sesion: Sesion; onCreado: () 
       <div className="span-2">
         <button className="btn" type="submit" disabled={guardando}>
           {guardando ? 'Guardando…' : 'Guardar producto'}
-        </button>
-      </div>
-    </form>
-  );
-}
-
-/**
- * "+ Ingresos": alta de stock para un producto ya existente, sin tener que
- * entrar a su ficha — el flujo de mostrador más común (llega mercadería,
- * se carga cantidad + precios de una). Crea el movimiento 'compra' y de
- * paso actualiza el precio de venta/costo del producto (ver comentario del
- * schema: esos campos se completan típicamente desde acá, no en el alta).
- */
-function IngresoForm({
-  sesion,
-  productos,
-  onCreado,
-}: {
-  sesion: Sesion;
-  productos: Producto[];
-  onCreado: () => void;
-}) {
-  const [nombreProducto, setNombreProducto] = useState('');
-  const producto = productos.find((p) => p.nombre === nombreProducto) ?? null;
-
-  const [cantidad, setCantidad] = useState('');
-  const [bultos, setBultos] = useState('');
-  const [contenidoPorBulto, setContenidoPorBulto] = useState('');
-  const totalCalculado =
-    bultos && contenidoPorBulto ? Number(bultos) * Number(contenidoPorBulto) : null;
-
-  const [fecha, setFecha] = useState('');
-  const [precioCompra, setPrecioCompra] = useState('');
-  const [precioVenta, setPrecioVenta] = useState('');
-  const [observaciones, setObservaciones] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [guardando, setGuardando] = useState(false);
-
-  function elegirProducto(nombre: string) {
-    setNombreProducto(nombre);
-    const p = productos.find((x) => x.nombre === nombre);
-    setPrecioVenta(p?.precio ?? '');
-    setPrecioCompra(p?.precioCompra ?? '');
-  }
-
-  async function guardar(e: React.FormEvent) {
-    e.preventDefault();
-    if (!producto) {
-      setError('Elegí un producto');
-      return;
-    }
-    if (!cantidad || Number(cantidad) <= 0) {
-      setError('Ingresá una cantidad mayor a 0');
-      return;
-    }
-    if (!precioVenta) {
-      setError('El precio de venta al cliente es obligatorio');
-      return;
-    }
-    setError(null);
-    setGuardando(true);
-    try {
-      const dataMovimiento: Record<string, unknown> = { productoId: producto.id, tipo: 'compra', cantidad: Number(cantidad) };
-      if (fecha) dataMovimiento.fecha = fecha;
-      if (observaciones) dataMovimiento.observaciones = observaciones;
-      await api.crearMovimientoStock(sesion, dataMovimiento);
-
-      const dataProducto: Record<string, unknown> = { precio: Number(precioVenta) };
-      if (precioCompra) dataProducto.precioCompra = Number(precioCompra);
-      await api.actualizarProducto(sesion, producto.id, dataProducto);
-
-      onCreado();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al guardar');
-    } finally {
-      setGuardando(false);
-    }
-  }
-
-  return (
-    <form className="card form-grid" onSubmit={guardar}>
-      <label className="span-2">
-        Producto
-        <SelectorBusqueda
-          opciones={productos.map((p) => p.nombre)}
-          valor={nombreProducto}
-          onCambiar={elegirProducto}
-          placeholder="Buscar producto…"
-        />
-      </label>
-
-      {producto && (
-        <>
-          <label>
-            Cantidad{producto.unidad ? ` (${producto.unidad})` : ''}
-            <input type="number" min="1" step="1" value={cantidad} onChange={(e) => setCantidad(e.target.value)} required />
-          </label>
-          <label>
-            Fecha (opcional)
-            <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
-          </label>
-
-          <div className="span-2 subform">
-            <div className="form-titulo">
-              ¿Entró en bultos? Calculá la cantidad total en vez de hacer la cuenta a mano
-            </div>
-            <label>
-              Bultos recibidos
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={bultos}
-                onChange={(e) => setBultos(e.target.value)}
-                placeholder="Ej: 4"
-              />
-            </label>
-            <label>
-              Contenido por bulto{producto.unidad ? ` (${producto.unidad})` : ''}
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={contenidoPorBulto}
-                onChange={(e) => setContenidoPorBulto(e.target.value)}
-                placeholder="Ej: 25"
-              />
-            </label>
-            {totalCalculado !== null && (
-              <div className="span-2 sugerencia-dosis">
-                Total: <b>{totalCalculado}{producto.unidad ? ` ${producto.unidad}` : ''}</b>{' '}
-                <button type="button" className="link" onClick={() => setCantidad(String(totalCalculado))}>
-                  Usar esta cantidad
-                </button>
-              </div>
-            )}
-          </div>
-
-          <label>
-            Precio de compra al proveedor (opcional){producto.unidad ? ` — por ${producto.unidad}` : ''}
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={precioCompra}
-              onChange={(e) => setPrecioCompra(e.target.value)}
-              placeholder="Ej: 1000"
-            />
-          </label>
-          <label>
-            Precio de venta al cliente{producto.unidad ? ` (por ${producto.unidad})` : ''}
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={precioVenta}
-              onChange={(e) => setPrecioVenta(e.target.value)}
-              placeholder="Ej: 1500"
-              required
-            />
-          </label>
-
-          <label className="span-2">
-            Observaciones (opcional)
-            <input value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
-          </label>
-        </>
-      )}
-
-      {error && <div className="alerta span-2">{error}</div>}
-      <div className="span-2">
-        <button className="btn" type="submit" disabled={guardando || !producto}>
-          {guardando ? 'Guardando…' : 'Registrar ingreso'}
         </button>
       </div>
     </form>
@@ -728,6 +558,7 @@ function NuevoMovimientoForm({
       if (fecha) data.fecha = fecha;
       if (observaciones) data.observaciones = observaciones;
       await api.crearMovimientoStock(sesion, data);
+      api.registrarEvento(sesion, 'accion', `stock-movimiento-${tipo}`);
       onCreado();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
@@ -858,6 +689,7 @@ function EditarProductoForm({
       data.precio = precio ? Number(precio) : undefined;
       data.precioCompra = precioCompra ? Number(precioCompra) : undefined;
       const actualizado = await api.actualizarProducto(sesion, producto.id, data);
+      api.registrarEvento(sesion, 'accion', 'producto-editar');
       onGuardado(actualizado);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
@@ -870,7 +702,7 @@ function EditarProductoForm({
     <form className="card form-grid" onSubmit={guardar}>
       <label className="span-2">
         Nombre
-        <input value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+        <BuscadorSenasa sesion={sesion} valor={nombre} onCambiar={setNombre} placeholder="Buscar en el vademécum SENASA…" />
       </label>
       <label>
         Presentación

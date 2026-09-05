@@ -14,9 +14,11 @@ import { CurrentOrg, CurrentUser } from '../../common/decorators/current-context
 export class CajasController {
   constructor(private readonly cajas: CajasService) {}
 
+  /** Antes de devolver la caja del día, normaliza (cierra sola una caja abierta que quedó de un día anterior — ver CajasService.normalizarDelDia()). */
   @Get('actual')
   @Roles('propietario', 'admin', 'recepcion')
-  actual(@CurrentOrg() organizacionId: string) {
+  async actual(@CurrentOrg() organizacionId: string, @CurrentUser() user: { sub: string }) {
+    await this.cajas.normalizarDelDia(organizacionId, user.sub);
     return this.cajas.actual(organizacionId);
   }
 
@@ -42,6 +44,17 @@ export class CajasController {
   @Roles('propietario', 'admin')
   listar(@CurrentOrg() organizacionId: string, @Query('estadoAuditoria') estadoAuditoria?: string) {
     return this.cajas.listar(organizacionId, estadoAuditoria);
+  }
+
+  /** Totales del período (cobros/egresos/neto, por método de pago, por día) — sólo propietario/gerente. */
+  @Get('estadisticas')
+  @Roles('propietario', 'admin')
+  estadisticas(
+    @CurrentOrg() organizacionId: string,
+    @Query('desde') desde?: string,
+    @Query('hasta') hasta?: string,
+  ) {
+    return this.cajas.estadisticas(organizacionId, desde, hasta);
   }
 
   @Patch(':id/auditoria')

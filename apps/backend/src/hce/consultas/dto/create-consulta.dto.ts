@@ -51,4 +51,10 @@ export class CreateConsultaDto {
   @IsOptional()
   @IsString()
   observaciones?: string;
+
+  // Obligatorio a pedido del negocio (2026-09-03): toda consulta cargada
+  // desde ahora tiene que dejar registrado un costo, aunque sea 0 (cortesía).
+  @IsNumber()
+  @Min(0)
+  costo!: number;
 }

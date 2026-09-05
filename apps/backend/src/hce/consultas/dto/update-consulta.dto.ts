@@ -47,4 +47,9 @@ export class UpdateConsultaDto {
   @IsOptional()
   @IsString()
   observaciones?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  costo?: number;
 }
