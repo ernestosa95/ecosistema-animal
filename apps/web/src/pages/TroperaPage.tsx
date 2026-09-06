@@ -6,6 +6,7 @@ import type {
   Potrero, PlantillaTareas, ProtocoloIatf, Tarea,
 } from '../api/types';
 import { DrawerTabla } from '../components/DrawerTabla';
+import { tieneAlguno, ROLES_TROPERA_CAMPO, ROLES_TROPERA_VETERINARIO } from '../nav/config';
 
 const ETIQUETAS_CATEGORIA: Record<CategoriaHacienda, string> = {
   vaca: 'Vacas',
@@ -177,6 +178,7 @@ interface DrillMovimientos {
 }
 
 export function TroperaHomeSection({ sesion }: { sesion: Sesion }) {
+  const puedeCampo = tieneAlguno(sesion.roles, ROLES_TROPERA_CAMPO);
   const [establecimientos, setEstablecimientos] = useState<Establecimiento[]>([]);
   const [existenciasTodas, setExistenciasTodas] = useState<
     { establecimientoId: string; categoria: CategoriaHacienda; cantidad: number }[]
@@ -230,12 +232,14 @@ export function TroperaHomeSection({ sesion }: { sesion: Sesion }) {
     <div>
       <div className="page-head">
         <h1>Home</h1>
-        <button className="btn" data-tour="tropera-nuevo" onClick={() => setMostrarForm((v) => !v)}>
-          {mostrarForm ? 'Cerrar' : '+ Nuevo establecimiento'}
-        </button>
+        {puedeCampo && (
+          <button className="btn" data-tour="tropera-nuevo" onClick={() => setMostrarForm((v) => !v)}>
+            {mostrarForm ? 'Cerrar' : '+ Nuevo establecimiento'}
+          </button>
+        )}
       </div>
 
-      {mostrarForm && (
+      {puedeCampo && mostrarForm && (
         <NuevoEstablecimientoForm
           sesion={sesion}
           onCreado={() => {
@@ -323,6 +327,7 @@ function FilaEstablecimiento({
   onActualizado: () => void;
 }) {
   const [editando, setEditando] = useState(false);
+  const puedeCampo = tieneAlguno(sesion.roles, ROLES_TROPERA_CAMPO);
   return (
     <>
       <tr>
@@ -330,12 +335,14 @@ function FilaEstablecimiento({
         <td>{establecimiento.ubicacion ?? '—'}</td>
         <td>{establecimiento.superficieHa ? `${establecimiento.superficieHa} ha` : '—'}</td>
         <td>
-          <button className="link" onClick={() => setEditando((v) => !v)}>
-            {editando ? 'Cerrar' : 'Editar'}
-          </button>
+          {puedeCampo && (
+            <button className="link" onClick={() => setEditando((v) => !v)}>
+              {editando ? 'Cerrar' : 'Editar'}
+            </button>
+          )}
         </td>
       </tr>
-      {editando && (
+      {puedeCampo && editando && (
         <tr>
           <td colSpan={4}>
             <EditarEstablecimientoForm
@@ -356,6 +363,7 @@ function FilaEstablecimiento({
 
 /** Hacienda agregada (existencias por categoría, movimientos y eventos a nivel categoría) del establecimiento elegido. */
 export function TroperaAnimalesSection({ sesion }: { sesion: Sesion }) {
+  const puedeCampo = tieneAlguno(sesion.roles, ROLES_TROPERA_CAMPO);
   const { establecimientos, seleccionado, seleccionadoId, setSeleccionadoId, cargando: cargandoEsts } =
     useEstablecimientos(sesion);
   const [existencias, setExistencias] = useState<Existencia[]>([]);
@@ -441,12 +449,14 @@ export function TroperaAnimalesSection({ sesion }: { sesion: Sesion }) {
 
           <div className="page-head">
             <h2>Movimientos</h2>
-            <button className="btn" onClick={() => setMostrarMovimiento((v) => !v)}>
-              {mostrarMovimiento ? 'Cerrar' : '+ Nuevo movimiento'}
-            </button>
+            {puedeCampo && (
+              <button className="btn" onClick={() => setMostrarMovimiento((v) => !v)}>
+                {mostrarMovimiento ? 'Cerrar' : '+ Nuevo movimiento'}
+              </button>
+            )}
           </div>
 
-          {mostrarMovimiento && (
+          {puedeCampo && mostrarMovimiento && (
             <NuevoMovimientoForm
               sesion={sesion}
               establecimiento={seleccionado}
@@ -922,6 +932,7 @@ function PotrerosSection({
   const [superficieHa, setSuperficieHa] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const puedeCampo = tieneAlguno(sesion.roles, ROLES_TROPERA_CAMPO);
 
   async function guardar(e: React.FormEvent) {
     e.preventDefault();
@@ -947,11 +958,13 @@ function PotrerosSection({
     <div>
       <div className="page-head">
         <h2>Potreros</h2>
-        <button className="btn" onClick={() => setMostrarForm((v) => !v)}>
-          {mostrarForm ? 'Cerrar' : '+ Nuevo potrero'}
-        </button>
+        {puedeCampo && (
+          <button className="btn" onClick={() => setMostrarForm((v) => !v)}>
+            {mostrarForm ? 'Cerrar' : '+ Nuevo potrero'}
+          </button>
+        )}
       </div>
-      {mostrarForm && (
+      {puedeCampo && mostrarForm && (
         <form className="card form-grid" onSubmit={guardar}>
           <label>
             Nombre
@@ -1008,6 +1021,7 @@ function AnimalesCampoSection({
   const [conciliandoId, setConciliandoId] = useState<string | null>(null);
   const [categoriaExpress, setCategoriaExpress] = useState<CategoriaHacienda>('vaca');
   const [dandoAltaExpress, setDandoAltaExpress] = useState(false);
+  const puedeCampo = tieneAlguno(sesion.roles, ROLES_TROPERA_CAMPO);
 
   async function cargar() {
     setCargando(true);
@@ -1061,26 +1075,30 @@ function AnimalesCampoSection({
     <div>
       <div className="page-head">
         <h2>Animales individuales{pendientes > 0 ? ` — ${pendientes} sin conciliar` : ''}</h2>
-        <button className="btn" onClick={() => setMostrarAlta((v) => !v)}>
-          {mostrarAlta ? 'Cerrar' : '+ Nuevo animal'}
-        </button>
+        {puedeCampo && (
+          <button className="btn" onClick={() => setMostrarAlta((v) => !v)}>
+            {mostrarAlta ? 'Cerrar' : '+ Nuevo animal'}
+          </button>
+        )}
       </div>
 
-      <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        <span className="muted" style={{ fontSize: '0.85rem' }}>Alta express sin identificar (§5.2):</span>
-        <select value={categoriaExpress} onChange={(e) => setCategoriaExpress(e.target.value as CategoriaHacienda)}>
-          {(Object.keys(ETIQUETAS_CATEGORIA) as CategoriaHacienda[]).map((c) => (
-            <option key={c} value={c}>
-              {ETIQUETAS_CATEGORIA[c]}
-            </option>
-          ))}
-        </select>
-        <button className="btn-ghost" onClick={altaExpress} disabled={dandoAltaExpress}>
-          {dandoAltaExpress ? 'Dando de alta…' : '+ Alta 1-tap'}
-        </button>
-      </div>
+      {puedeCampo && (
+        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+          <span className="muted" style={{ fontSize: '0.85rem' }}>Alta express sin identificar (§5.2):</span>
+          <select value={categoriaExpress} onChange={(e) => setCategoriaExpress(e.target.value as CategoriaHacienda)}>
+            {(Object.keys(ETIQUETAS_CATEGORIA) as CategoriaHacienda[]).map((c) => (
+              <option key={c} value={c}>
+                {ETIQUETAS_CATEGORIA[c]}
+              </option>
+            ))}
+          </select>
+          <button className="btn-ghost" onClick={altaExpress} disabled={dandoAltaExpress}>
+            {dandoAltaExpress ? 'Dando de alta…' : '+ Alta 1-tap'}
+          </button>
+        </div>
+      )}
 
-      {mostrarAlta && (
+      {puedeCampo && mostrarAlta && (
         <NuevoAnimalCampoForm
           sesion={sesion}
           establecimiento={establecimiento}
@@ -1147,7 +1165,7 @@ function AnimalesCampoSection({
                       />
                     ) : (
                       <>
-                        {!a.caravanaDefinitiva && (
+                        {puedeCampo && !a.caravanaDefinitiva && (
                           <>
                             <button className="link" onClick={() => setConciliandoId(a.id)}>
                               Asignar caravana
@@ -1312,6 +1330,7 @@ function FichaAnimalCampo({
   const [error, setError] = useState<string | null>(null);
   const [mostrarEvento, setMostrarEvento] = useState(false);
   const [editando, setEditando] = useState(false);
+  const puedeCampo = tieneAlguno(sesion.roles, ROLES_TROPERA_CAMPO);
 
   async function cargar() {
     setCargando(true);
@@ -1345,9 +1364,11 @@ function FichaAnimalCampo({
 
       <div className="page-head">
         <h1>{animal.caravana}</h1>
-        <button className="btn-ghost" onClick={() => setEditando((v) => !v)}>
-          {editando ? 'Cerrar' : 'Editar'}
-        </button>
+        {puedeCampo && (
+          <button className="btn-ghost" onClick={() => setEditando((v) => !v)}>
+            {editando ? 'Cerrar' : 'Editar'}
+          </button>
+        )}
       </div>
 
       {retiroVigente && (
@@ -1356,7 +1377,7 @@ function FichaAnimalCampo({
         </div>
       )}
 
-      {editando ? (
+      {puedeCampo && editando ? (
         <EditarAnimalCampoForm
           sesion={sesion}
           animal={animal}
@@ -1445,6 +1466,7 @@ function EvaluacionAndrologicaSection({ sesion, animal }: { sesion: Sesion; anim
   const [motilidad, setMotilidad] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const puedeVeterinario = tieneAlguno(sesion.roles, ROLES_TROPERA_VETERINARIO);
 
   async function cargar() {
     setCargando(true);
@@ -1488,12 +1510,14 @@ function EvaluacionAndrologicaSection({ sesion, animal }: { sesion: Sesion; anim
     <>
       <div className="page-head">
         <h2>Evaluación andrológica</h2>
-        <button className="btn" onClick={() => setMostrarForm((v) => !v)}>
-          {mostrarForm ? 'Cerrar' : '+ Nueva evaluación'}
-        </button>
+        {puedeVeterinario && (
+          <button className="btn" onClick={() => setMostrarForm((v) => !v)}>
+            {mostrarForm ? 'Cerrar' : '+ Nueva evaluación'}
+          </button>
+        )}
       </div>
 
-      {mostrarForm && (
+      {puedeVeterinario && mostrarForm && (
         <form className="card form-grid" onSubmit={guardar}>
           <label>
             Circunferencia escrotal (cm)
@@ -1836,9 +1860,10 @@ function AplicarPlantillaSection({
   const [plantillaId, setPlantillaId] = useState('');
   const [aplicando, setAplicando] = useState(false);
   const [mensaje, setMensaje] = useState<string | null>(null);
+  const puedeCampo = tieneAlguno(sesion.roles, ROLES_TROPERA_CAMPO);
 
   useEffect(() => {
-    api.plantillasTareas(sesion).then(setPlantillas).catch(() => {});
+    if (puedeCampo) api.plantillasTareas(sesion).then(setPlantillas).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1858,7 +1883,7 @@ function AplicarPlantillaSection({
     }
   }
 
-  if (plantillas.length === 0) return null;
+  if (!puedeCampo || plantillas.length === 0) return null;
 
   return (
     <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
@@ -1895,9 +1920,10 @@ function AplicarProtocoloSection({
   const [tareas, setTareas] = useState<Tarea[]>([]);
   const [aplicando, setAplicando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const puedeVeterinario = tieneAlguno(sesion.roles, ROLES_TROPERA_VETERINARIO);
 
   useEffect(() => {
-    api.protocolosIatf(sesion).then(setProtocolos).catch(() => {});
+    if (puedeVeterinario) api.protocolosIatf(sesion).then(setProtocolos).catch(() => {});
     api.tareas(sesion, establecimiento.id, animal.id).then(setTareas).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animal.id]);
@@ -1936,7 +1962,7 @@ function AplicarProtocoloSection({
       <div className="page-head">
         <h2>Protocolo IATF</h2>
       </div>
-      {protocolos.length > 0 && (
+      {puedeVeterinario && protocolos.length > 0 && (
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
           <select value={protocoloId} onChange={(e) => setProtocoloId(e.target.value)}>
             <option value="">Seleccionar protocolo…</option>
@@ -2032,6 +2058,7 @@ function GestorPlantillas({ sesion }: { sesion: Sesion }) {
   const [items, setItems] = useState<{ tipo: TipoEvento; producto: string }[]>([{ tipo: 'vacunacion', producto: '' }]);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const puedeCampo = tieneAlguno(sesion.roles, ROLES_TROPERA_CAMPO);
 
   async function cargar() {
     setCargando(true);
@@ -2070,10 +2097,12 @@ function GestorPlantillas({ sesion }: { sesion: Sesion }) {
 
   return (
     <div>
-      <button className="btn-ghost" onClick={() => setMostrarForm((v) => !v)} style={{ marginBottom: '0.75rem' }}>
-        {mostrarForm ? 'Cerrar' : '+ Nueva plantilla'}
-      </button>
-      {mostrarForm && (
+      {puedeCampo && (
+        <button className="btn-ghost" onClick={() => setMostrarForm((v) => !v)} style={{ marginBottom: '0.75rem' }}>
+          {mostrarForm ? 'Cerrar' : '+ Nueva plantilla'}
+        </button>
+      )}
+      {puedeCampo && mostrarForm && (
         <form className="card form-grid" onSubmit={guardar}>
           <label className="span-2">
             Nombre
@@ -2144,6 +2173,7 @@ function GestorProtocolos({ sesion }: { sesion: Sesion }) {
   ]);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const puedeVeterinario = tieneAlguno(sesion.roles, ROLES_TROPERA_VETERINARIO);
 
   async function cargar() {
     setCargando(true);
@@ -2188,10 +2218,12 @@ function GestorProtocolos({ sesion }: { sesion: Sesion }) {
 
   return (
     <div>
-      <button className="btn-ghost" onClick={() => setMostrarForm((v) => !v)} style={{ marginBottom: '0.75rem' }}>
-        {mostrarForm ? 'Cerrar' : '+ Nuevo protocolo'}
-      </button>
-      {mostrarForm && (
+      {puedeVeterinario && (
+        <button className="btn-ghost" onClick={() => setMostrarForm((v) => !v)} style={{ marginBottom: '0.75rem' }}>
+          {mostrarForm ? 'Cerrar' : '+ Nuevo protocolo'}
+        </button>
+      )}
+      {puedeVeterinario && mostrarForm && (
         <form className="card form-grid" onSubmit={guardar}>
           <label className="span-2">
             Nombre
@@ -2487,6 +2519,7 @@ function FilaExistencia({
 }) {
   const [cantidad, setCantidad] = useState(String(existencia.cantidad));
   const [guardando, setGuardando] = useState(false);
+  const puedeCampo = tieneAlguno(sesion.roles, ROLES_TROPERA_CAMPO);
 
   const cambio = Number(cantidad) !== existencia.cantidad;
 
@@ -2504,6 +2537,16 @@ function FilaExistencia({
     } finally {
       setGuardando(false);
     }
+  }
+
+  if (!puedeCampo) {
+    return (
+      <tr>
+        <td>{ETIQUETAS_CATEGORIA[existencia.categoria]}</td>
+        <td>{existencia.cantidad}</td>
+        <td />
+      </tr>
+    );
   }
 
   return (

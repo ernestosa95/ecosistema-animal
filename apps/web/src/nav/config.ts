@@ -9,7 +9,21 @@ export function tieneAlguno(roles: string[] | undefined, set: Set<string>): bool
 // --- Roles por sección (mismos sets que antes regían la nav horizontal) ---
 export const ROLES_DASHBOARD = new Set(['propietario', 'admin']);
 export const ROLES_TURNERO = new Set(['propietario', 'admin', 'recepcion', 'veterinario']);
-export const ROLES_TROPERA = new Set(['propietario', 'admin', 'capataz']);
+/**
+ * Quién puede entrar a Tropera en absoluto (visibilidad de la pestaña).
+ * Incluye `veterinario` desde 2026-09-06 — la Fase E (evaluación andrológica,
+ * protocolos IATF, muestras, diagnóstico reproductivo) es trabajo de un
+ * veterinario sanitarista, y el backend ya lo permitía en esos endpoints
+ * puntuales aunque acá nunca se le dejaba llegar a la pantalla. Dentro de
+ * Tropera, no todas las acciones son para todos los que entran — ver
+ * `ROLES_TROPERA_CAMPO`/`ROLES_TROPERA_VETERINARIO` más abajo, mismo criterio
+ * que ya se aplica en la ficha del paciente de Huella (ver `ROLES_CLINICO`).
+ */
+export const ROLES_TROPERA = new Set(['propietario', 'admin', 'capataz', 'veterinario']);
+/** Manejo de campo "de conteo" (establecimientos, potreros, existencias, movimientos, fichas individuales, plantillas 1-tap) — mismos roles que exige el backend en esos módulos, no incluye veterinario. */
+export const ROLES_TROPERA_CAMPO = new Set(['propietario', 'admin', 'capataz']);
+/** Trabajo veterinario específico de Tropera (evaluación andrológica, protocolos IATF) — mismos roles que exige el backend ahí, no incluye capataz. */
+export const ROLES_TROPERA_VETERINARIO = new Set(['propietario', 'admin', 'veterinario']);
 export const ROLES_USUARIOS = new Set(['propietario', 'admin']);
 export const ROLES_FARMACIA = new Set(['propietario', 'admin', 'veterinario']);
 export const ROLES_CAJA = new Set(['propietario', 'admin', 'recepcion']);
