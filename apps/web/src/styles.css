@@ -576,6 +576,66 @@ h2 {
 .wizard-card {
   max-width: 560px;
 }
+/* Modo "registro" de LoginPage.tsx: mismo look que la landing (serif +
+   verde) pero embebido en una card, no una página completa — y bastante
+   más ancho que el login simple para que los campos se acomoden de a 2
+   columnas (.form-grid) en vez de una sola torre vertical. */
+.login-card-ancho {
+  max-width: 640px;
+}
+.login-card-ancho h1 {
+  color: var(--verde-dark);
+}
+.login-card-ancho .form-grid {
+  margin-top: 0.25rem;
+}
+.login-card-plan {
+  background: var(--huella-bg);
+  border-color: var(--border);
+  padding: 0.75rem 0.9rem;
+}
+/* Indicador de paso del alta: una barra de segmentos (no números en
+   círculos, muy chico el espacio) + un renglón de texto "Paso X de N". */
+.form-pasos {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0.25rem 0 0.6rem;
+}
+.form-paso-punto {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border);
+  transition: background-color 0.15s;
+}
+.form-paso-punto.activo {
+  background: var(--verde);
+}
+.form-paso-label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 0 0 1rem;
+}
+.form-paso-label b {
+  color: var(--verde-dark);
+}
+.login-card-verif-email {
+  margin: -0.25rem 0 0.5rem;
+}
+.login-card-nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+.login-card-nav .btn-ghost {
+  margin-right: auto;
+}
+.login-card-nav .landing-btn {
+  min-width: 160px;
+  justify-content: center;
+}
 
 /* --- Formularios --- */
 label {
@@ -1543,18 +1603,20 @@ textarea:focus {
 .selector-busqueda {
   position: relative;
 }
+/* top/left/width se fijan inline (SelectorBusqueda.tsx los calcula desde el
+   <input> y renderiza esto en un portal a document.body) — así el
+   desplegable no queda recortado por el overflow de un ancestro (ej. un
+   modal corto). z-index por encima de `.modal-overlay` (120): al vivir en un
+   portal, ya no hereda el stacking context del formulario que lo contiene. */
 .selector-busqueda-resultados {
-  position: absolute;
-  top: calc(100% + 0.25rem);
-  left: 0;
-  right: 0;
+  position: fixed;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 9px;
   box-shadow: var(--sombra-flotante);
   max-height: 12rem;
   overflow-y: auto;
-  z-index: 5;
+  z-index: 200;
 }
 .selector-busqueda-resultados button {
   display: block;

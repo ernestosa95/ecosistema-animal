@@ -6,6 +6,14 @@ export const getToken = () => localStorage.getItem(TOKEN_KEY) ?? '';
 export const setToken = (t: string) => localStorage.setItem(TOKEN_KEY, t);
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 
+// AdminPage.tsx se suscribe acá (una vez, al montar) para volver a la
+// pantalla de login apenas cualquier llamado del panel devuelva 401 (token
+// vencido o inválido) — antes eso se mostraba como el JSON crudo del error
+// en la primera card que fallaba, en vez de sacar a la persona de un panel
+// al que ya no tiene acceso.
+let alExpirar: (() => void) | null = null;
+export const suscribirseAExpiracion = (cb: () => void) => { alExpirar = cb; };
+
 async function req(path: string, options: RequestInit = {}): Promise<any> {
   const res = await fetch(`${BASE}${path}`, {
     ...options,
@@ -15,6 +23,10 @@ async function req(path: string, options: RequestInit = {}): Promise<any> {
       ...(options.headers as Record<string, string> || {}),
     },
   });
+  if (res.status === 401) {
+    clearToken();
+    alExpirar?.();
+  }
   if (!res.ok) {
     const msg = await res.text().catch(() => '');
     throw new Error(msg || `Error ${res.status}`);
@@ -39,6 +51,12 @@ export interface ResumenPagoOrg {
 export interface Pago {
   id: string; organizacionId: string; periodo: string; monto: string;
   fechaPago: string; medioPago?: string | null; observaciones?: string | null;
+  estado?: 'pendiente' | 'confirmado' | 'rechazado';
+}
+export interface PagoPendiente {
+  id: string; organizacionId: string; organizacionNombre: string;
+  periodo: string; monto: string; medioPago: string | null;
+  observaciones: string | null; comprobanteUrl: string | null; createdAt: string;
 }
 export interface GananciasPeriodo {
   porPeriodo: Array<{ periodo: string; total: string }>;
@@ -68,7 +86,14 @@ export interface MensajeAdmin {
   organizacionId?: string | null; grupoId?: string | null; publicadoEn: string;
 }
 
-/** Inicia sesión con las credenciales del super-admin (mismo /auth/login). */
+/**
+ * Inicia sesión con las credenciales del super-admin (mismo /auth/login,
+ * que no distingue super-admin de un usuario común — cualquier cuenta
+ * válida "loguea" acá). Por eso después de loguear se confirma contra
+ * GET /admin/whoami (gateado por SuperAdminGuard): si el usuario no es
+ * super-admin de la plataforma, se descarta el token en vez de dejarlo
+ * entrar al panel y recién enterarse con un 403 en la primera lista.
+ */
 export async function login(email: string, password: string) {
   const res = await fetch(`${BASE}/auth/login`, {
     method: 'POST',
@@ -77,6 +102,15 @@ export async function login(email: string, password: string) {
   });
   if (!res.ok) throw new Error('Credenciales inválidas');
   const data = await res.json();
+  // Chequea /admin/whoami con el token todavía SIN persistir — así el token
+  // de una cuenta válida pero no super-admin nunca llega a tocar
+  // localStorage, ni por la ventana breve entre guardarlo y confirmarlo.
+  const whoami = await fetch(`${BASE}/admin/whoami`, {
+    headers: { Authorization: `Bearer ${data.accessToken}` },
+  });
+  if (!whoami.ok) {
+    throw new Error('Tu cuenta no tiene permisos de administración de la plataforma');
+  }
   setToken(data.accessToken);
   return data;
 }
@@ -127,6 +161,10 @@ export const setAcceso = (
 // ── Pagos / facturación ────────────────────────────────────────────────
 export const resumenPagos = (): Promise<ResumenPagoOrg[]> => req('/admin/resumen-pagos');
 
+/** Manda por email un recordatorio de pago a los propietarios/admins activos de la organización. */
+export const enviarRecordatorioPago = (orgId: string): Promise<{ ok: true; enviados: number }> =>
+  req(`/admin/organizaciones/${orgId}/recordatorio-pago`, { method: 'POST' });
+
 export const gananciasPorPeriodo = (): Promise<GananciasPeriodo> => req('/admin/pagos/ganancias');
 
 export const resumenAnalitica = (desde?: string, hasta?: string): Promise<ResumenAnalitica> => {
@@ -143,6 +181,13 @@ export const registrarPago = (
   orgId: string,
   d: { periodo?: string; monto: number; medioPago?: string; observaciones?: string },
 ): Promise<Pago> => req(`/admin/organizaciones/${orgId}/pagos`, { method: 'POST', body: JSON.stringify(d) });
+
+/** Pagos cargados por las propias organizaciones (comprobante de transferencia) a la espera de revisión. */
+export const listarPagosPendientes = (): Promise<PagoPendiente[]> => req('/admin/pagos/pendientes');
+
+/** Aprueba (`aprobar: true`) o rechaza un pago pendiente. */
+export const revisarPago = (id: string, aprobar: boolean, motivoRechazo?: string) =>
+  req(`/admin/pagos/${id}/revisar`, { method: 'POST', body: JSON.stringify({ aprobar, motivoRechazo }) });
 
 // ── Soluciones habilitadas (Tropera / Huella) ────────────────────────────
 export const setSoluciones = (

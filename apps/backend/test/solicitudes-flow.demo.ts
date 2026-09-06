@@ -12,9 +12,11 @@
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { eq } from 'drizzle-orm';
+import { JwtService } from '@nestjs/jwt';
 import * as core from '../src/database/schema/core';
 import * as plataforma from '../src/database/schema/plataforma';
 import { SolicitudesService } from '../src/solicitudes/solicitudes.service';
+import { MailService } from '../src/common/mail/mail.service';
 
 let ok = 0, fail = 0;
 const check = (n: string, c: boolean) => { c ? (ok++, console.log(`  ✓ ${n}`)) : (fail++, console.log(`  ✗ FALLA: ${n}`)); };
@@ -29,11 +31,11 @@ async function main() {
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), nombre text NOT NULL,
       huella_activa boolean NOT NULL DEFAULT true, tropera_activa boolean NOT NULL DEFAULT false, cuit text, direccion text, localidad text, provincia text, telefono text, email text,
       activo boolean NOT NULL DEFAULT true,
-      grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, fecha_activacion timestamptz, es_demo boolean NOT NULL DEFAULT false,
+      grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, fecha_activacion timestamptz, es_demo boolean NOT NULL DEFAULT false, logo_url text,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
     CREATE TABLE core.usuarios (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text NOT NULL UNIQUE, password_hash text NOT NULL,
-      nombre text, apellido text, dni text, email_verificado boolean NOT NULL DEFAULT false, ultimo_login timestamptz,
+      nombre text, apellido text, dni text, email_verificado boolean NOT NULL DEFAULT false, ultimo_login timestamptz, password_changed_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
     CREATE TABLE core.membresias (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -61,7 +63,11 @@ async function main() {
   `);
 
   const db = drizzle(client, { schema: { ...core, ...plataforma } });
-  const solicitudesService = new SolicitudesService(db as any);
+  const jwt = new JwtService({ secret: 'secreto-de-prueba' });
+  const solicitudesService = new SolicitudesService(db as any, jwt, new MailService());
+  // Mismo token que emitiría confirmarCodigoVerificacion() — crear() ahora
+  // exige que el email ya esté verificado.
+  const tokenVerificado = (email: string) => jwt.sign({ email, scope: 'email_verificado' }, { expiresIn: '30m' });
 
   const [planActivo] = await db.insert(plataforma.planes).values({
     nombre: 'Plan Estándar', precioMensual: '15000', limitesRoles: { veterinario: 2, recepcion: 1 },
@@ -81,7 +87,29 @@ async function main() {
     nombre: 'Ana', apellido: 'García', email: 'ana@vet.com', password: 'password123',
     telefono: '3511234567', dni: '30111222',
     nombreOrganizacion: 'Veterinaria del Sur', tipoOrganizacion: 'clinica',
+    emailVerificadoToken: tokenVerificado('ana@vet.com'),
   };
+
+  console.log('1b) verificación de email por código, previa al alta');
+  const { token: tokenCodigo } = await solicitudesService.enviarCodigoVerificacion('nueva@vet.com');
+  const { codigo: codigoReal } = jwt.verify(tokenCodigo) as { codigo: string };
+  const codigoIncorrecto = codigoReal === '123456' ? '654321' : '123456';
+  let rechazaCodigoIncorrecto = false;
+  try { solicitudesService.confirmarCodigoVerificacion(tokenCodigo, codigoIncorrecto); }
+  catch (e: any) { rechazaCodigoIncorrecto = e?.status === 400 || e?.name === 'BadRequestException'; }
+  check('código incorrecto se rechaza', rechazaCodigoIncorrecto);
+  const { emailVerificadoToken: tokenNueva } = solicitudesService.confirmarCodigoVerificacion(tokenCodigo, codigoReal);
+  check('código correcto devuelve un token de verificación', !!tokenNueva);
+  let rechazaSinVerificar = false;
+  try {
+    await solicitudesService.crear({ ...dtoBase, email: 'nueva@vet.com', planId: planActivo.id, emailVerificadoToken: 'token-invalido' } as any);
+  } catch (e: any) { rechazaSinVerificar = e?.status === 400 || e?.name === 'BadRequestException'; }
+  check('crear() sin un emailVerificadoToken válido se rechaza', rechazaSinVerificar);
+  let rechazaEmailDistinto = false;
+  try {
+    await solicitudesService.crear({ ...dtoBase, email: 'otra-cuenta@vet.com', planId: planActivo.id, emailVerificadoToken: tokenNueva } as any);
+  } catch (e: any) { rechazaEmailDistinto = e?.status === 400 || e?.name === 'BadRequestException'; }
+  check('crear() con un token verificado de OTRO email se rechaza', rechazaEmailDistinto);
 
   console.log('2) crear(): un plan inexistente se rechaza');
   let rechazadoNoExiste = false;
@@ -133,7 +161,9 @@ async function main() {
   check('reintentar aprobar una solicitud ya resuelta → 400', rechazadoYaResuelta);
 
   console.log('9) rechazar(): marca la solicitud como rechazada con motivo');
-  const otra = await solicitudesService.crear({ ...dtoBase, email: 'otro@vet.com', planId: planActivo.id } as any);
+  const otra = await solicitudesService.crear({
+    ...dtoBase, email: 'otro@vet.com', planId: planActivo.id, emailVerificadoToken: tokenVerificado('otro@vet.com'),
+  } as any);
   await solicitudesService.rechazar(otra.id, adminFicticio.id, { motivo: 'No cumple los requisitos' });
   const [solRechazada] = await db.select().from(core.solicitudes).where(eq(core.solicitudes.id, otra.id));
   check('queda "rechazada" con el motivo guardado', solRechazada.estado === 'rechazada' && solRechazada.motivoRechazo === 'No cumple los requisitos');

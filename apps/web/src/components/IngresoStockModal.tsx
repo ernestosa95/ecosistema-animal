@@ -39,6 +39,7 @@ export function IngresoStockModal({
             <IngresoStockForm
               sesion={sesion}
               productos={productos}
+              onProductoCreado={(p) => setProductos((prev) => [...prev, p])}
               onCreado={() => {
                 setOk(true);
                 setTimeout(onCompletado, 900);

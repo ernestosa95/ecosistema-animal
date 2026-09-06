@@ -28,8 +28,11 @@ const s = StyleSheet.create({
   page: { paddingTop: 0, paddingBottom: 32, paddingHorizontal: 0, fontFamily: 'Helvetica', color: C.ink, fontSize: 10 },
 
   header: { backgroundColor: C.teal, paddingHorizontal: 30, paddingVertical: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  brandRow: { flexDirection: 'row', alignItems: 'center' },
+  brandRow: { flexDirection: 'row', alignItems: 'center', maxWidth: 320 },
   wordmark: { color: C.white, fontFamily: 'Helvetica-Bold', fontSize: 26, marginLeft: 10, letterSpacing: 0.5 },
+  orgLogoBox: { width: 48, height: 48, borderRadius: 6, backgroundColor: C.white, alignItems: 'center', justifyContent: 'center', padding: 2 },
+  orgLogo: { width: 40, height: 40, objectFit: 'contain' },
+  orgNombre: { color: C.white, fontFamily: 'Helvetica-Bold', fontSize: 17, marginLeft: 10 },
   headerRight: { alignItems: 'flex-end' },
   headerKicker: { color: '#BFE4DC', fontSize: 8.5, fontFamily: 'Helvetica-Bold', letterSpacing: 1.5 },
   headerSub: { color: C.white, fontSize: 9, marginTop: 2 },
@@ -80,6 +83,21 @@ function PawLogo(size = 30, color = C.white) {
   ]);
 }
 
+/** Mismo criterio que carnet.document.ts: logo propio de la organización si lo cargó, si no la marca Huella. */
+function Brand(data: CarnetData) {
+  const org = data.organizacion;
+  if (org?.logoUrl) {
+    return [
+      h(View, { key: 'logoBox', style: s.orgLogoBox }, h(Image, { style: s.orgLogo, src: org.logoUrl })),
+      h(Text, { key: 'wm', style: s.orgNombre }, org.nombre),
+    ];
+  }
+  return [
+    PawLogo(),
+    h(Text, { key: 'wm', style: s.wordmark }, 'Huella'),
+  ];
+}
+
 function Field(key: string, label: string, value?: string) {
   return h(View, { key, style: s.field }, [
     h(Text, { key: 'l', style: s.fieldLabel }, label),
@@ -101,10 +119,7 @@ export function FichaDocument(data: CarnetData) {
     h(Page as any, { size: 'A4', style: s.page }, [
 
       h(View, { key: 'h', style: s.header }, [
-        h(View, { key: 'brand', style: s.brandRow }, [
-          PawLogo(),
-          h(Text, { key: 'wm', style: s.wordmark }, 'Huella'),
-        ]),
+        h(View, { key: 'brand', style: s.brandRow }, Brand(data)),
         h(View, { key: 'hr', style: s.headerRight }, [
           h(Text, { key: 'k', style: s.headerKicker }, 'FICHA DEL ANIMAL'),
           h(Text, { key: 'e', style: s.headerSub }, `Emitida ${data.emitidoEl}`),

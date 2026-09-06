@@ -11,6 +11,7 @@ import { Animal } from './models/Animal';
 import { Consulta } from './models/Consulta';
 import { Vacunacion } from './models/Vacunacion';
 import { Turno } from './models/Turno';
+import { Agenda } from './models/Agenda';
 import { AnimalCampo } from './models/AnimalCampo';
 import { Potrero } from './models/Potrero';
 import { Hallazgo } from './models/Hallazgo';
@@ -42,7 +43,7 @@ export const database = new Database({
   adapter,
   modelClasses: [
     Establecimiento, Existencia, Movimiento, Evento,
-    Persona, Animal, Consulta, Vacunacion, Turno,
+    Persona, Animal, Consulta, Vacunacion, Turno, Agenda,
     AnimalCampo, Potrero, Hallazgo, ToroVirtual, Muestra,
     PlantillaTarea, ProtocoloIatf, Tarea,
     Producto, Stock, MovimientoStock,

@@ -41,6 +41,12 @@ export const organizaciones = core.table('organizaciones', {
   huellaActiva: boolean('huella_activa').notNull().default(true),
   troperaActiva: boolean('tropera_activa').notNull().default(false),
   cuit: text('cuit'),
+  // Logo propio de la organización — se muestra en todo lo que llega al
+  // dueño de una mascota (carnet, ficha PDF, portal), en vez de (o además
+  // de) la marca "Huella" de la plataforma. Cargado por el propietario/admin
+  // desde "Mi plan" (self-service, ver core/organizacion/). null = sin logo
+  // propio, todo sigue mostrando la marca de la plataforma como hasta ahora.
+  logoUrl: text('logo_url'),
   // Datos de contacto/ubicación de la institución/campo — capturados desde
   // el alta (form de solicitud de cuenta), texto libre igual que
   // personas.domicilio (no hay necesidad de geocodificar/filtrar todavía).

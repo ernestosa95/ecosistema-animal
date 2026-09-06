@@ -19,12 +19,23 @@ import { SetRolesDto } from './dto/set-roles.dto';
 import { SetAccesoDto } from './dto/set-acceso.dto';
 import { SetSolucionesDto } from './dto/set-soluciones.dto';
 import { RegistrarPagoDto } from './dto/registrar-pago.dto';
+import { RevisarPagoDto } from './dto/revisar-pago.dto';
 
 /** Todas las rutas requieren usuario autenticado + super-admin de plataforma. */
 @Controller('admin')
 @UseGuards(JwtAuthGuard, SuperAdminGuard)
 export class AdminController {
   constructor(private readonly admin: AdminService) {}
+
+  // Endpoint liviano para que el login del panel /admin (web) confirme que
+  // quien acaba de loguearse es super-admin antes de entrar al panel — sin
+  // esto, cualquier usuario con cuenta válida podía "iniciar sesión" en
+  // /admin (POST /auth/login no distingue super-admin) y recién se enteraba
+  // de que no tenía permiso al ver un 403 en la primera lista que cargaba.
+  @Get('whoami')
+  whoami() {
+    return { ok: true };
+  }
 
   @Get('organizaciones')
   listarOrganizaciones() {
@@ -51,6 +62,12 @@ export class AdminController {
     return this.admin.resumenPagos();
   }
 
+  /** Manda por email un recordatorio de pago a los propietarios/admins activos de la organización. */
+  @Post('organizaciones/:id/recordatorio-pago')
+  enviarRecordatorioPago(@Param('id') id: string) {
+    return this.admin.enviarRecordatorioPago(id);
+  }
+
   @Get('pagos/ganancias')
   gananciasPorPeriodo() {
     return this.admin.gananciasPorPeriodo();
@@ -69,6 +86,18 @@ export class AdminController {
   @Post('organizaciones/:id/pagos')
   registrarPago(@Param('id') id: string, @Body() dto: RegistrarPagoDto, @CurrentUser() user: { sub: string }) {
     return this.admin.registrarPago(id, dto, user?.sub);
+  }
+
+  /** Cola de pagos cargados por las propias organizaciones (comprobante de transferencia) a la espera de revisión. */
+  @Get('pagos/pendientes')
+  listarPagosPendientes() {
+    return this.admin.listarPagosPendientes();
+  }
+
+  /** Aprueba o rechaza un pago pendiente. */
+  @Post('pagos/:id/revisar')
+  revisarPago(@Param('id') id: string, @Body() dto: RevisarPagoDto, @CurrentUser() user: { sub: string }) {
+    return this.admin.revisarPago(id, dto.aprobar, user.sub, dto.motivoRechazo);
   }
 
   @Patch('organizaciones/:id/soluciones')

@@ -28,11 +28,11 @@ async function main() {
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), nombre text NOT NULL,
       huella_activa boolean NOT NULL DEFAULT true, tropera_activa boolean NOT NULL DEFAULT false, cuit text, direccion text, localidad text, provincia text, telefono text, email text,
       activo boolean NOT NULL DEFAULT true,
-      grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, fecha_activacion timestamptz, es_demo boolean NOT NULL DEFAULT false,
+      grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, fecha_activacion timestamptz, es_demo boolean NOT NULL DEFAULT false, logo_url text,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
     CREATE TABLE core.usuarios (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text NOT NULL UNIQUE, password_hash text NOT NULL,
-      nombre text, apellido text, dni text, email_verificado boolean NOT NULL DEFAULT false, ultimo_login timestamptz,
+      nombre text, apellido text, dni text, email_verificado boolean NOT NULL DEFAULT false, ultimo_login timestamptz, password_changed_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
     CREATE TABLE core.membresias (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -120,6 +120,40 @@ async function main() {
   const reset = await usuariosService.resetearPassword(org.id, ['propietario'], altaVet.usuario.id, undefined);
   check('devuelve una contraseña temporal', reset.temporal === true && !!reset.password);
   check('sigue siendo miembro de la organización (búsqueda no rompió nada)', !!membresiaVet);
+
+  console.log('9) actualizarRoles(): agregar un rol adicional a un miembro existente (sin tope en el plan)');
+  const actualizado = await usuariosService.actualizarRoles(
+    org.id, ['propietario'], altaVet.usuario.id, { roles: ['veterinario', 'capataz'] } as any,
+  );
+  check('devuelve los roles nuevos', actualizado.roles.includes('capataz') && actualizado.roles.includes('veterinario'));
+
+  console.log('10) actualizarRoles(): un admin NO puede autopromoverse (ni promover a otro) a propietario');
+  const altaAdmin = await usuariosService.agregarMiembro(org.id, {
+    email: 'admin1@vet.com', password: 'password123', roles: ['admin'],
+  } as any);
+  let rechazaAutopromocion = false;
+  try {
+    await usuariosService.actualizarRoles(org.id, ['admin'], altaAdmin.usuario.id, { roles: ['admin', 'propietario'] } as any);
+  } catch (e: any) {
+    rechazaAutopromocion = e?.status === 403 || e?.name === 'ForbiddenException';
+  }
+  check('rechaza con 403', rechazaAutopromocion);
+
+  console.log('11) actualizarRoles(): un propietario SÍ puede otorgar el rol de propietario');
+  const promovido = await usuariosService.actualizarRoles(
+    org.id, ['propietario'], altaAdmin.usuario.id, { roles: ['admin', 'propietario'] } as any,
+  );
+  check('ahora es propietario', promovido.roles.includes('propietario'));
+
+  console.log('12) actualizarRoles(): protege al último propietario activo (mismo criterio que AdminService.setRoles)');
+  await usuariosService.actualizarRoles(org.id, ['propietario'], propietario.id, { roles: ['capataz'] } as any);
+  let rechazaUltimoPropietario = false;
+  try {
+    await usuariosService.actualizarRoles(org.id, ['propietario'], altaAdmin.usuario.id, { roles: ['admin'] } as any);
+  } catch (e: any) {
+    rechazaUltimoPropietario = e?.status === 400 || e?.name === 'BadRequestException';
+  }
+  check('no deja sacar al último propietario activo', rechazaUltimoPropietario);
 
   console.log(`\nRESULTADO: ${ok} OK, ${fail} fallas`);
   await client.close();

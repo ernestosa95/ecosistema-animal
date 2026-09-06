@@ -8,6 +8,7 @@ import { useSesionContext } from '@/auth/SesionContext';
 import { useSyncContext } from '@/db/SyncContext';
 import { tieneAlguno, ROLES_ATIENDEN } from '@/nav/roles';
 import { Turno } from '@/db/models/Turno';
+import { Agenda } from '@/db/models/Agenda';
 import { Animal } from '@/db/models/Animal';
 import { Colors, Radii, Shadows } from '@/constants/theme';
 import { EmptyState } from '@/components/EmptyState';
@@ -88,7 +89,25 @@ export default function TurnosScreen() {
         });
       });
       if (sesion) api.registrarEvento(sesion, 'accion', 'turno-atender');
-      if (animalId) router.push(`/paciente/${animalId}?seccion=consulta`);
+
+      // Si el turno tiene una agenda asignada SIN profesional (agenda "no
+      // médica", ej. peluquería) no tiene sentido abrir una consulta
+      // clínica. Un turno sin ninguna agenda (el caso más común
+      // históricamente) sigue abriendo la consulta como siempre — la
+      // ausencia de agenda no implica "no médica". Si la agenda todavía no
+      // sincronizó a este dispositivo, se asume médica (fail-open) antes
+      // que bloquear al staff de abrir una consulta real.
+      let esAgendaNoMedica = false;
+      if (t.agendaId) {
+        try {
+          const agenda = await database.get<Agenda>('agendas').find(t.agendaId);
+          esAgendaNoMedica = !agenda.usuarioId;
+        } catch {
+          esAgendaNoMedica = false;
+        }
+      }
+
+      if (animalId && !esAgendaNoMedica) router.push(`/paciente/${animalId}?seccion=consulta`);
     } finally {
       setAtendiendoId(null);
     }

@@ -25,6 +25,13 @@ export class CrearSolicitudDto {
   @IsString() @MinLength(8)
   password!: string;
 
+  // Prueba de que este email se verificó con el código de 6 dígitos antes de
+  // llegar acá (JWT stateless, `scope: 'email_verificado'`, ver
+  // SolicitudesService.enviarCodigoVerificacion()/confirmarCodigoVerificacion()
+  // — se valida que el email embebido coincida con el de arriba).
+  @IsString() @MinLength(10)
+  emailVerificadoToken!: string;
+
   // Datos filiatorios de quien solicita la cuenta — antes opcionales, ahora
   // obligatorios (a pedido del negocio: hace falta poder contactar/
   // identificar a quien pide el alta antes de aprobarla).
@@ -47,16 +54,21 @@ export class CrearSolicitudDto {
   @IsOptional() @IsIn(['clinica', 'establecimiento', 'mixta'])
   tipoOrganizacion?: string;
 
-  // Datos de la institución/campo — sólo tienen sentido si tipo = 'crear',
-  // todos opcionales (no todas las instituciones tienen los cinco datos a mano).
+  // Datos de la institución/campo — sólo tienen sentido si tipo = 'crear'.
+  // Localidad/provincia pasaron a obligatorias (a pedido del negocio, mismo
+  // motivo que telefono/dni arriba); dirección/teléfono/email de la
+  // institución siguen opcionales.
   @IsOptional() @IsString()
   direccionOrganizacion?: string;
 
-  @IsOptional() @IsString()
-  localidadOrganizacion?: string;
+  @IsString() @MinLength(2)
+  localidadOrganizacion!: string;
 
-  @IsOptional() @IsString()
-  provinciaOrganizacion?: string;
+  // Texto libre a nivel DB/DTO — el <select> de provincias en el web es una
+  // restricción sólo de UI (mismo criterio que categoria/unidad/presentacion
+  // de farmacia), no vale la pena un @IsIn acá.
+  @IsString() @MinLength(2)
+  provinciaOrganizacion!: string;
 
   @IsOptional() @IsString()
   telefonoOrganizacion?: string;

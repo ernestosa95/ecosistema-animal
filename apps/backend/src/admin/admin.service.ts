@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
-import { and, asc, desc, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, lte, or, sql } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDB } from '../database/drizzle.provider';
 import {
   organizaciones, usuarios, membresias, planes, pagos,
@@ -17,40 +17,17 @@ import { CrearOrganizacionDto } from './dto/crear-organizacion.dto';
 import { AgregarMiembroDto } from './dto/agregar-miembro.dto';
 import { RegistrarPagoDto } from './dto/registrar-pago.dto';
 import { verificarLimitesRoles } from '../common/verificar-limites-roles';
-
-/** Primer día (00:00 UTC) del mes calendario que contiene `fecha`. */
-function inicioDeMes(fecha: Date): Date {
-  return new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), 1));
-}
-
-/** `fecha` truncada a día (00:00 UTC), sin hora — para comparar sólo fechas. */
-function inicioDeDia(fecha: Date): Date {
-  return new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate()));
-}
-
-/**
- * Próxima fecha de facturación: mismo día-del-mes que `activacion`, la
- * primera ocurrencia que no sea anterior a `hoy` (comparando sólo fechas,
- * no hora — si hoy es justo el día de facturación, vence hoy, no el mes que
- * viene). Si el mes no tiene ese día (ej. activación el 31 y el mes tiene
- * 30) se clampea al último día del mes.
- */
-function proximoVencimiento(activacion: Date, hoy: Date): Date {
-  const dia = activacion.getUTCDate();
-  const hoyDia = inicioDeDia(hoy);
-  const candidato = (año: number, mes: number) => {
-    const ultimoDia = new Date(Date.UTC(año, mes + 1, 0)).getUTCDate();
-    return new Date(Date.UTC(año, mes, Math.min(dia, ultimoDia)));
-  };
-  const esteMes = candidato(hoyDia.getUTCFullYear(), hoyDia.getUTCMonth());
-  return esteMes >= hoyDia ? esteMes : candidato(hoyDia.getUTCFullYear(), hoyDia.getUTCMonth() + 1);
-}
+import { inicioDeMes, proximoVencimiento } from '../common/facturacion.util';
+import { MailService } from '../common/mail/mail.service';
 
 type Rol = 'propietario' | 'admin' | 'capataz' | 'veterinario' | 'recepcion';
 
 @Injectable()
 export class AdminService {
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DrizzleDB,
+    private readonly mail: MailService,
+  ) {}
 
   /** Lista todas las organizaciones de la plataforma. */
   listarOrganizaciones() {
@@ -112,7 +89,13 @@ export class AdminService {
     return org;
   }
 
-  /** Registra un pago de una organización para un período (mes calendario). */
+  /**
+   * Registra un pago de una organización para un período (mes calendario).
+   * Uso del super-admin — a diferencia de `OrganizacionService.registrarPagoPendiente()`
+   * (self-service, comprobante de transferencia), esto lo carga directamente
+   * el super-admin al confirmar un cobro, así que queda `confirmado` de una
+   * (mismo usuario que lo carga = quien lo "revisó").
+   */
   async registrarPago(organizacionId: string, dto: RegistrarPagoDto, usuarioId?: string) {
     await this.verificarOrg(organizacionId);
     const periodo = inicioDeMes(dto.periodo ? new Date(dto.periodo) : new Date());
@@ -125,12 +108,15 @@ export class AdminService {
         medioPago: dto.medioPago,
         observaciones: dto.observaciones,
         registradoPor: usuarioId,
+        estado: 'confirmado',
+        revisadoPor: usuarioId,
+        revisadoEn: new Date(),
       })
       .returning();
     return pago;
   }
 
-  /** Historial de pagos de una organización, más recientes primero. */
+  /** Historial de pagos de una organización, más recientes primero (incluye pendientes/rechazados). */
   async listarPagos(organizacionId: string) {
     await this.verificarOrg(organizacionId);
     return this.db
@@ -138,6 +124,102 @@ export class AdminService {
       .from(pagos)
       .where(eq(pagos.organizacionId, organizacionId))
       .orderBy(desc(pagos.periodo), desc(pagos.fechaPago));
+  }
+
+  /** Pagos cargados por organizaciones (comprobante de transferencia) esperando revisión, más antiguos primero. */
+  async listarPagosPendientes() {
+    return this.db
+      .select({
+        id: pagos.id,
+        organizacionId: pagos.organizacionId,
+        organizacionNombre: organizaciones.nombre,
+        periodo: pagos.periodo,
+        monto: pagos.monto,
+        medioPago: pagos.medioPago,
+        observaciones: pagos.observaciones,
+        comprobanteUrl: pagos.comprobanteUrl,
+        createdAt: pagos.createdAt,
+      })
+      .from(pagos)
+      .innerJoin(organizaciones, eq(organizaciones.id, pagos.organizacionId))
+      .where(eq(pagos.estado, 'pendiente'))
+      .orderBy(asc(pagos.createdAt));
+  }
+
+  /** Aprueba o rechaza un pago pendiente cargado por una organización. */
+  async revisarPago(pagoId: string, aprobar: boolean, revisorUsuarioId: string, motivoRechazo?: string) {
+    const [pago] = await this.db.select().from(pagos).where(eq(pagos.id, pagoId)).limit(1);
+    if (!pago) throw new NotFoundException('Pago no encontrado');
+    if (pago.estado !== 'pendiente') {
+      throw new BadRequestException('Este pago ya fue revisado');
+    }
+    const [actualizado] = await this.db
+      .update(pagos)
+      .set({
+        estado: aprobar ? 'confirmado' : 'rechazado',
+        revisadoPor: revisorUsuarioId,
+        revisadoEn: new Date(),
+        motivoRechazo: aprobar ? null : (motivoRechazo ?? null),
+      })
+      .where(eq(pagos.id, pagoId))
+      .returning();
+    return actualizado;
+  }
+
+  /**
+   * Manda por email un recordatorio de pago a los propietarios/admins
+   * activos de una organización — hoy se dispara a mano desde el botón
+   * "Enviar recordatorio" de Home (super-admin decide cuándo). Reusa el
+   * mismo cálculo de vencimiento que `resumenPagos()`; queda como un método
+   * de servicio aparte a propósito, para que un futuro job automático
+   * (todavía no existe ningún scheduler en el backend) pueda llamarlo igual
+   * sin duplicar la lógica del mail.
+   */
+  async enviarRecordatorioPago(organizacionId: string): Promise<{ ok: true; enviados: number }> {
+    const [org] = await this.db
+      .select({
+        nombre: organizaciones.nombre,
+        fechaActivacion: organizaciones.fechaActivacion,
+        createdAt: organizaciones.createdAt,
+      })
+      .from(organizaciones)
+      .where(eq(organizaciones.id, organizacionId))
+      .limit(1);
+    if (!org) throw new NotFoundException('Organización no encontrada');
+
+    const destinatarios = await this.db
+      .select({ email: usuarios.email, nombre: usuarios.nombre })
+      .from(membresias)
+      .innerJoin(usuarios, eq(membresias.usuarioId, usuarios.id))
+      .where(
+        and(
+          eq(membresias.organizacionId, organizacionId),
+          eq(membresias.activo, true),
+          or(
+            sql`'propietario' = ANY(${membresias.roles})`,
+            sql`'admin' = ANY(${membresias.roles})`,
+          ),
+        ),
+      );
+    if (destinatarios.length === 0) {
+      throw new BadRequestException('Esta organización no tiene propietario/admin activo a quien avisar');
+    }
+
+    const hoy = new Date();
+    const activacion = org.fechaActivacion ?? org.createdAt;
+    const vencimiento = proximoVencimiento(activacion, hoy).toLocaleDateString('es-AR', {
+      day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC',
+    });
+    for (const d of destinatarios) {
+      await this.mail.enviar(
+        d.email,
+        `Recordatorio de pago — ${org.nombre}`,
+        `<p>Hola${d.nombre ? ` ${d.nombre}` : ''},</p>
+         <p>Te escribimos para recordarte el próximo vencimiento del plan de <b>${org.nombre}</b>: <b>${vencimiento}</b>.</p>
+         <p>Podés registrar el pago (por transferencia, con el comprobante) desde "Mi plan" dentro del sistema.</p>`,
+      );
+    }
+    return { ok: true, enviados: destinatarios.length };
   }
 
   /**
@@ -164,7 +246,7 @@ export class AdminService {
       this.db
         .select({ organizacionId: pagos.organizacionId, monto: pagos.monto, fechaPago: pagos.fechaPago })
         .from(pagos)
-        .where(eq(pagos.periodo, inicioMesActual)),
+        .where(and(eq(pagos.periodo, inicioMesActual), eq(pagos.estado, 'confirmado'))),
     ]);
     const pagadoPorOrg = new Map(pagosDelMes.map((p) => [p.organizacionId, p]));
     return orgs.map((org) => {
@@ -232,11 +314,12 @@ export class AdminService {
     return { pantallas, acciones, porOrganizacion, total: total[0]?.cantidad ?? 0 };
   }
 
-  /** Ganancias acumuladas por período (mes calendario) más el total histórico. */
+  /** Ganancias acumuladas por período (mes calendario) más el total histórico. Sólo pagos confirmados. */
   async gananciasPorPeriodo() {
     const filas = await this.db
       .select({ periodo: pagos.periodo, total: sql<string>`sum(${pagos.monto})` })
       .from(pagos)
+      .where(eq(pagos.estado, 'confirmado'))
       .groupBy(pagos.periodo)
       .orderBy(desc(pagos.periodo));
     const totalAcumulado = filas.reduce((acc, f) => acc + Number(f.total), 0);

@@ -3,7 +3,7 @@ import { and, eq, desc, isNull } from 'drizzle-orm';
 import { renderToBuffer } from '@react-pdf/renderer';
 import * as QRCode from 'qrcode';
 import { DRIZZLE, DrizzleDB } from '../../database/drizzle.provider';
-import { animales, especies, personas, vacunaciones } from '../../database/schema';
+import { animales, especies, personas, vacunaciones, organizaciones } from '../../database/schema';
 import { CarnetDocument } from './carnet.document';
 import { FichaDocument } from './ficha.document';
 import type { CarnetData, CarnetVacuna } from './carnet.types';
@@ -67,6 +67,13 @@ export class CarnetService {
 
     if (!row) throw new NotFoundException('Animal no encontrado');
 
+    // 1b) Datos de la organización (nombre + logo propio, si cargó uno).
+    const [org] = await this.db
+      .select({ nombre: organizaciones.nombre, logoUrl: organizaciones.logoUrl })
+      .from(organizaciones)
+      .where(eq(organizaciones.id, organizacionId))
+      .limit(1);
+
     // 2) Vacunaciones del paciente (más reciente primero).
     const vacs = await this.db
       .select({
@@ -96,6 +103,10 @@ export class CarnetService {
     return {
       emitidoEl: hoy(),
       qrDataUrl,
+      organizacion: {
+        nombre: org?.nombre ?? '—',
+        logoUrl: org?.logoUrl ?? null,
+      },
       paciente: {
         nombre: row.nombre,
         especie: row.especieNombre ?? '—',

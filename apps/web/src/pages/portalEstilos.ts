@@ -11,6 +11,7 @@ export const CSS_PORTAL = `
 .pd-page { min-height: 100vh; background: var(--bg); color: var(--text); display: flex; flex-direction: column; }
 .pd-top { background: var(--verde); color: #fff; padding: .9rem 1.1rem; display: flex; align-items: baseline; gap: .6rem; }
 .pd-logo { font-weight: 800; font-size: 1.1rem; }
+.pd-logo-img { height: 28px; max-width: 140px; object-fit: contain; border-radius: 4px; background: #fff; padding: 2px 4px; }
 .pd-top-sub { font-size: .8rem; opacity: .85; }
 .pd-main { flex: 1; width: 100%; max-width: 640px; margin: 0 auto; padding: 1rem; box-sizing: border-box; }
 .pd-foot { text-align: center; font-size: .75rem; color: var(--muted); padding: 1rem; }

@@ -12,6 +12,7 @@ import { DRIZZLE, DrizzleDB } from '../../database/drizzle.provider';
 import { membresias, usuarios, organizaciones, planes } from '../../database/schema';
 import { verificarLimitesRoles } from '../../common/verificar-limites-roles';
 import { AgregarMiembroDto } from './dto/agregar-miembro.dto';
+import { ActualizarRolesDto } from './dto/actualizar-roles.dto';
 
 /** Roles habilitados para atender (para el selector de "profesional" del turno). */
 type Rol = 'propietario' | 'admin' | 'capataz' | 'veterinario' | 'recepcion';
@@ -166,6 +167,67 @@ export class UsuariosService {
       roles: dto.roles,
       usuario: { id: usuario.id, email: usuario.email, nombre: usuario.nombre, apellido: usuario.apellido },
     };
+  }
+
+  /**
+   * Reemplaza el conjunto completo de roles de un miembro activo — self-
+   * service (propietario/admin de la propia organización), a diferencia de
+   * `AdminService.setRoles()` que es la variante de super-admin de
+   * plataforma. Mismas protecciones que esa: no dejar la org sin propietario
+   * activo, y respetar el cupo por rol del plan (excluyendo la propia
+   * membresía del conteo, para poder re-guardar el mismo rol sin
+   * autobloquearse al estar ya en el límite). Suma una protección propia de
+   * esta variante self-service: sólo un propietario puede OTORGAR el rol de
+   * propietario (a sí mismo o a otro) — un admin no puede autopromoverse,
+   * porque eso le daría acceso a acciones reservadas a propietario (ej.
+   * resetear la contraseña de otro propietario) sin que nunca lo hubiese
+   * aprobado un propietario real.
+   */
+  async actualizarRoles(organizacionId: string, actorRoles: string[], usuarioId: string, dto: ActualizarRolesDto) {
+    const [m] = await this.db
+      .select({ id: membresias.id, roles: membresias.roles, activo: membresias.activo })
+      .from(membresias)
+      .where(
+        and(
+          eq(membresias.usuarioId, usuarioId),
+          eq(membresias.organizacionId, organizacionId),
+          eq(membresias.activo, true),
+          isNull(membresias.deletedAt),
+        ),
+      )
+      .limit(1);
+    if (!m) {
+      throw new NotFoundException('El usuario no es miembro activo de esta organización');
+    }
+
+    if (dto.roles.includes('propietario') && !m.roles.includes('propietario') && !actorRoles.includes('propietario')) {
+      throw new ForbiddenException('Sólo un propietario puede asignarle el rol de propietario a alguien');
+    }
+
+    if (m.roles.includes('propietario') && !dto.roles.includes('propietario')) {
+      const propietariosActivos = await this.db
+        .select({ id: membresias.id })
+        .from(membresias)
+        .where(
+          and(
+            eq(membresias.organizacionId, organizacionId),
+            sql`'propietario' = ANY(${membresias.roles})`,
+            eq(membresias.activo, true),
+          ),
+        );
+      if (propietariosActivos.length <= 1) {
+        throw new BadRequestException('No podés dejar la organización sin propietario activo');
+      }
+    }
+
+    await verificarLimitesRoles(this.db, organizacionId, m.id, dto.roles);
+
+    await this.db
+      .update(membresias)
+      .set({ roles: dto.roles as Rol[], updatedAt: new Date() })
+      .where(eq(membresias.id, m.id));
+
+    return { ok: true, roles: dto.roles };
   }
 
   /**

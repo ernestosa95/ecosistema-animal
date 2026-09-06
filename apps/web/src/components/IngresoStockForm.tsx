@@ -19,13 +19,22 @@ export function IngresoStockForm({
   sesion,
   productos,
   onCreado,
+  onProductoCreado,
 }: {
   sesion: Sesion;
   productos: Producto[];
   onCreado: () => void;
+  /** El producto recién creado por el alta rápida — quien nos pasó `productos` tiene que sumarlo a su lista. */
+  onProductoCreado: (p: Producto) => void;
 }) {
   const [nombreProducto, setNombreProducto] = useState('');
   const producto = productos.find((p) => p.nombre === nombreProducto) ?? null;
+
+  const [mostrarAltaProducto, setMostrarAltaProducto] = useState(false);
+  const [nuevoNombre, setNuevoNombre] = useState('');
+  const [nuevaUnidad, setNuevaUnidad] = useState('');
+  const [creandoProducto, setCreandoProducto] = useState(false);
+  const [errorAltaProducto, setErrorAltaProducto] = useState<string | null>(null);
 
   const [cantidad, setCantidad] = useState('');
   const [bultos, setBultos] = useState('');
@@ -45,6 +54,30 @@ export function IngresoStockForm({
     const p = productos.find((x) => x.nombre === nombre);
     setPrecioVenta(p?.precio ?? '');
     setPrecioCompra(p?.precioCompra ?? '');
+  }
+
+  /** Alta rápida sin salir de este formulario, para cuando el producto que llegó todavía no está en el vademécum. */
+  async function crearProductoRapido() {
+    if (!nuevoNombre.trim()) { setErrorAltaProducto('Ingresá un nombre'); return; }
+    setErrorAltaProducto(null);
+    setCreandoProducto(true);
+    try {
+      const data: Record<string, unknown> = { nombre: nuevoNombre.trim() };
+      if (nuevaUnidad.trim()) data.unidad = nuevaUnidad.trim();
+      const creado = await api.crearProducto(sesion, data);
+      api.registrarEvento(sesion, 'accion', 'producto-crear');
+      onProductoCreado(creado);
+      setNombreProducto(creado.nombre);
+      setPrecioVenta(creado.precio ?? '');
+      setPrecioCompra(creado.precioCompra ?? '');
+      setMostrarAltaProducto(false);
+      setNuevoNombre('');
+      setNuevaUnidad('');
+    } catch (err) {
+      setErrorAltaProducto(err instanceof Error ? err.message : 'No se pudo crear el producto');
+    } finally {
+      setCreandoProducto(false);
+    }
   }
 
   async function guardar(e: React.FormEvent) {
@@ -109,6 +142,37 @@ export function IngresoStockForm({
           placeholder="Buscar producto…"
         />
       </label>
+
+      {!producto && (
+        mostrarAltaProducto ? (
+          <div className="span-2 subform">
+            <div className="form-titulo">Producto nuevo</div>
+            <label>
+              Nombre
+              <input value={nuevoNombre} onChange={(e) => setNuevoNombre(e.target.value)} autoFocus />
+            </label>
+            <label>
+              Unidad (opcional)
+              <input value={nuevaUnidad} onChange={(e) => setNuevaUnidad(e.target.value)} placeholder="Ej: ml, comprimidos, unidad" />
+            </label>
+            {errorAltaProducto && <div className="alerta span-2">{errorAltaProducto}</div>}
+            <div className="span-2" style={{ display: 'flex', gap: '0.5rem' }}>
+              <button type="button" className="btn-ghost" disabled={creandoProducto} onClick={crearProductoRapido}>
+                {creandoProducto ? 'Creando…' : 'Crear producto'}
+              </button>
+              <button type="button" className="link" onClick={() => setMostrarAltaProducto(false)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="span-2">
+            <button type="button" className="link" onClick={() => setMostrarAltaProducto(true)}>
+              ＋ No está en la lista: crear producto nuevo
+            </button>
+          </div>
+        )
+      )}
 
       {producto && (
         <>

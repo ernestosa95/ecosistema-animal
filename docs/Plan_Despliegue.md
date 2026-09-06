@@ -309,10 +309,20 @@ Recordatorio del plan original, sigue aplicando: `VITE_API_URL` queda **horneado
 docker compose build
 docker compose up -d
 
-# Migraciones + seed, corridos DENTRO del contenedor del backend ya levantado:
+# Migraciones + seeds, corridos DENTRO del contenedor del backend ya levantado:
 docker compose exec backend pnpm --filter backend db:migrate
-docker compose exec backend pnpm --filter backend db:seed
+docker compose exec backend pnpm --filter backend db:seed              # especies base — obligatorio
+docker compose exec backend pnpm --filter backend db:seed:vacunas      # catálogo de vacunas por especie (sugerencias)
+docker compose exec backend pnpm --filter backend db:seed:diagnosticos # catálogo de diagnósticos por especie (sugerencias)
+docker compose exec backend pnpm --filter backend db:seed:vademecum    # vademécum SENASA (7003 productos, sugerencias de Farmacia)
 ```
+
+Los tres últimos son opcionales en el sentido de que nada rompe si no corren — son sólo
+catálogos de referencia para autocompletar (ver `hce/catalogo-vacunas/`,
+`hce/catalogo-diagnosticos/`, `farmacia/vademecum-senasa/`) — pero sin ellos esas búsquedas con
+sugerencias quedan vacías en silencio, sin ningún error visible. Verificado el 2026-09-05
+corriendo las 34 migraciones + los 4 seeds contra un Postgres 16 real desde cero (mismo
+escenario que un primer deploy).
 
 ---
 
@@ -346,14 +356,10 @@ Nada de esto bloquea un primer deploy de prueba, pero **sí antes de dar el link
 
 - [ ] **`JWT_SECRET` nuevo y random**, nunca el valor de dev committeado en ningún `.env` local. Generarlo con `openssl rand -hex 32`.
 - [ ] **`SUPERADMIN_EMAILS`** con tu email real, no el de prueba.
-- [ ] **CORS**: `main.ts` hoy llama `app.enableCors()` sin opciones, que permite **cualquier origen**. Para prod conviene restringirlo al dominio real:
-  ```ts
-  app.enableCors({ origin: 'https://app.tudominio.com' });
-  ```
-  (o un array si vas a tener más de un frontend — ej. cuando `apps/mobile` empiece a pegarle a la API de prod).
-- [ ] **Rate-limiting en los endpoints de auth.** Hoy `/auth/login`, `/auth/forgot-password` y `/auth/reset-password` no tienen ningún límite de intentos — blanco fácil de fuerza bruta (login) o de spam de emails de reset a costa tuya en Resend (forgot-password). Sumar `@nestjs/throttler` con un límite conservador (ej. 5 intentos / 15 min por IP) en esos tres endpoints antes de exponerlos a desconocidos.
-- [ ] **Dominio propio verificado en Resend.** `MAIL_FROM` hoy usa el dominio de pruebas de Resend (`onboarding@resend.dev`), que en modo sandbox **sólo entrega a la casilla dueña de la cuenta de Resend** — ningún usuario real va a recibir el mail de "olvidé mi contraseña" hasta que se verifique un dominio propio (unos registros DNS, agregados desde el panel de Resend).
-- [ ] **`GET /health`** — no existe todavía. Un endpoint mínimo (sin guards, sólo confirma que el proceso responde y opcionalmente que puede pegarle a Postgres) es lo que un servicio de uptime (sección 10) o un `healthcheck:` de Docker Compose necesitan para distinguir "el contenedor está *up*" de "el backend realmente responde".
+- [x] **CORS** — resuelto (2026-09-05, commit `bfd10aeb`): `main.ts` ahora lee `CORS_ORIGIN` de env (`app.enableCors(corsOrigin ? { origin: corsOrigin.split(',').map(o => o.trim()) } : undefined)`); sin la variable, sigue abierto a cualquier origen (dev local). Sólo falta **cargar la variable en el `.env` de prod** con el dominio real (`CORS_ORIGIN=https://app.tudominio.com`, separado por coma si hace falta más de un origen).
+- [x] **Rate-limiting en los endpoints de auth** — resuelto (2026-09-05, mismo commit): `/auth/login`, `/auth/forgot-password`, `/auth/reset-password` (y desde esa misma sesión, `/solicitudes/verificar-email` y su `/confirmar`) tienen `@Throttle` a 5 intentos / 15 min por IP, sobre el límite global de 100/min de toda la API.
+- [ ] **Dominio propio verificado en Resend.** `MAIL_FROM` hoy usa el dominio de pruebas de Resend (`onboarding@resend.dev`), que en modo sandbox **sólo entrega a la casilla dueña de la cuenta de Resend** — ningún usuario real va a recibir el mail de "olvidé mi contraseña" (ni el código de verificación de email, ni el recordatorio de pago) hasta que se verifique un dominio propio (unos registros DNS, agregados desde el panel de Resend). Sigue siendo el gap más importante de los que quedan en esta lista.
+- [x] **`GET /health`** — resuelto (2026-09-05, mismo commit): sin guards, confirma que el proceso responde y que la conexión a Postgres está viva (`SELECT 1`), pensado para el `healthcheck:` de Docker Compose o un servicio de uptime externo (sección 10).
 - [ ] **Error tracking** (Sentry o similar) — hoy no hay ninguno; un error en producción sólo se nota si el usuario se queja o alguien mira los logs a mano.
 - [ ] **`BACKEND_PUBLIC_URL`** correcto *antes* de que alguien suba la primera foto real — queda grabado en `animales.foto_url` en el momento de subir; cambiarlo después no corrige las fotos ya subidas.
 - [ ] **Backups** (sección 9) funcionando y **probados** — no basta con que el cron exista, hay que confirmar al menos una vez que un backup restaura de verdad. Sigue sin haberse probado a la fecha de esta revisión.
@@ -414,7 +420,7 @@ No hace falta nada elaborado al arrancar. Lo mínimo que vale la pena:
 1. [ ] Contratar la VPS (2vCPU/4GB/60-80GB como piso por proyecto, región cerca de Argentina si es posible).
 2. [ ] DNS: `app.tudominio.com` y `api.tudominio.com` apuntando a la IP de la VPS.
 3. [ ] Sección 3: usuario `deploy`, firewall, Docker instalado, red `edge` creada, stack de Caddy "edge" levantado.
-4. [ ] Sección 5: repo clonado, `.env` de raíz + `apps/backend/.env` armados, `docker compose build` + `up -d`, `db:migrate` + `db:seed` corridos dentro del contenedor.
+4. [ ] Sección 5: repo clonado, `.env` de raíz + `apps/backend/.env` armados, `docker compose build` + `up -d`, `db:migrate` + los 4 `db:seed*` corridos dentro del contenedor (especies es obligatorio; vacunas/diagnósticos/vademécum son catálogos de sugerencias — sin ellos no rompe nada, pero esas búsquedas quedan vacías en silencio).
 5. [ ] Sección 7: confirmar que Caddy detectó los labels y los dos dominios responden por HTTPS.
 6. [ ] Sección 8: checklist de endurecimiento completo — incluye los ítems nuevos de esta revisión (rate-limiting, dominio de Resend, health-check, backup probado, build de mobile si corresponde).
 7. [ ] Sección 9: cron de backup corriendo, un restore probado al menos una vez a mano.
@@ -430,11 +436,18 @@ cd /home/deploy/ecosistema
 git pull
 docker compose build
 docker compose up -d
-# Sólo si hay schema nuevo — revisar el .sql generado antes de aplicar:
-docker compose exec backend pnpm --filter backend db:generate
+# Sólo si el pull trajo migraciones nuevas en db/migrations/ (ya generadas y
+# committeadas en dev con `pnpm db:generate` — NUNCA correr `db:generate`
+# acá: generaría un .sql suelto dentro del contenedor, no versionado, que
+# `git pull` del próximo deploy no va a traer):
 docker compose exec backend pnpm --filter backend db:migrate
 ```
 `docker compose up -d` reemplaza sólo los contenedores cuya imagen cambió — no hace falta bajar todo el stack para un deploy normal. No hace falta tocar el stack "edge" salvo que cambien los dominios/labels.
+
+Verificado el 2026-09-05: las 34 migraciones actuales (`0000`–`0033`) corren de punta a punta
+contra un Postgres 16 limpio sin ningún error — incluida la extensión `pgcrypto` (best-effort,
+no hace falta en PG13+) y las columnas más recientes (`plataforma.pagos.estado`/
+`comprobante_url`, `core.organizaciones.logo_url`).
 
 ---
 

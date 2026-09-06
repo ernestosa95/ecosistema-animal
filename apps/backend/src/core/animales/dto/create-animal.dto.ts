@@ -17,9 +17,14 @@ export class CreateAnimalDto {
   @IsUUID()
   especieId!: string;
 
-  @IsOptional()
+  // Obligatorio a propósito: todo animal identificado en Huella tiene que
+  // tener un dueño asignado — no existe el concepto de paciente "suelto".
+  // El quick-create de dueño inline (nombre/apellido/celular/DNI, ver
+  // PacientesPage.tsx/TurnosPage.tsx/SeleccionarAnimalModal.tsx) resuelve un
+  // personaId antes de llegar acá, así que igual nunca hace falta dejarlo
+  // sin cargar desde el formulario.
   @IsUUID()
-  personaId?: string;
+  personaId!: string;
 
   @IsOptional()
   @IsIn(['macho', 'hembra', 'indefinido'])

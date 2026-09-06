@@ -23,11 +23,18 @@ import { appSchema, tableSchema } from '@nozbe/watermelondb';
 // v5→v6: `consultas.costo` (monto cobrado, por defecto 0) — mismo campo que
 // ya era obligatorio en el alta web desde 2026-09-03, le faltaba a este
 // schema y al alta offline del Home/ficha.
+// v6→v7: `turnos.agenda_id` + tabla nueva `agendas` (sólo lectura en la
+// práctica — mobile no tiene UI para crear/editar agendas, se sincroniza
+// nada más para poder saber si la agenda de un turno tiene profesional
+// asignado — "Atender" en `(app)/turnos.tsx` sólo abre la ficha con
+// "Nueva consulta" para agendas médicas, no para una "no médica" como
+// peluquería). No se suman `agenda_bloques`/`agenda_excepciones`: mobile no
+// necesita horarios/slots, sólo saber si HAY un profesional.
 // Nombres de columna en snake_case porque así los serializa
 // `serializeRow`/`valoresParaEscribir` (contrato = objeto WatermelonDB, no
 // el camelCase de Drizzle).
 export const schema = appSchema({
-  version: 6,
+  version: 7,
   tables: [
     tableSchema({
       name: 'personas',
@@ -107,10 +114,25 @@ export const schema = appSchema({
         { name: 'animal_id', type: 'string', isOptional: true, isIndexed: true },
         { name: 'persona_id', type: 'string', isOptional: true },
         { name: 'veterinario_id', type: 'string', isOptional: true },
+        { name: 'agenda_id', type: 'string', isOptional: true, isIndexed: true },
         { name: 'fecha_hora', type: 'number' },
         { name: 'estado', type: 'string' },
         { name: 'motivo', type: 'string', isOptional: true },
         { name: 'canal', type: 'string', isOptional: true },
+        { name: 'created_at', type: 'number' },
+        { name: 'updated_at', type: 'number' },
+      ],
+    }),
+    tableSchema({
+      name: 'agendas',
+      columns: [
+        { name: 'organizacion_id', type: 'string', isIndexed: true },
+        { name: 'nombre', type: 'string' },
+        // null = agenda sin profesional asignado ("no médica", ej. peluquería).
+        { name: 'usuario_id', type: 'string', isOptional: true },
+        { name: 'duracion_turno_minutos', type: 'number' },
+        { name: 'color', type: 'string', isOptional: true },
+        { name: 'activa', type: 'boolean' },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],

@@ -40,14 +40,37 @@ export async function listarPlanesPublicos(): Promise<PlanPublico[]> {
   return res.json();
 }
 
+/** Paso 1 de la verificación de email previa al alta: manda el código de 6 dígitos. Devuelve un token opaco que hay que retener para confirmarlo. */
+export async function enviarCodigoVerificacion(email: string): Promise<{ token: string }> {
+  const res = await fetch(`${BASE}/solicitudes/verificar-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) throw new Error((await res.text().catch(() => '')) || 'No se pudo enviar el código');
+  return res.json();
+}
+
+/** Paso 2: confirma el código contra el token del paso 1 — devuelve el token que hay que adjuntar a `crearSolicitud`. */
+export async function confirmarCodigoVerificacion(token: string, codigo: string): Promise<{ emailVerificadoToken: string }> {
+  const res = await fetch(`${BASE}/solicitudes/verificar-email/confirmar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, codigo }),
+  });
+  if (!res.ok) throw new Error((await res.text().catch(() => '')) || 'El código no es correcto');
+  return res.json();
+}
+
 export async function crearSolicitud(d: {
   nombre: string; apellido: string; email: string; password: string;
   terminosAceptados: boolean;
   telefono: string; dni: string;
   planId: string;
   nombreOrganizacion: string; tipoOrganizacion?: string;
-  direccionOrganizacion?: string; localidadOrganizacion?: string; provinciaOrganizacion?: string;
+  direccionOrganizacion?: string; localidadOrganizacion: string; provinciaOrganizacion: string;
   telefonoOrganizacion?: string; emailOrganizacion?: string;
+  emailVerificadoToken: string;
 }): Promise<{ ok: boolean; id: string }> {
   const res = await fetch(`${BASE}/solicitudes`, {
     method: 'POST',

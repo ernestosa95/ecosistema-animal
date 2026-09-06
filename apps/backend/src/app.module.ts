@@ -13,6 +13,7 @@ import { PortalModule } from './portal/portal.module';
 import { AdminModule } from './admin/admin.module';
 import { SolicitudesModule } from './solicitudes/solicitudes.module';
 import { UsuariosModule } from './core/usuarios/usuarios.module';
+import { OrganizacionModule } from './core/organizacion/organizacion.module';
 import { TroperaModule } from './tropera/tropera.module';
 import { FarmaciaModule } from './farmacia/farmacia.module';
 import { SyncModule } from './sync/sync.module';
@@ -50,6 +51,7 @@ import { HealthModule } from './health/health.module';
     AdminModule,
     SolicitudesModule,
     UsuariosModule,
+    OrganizacionModule,
     TroperaModule,
     FarmaciaModule,
     SyncModule,

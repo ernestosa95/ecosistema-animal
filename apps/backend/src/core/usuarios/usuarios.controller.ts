@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@ne
 import { UsuariosService } from './usuarios.service';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { AgregarMiembroDto } from './dto/agregar-miembro.dto';
+import { ActualizarRolesDto } from './dto/actualizar-roles.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../../common/guards/tenant.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -37,6 +38,22 @@ export class UsuariosController {
   @UseGuards(RolesGuard)
   agregarMiembro(@CurrentOrg() organizacionId: string, @Body() dto: AgregarMiembroDto) {
     return this.usuarios.agregarMiembro(organizacionId, dto);
+  }
+
+  /**
+   * Reemplaza el conjunto de roles de un miembro activo de la organización.
+   * Solo propietario/admin. RolesGuard corre después de TenantGuard (usa req.roles).
+   */
+  @Patch(':id/roles')
+  @Roles('propietario', 'admin')
+  @UseGuards(RolesGuard)
+  actualizarRoles(
+    @CurrentOrg() organizacionId: string,
+    @CurrentRol() actorRoles: string[],
+    @Param('id') id: string,
+    @Body() dto: ActualizarRolesDto,
+  ) {
+    return this.usuarios.actualizarRoles(organizacionId, actorRoles, id, dto);
   }
 
   /**

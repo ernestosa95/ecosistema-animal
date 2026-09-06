@@ -1,7 +1,7 @@
 // apps/web/src/pages/AdminPage.tsx
 import { useEffect, useState } from 'react';
 import {
-  login, getToken, clearToken,
+  login, getToken, clearToken, suscribirseAExpiracion,
   listarOrganizaciones, crearOrganizacion, listarMiembros, agregarMiembro,
   setOrgActivo, eliminarOrg, exportarOrg, quitarMiembro, setMiembroActivo, setMiembroRoles,
   setAcceso, setSoluciones,
@@ -9,8 +9,9 @@ import {
   listarPlanes, crearPlan, actualizarPlan, eliminarPlan,
   listarMensajesAdmin, crearMensaje, eliminarMensaje,
   resumenPagos, gananciasPorPeriodo, listarPagosOrg, registrarPago, resumenAnalitica,
+  listarPagosPendientes, revisarPago, enviarRecordatorioPago,
   type Organizacion, type Miembro, type Grupo, type Plan, type MensajeAdmin, type DestinatarioTipo,
-  type ResumenPagoOrg, type GananciasPeriodo, type Pago, type ResumenAnalitica,
+  type ResumenPagoOrg, type GananciasPeriodo, type Pago, type ResumenAnalitica, type PagoPendiente,
 } from '../api/admin';
 import { listarSolicitudes, aprobarSolicitud, rechazarSolicitud, type Solicitud } from '../api/solicitudes';
 import { InfoRoles } from '../components/InfoRoles';
@@ -44,13 +45,23 @@ function EstadoChip({ texto, tono = 'advertencia' }: { texto: string; tono?: 'ad
 
 export default function AdminPage() {
   const [logueado, setLogueado] = useState(!!getToken());
+  const [expirada, setExpirada] = useState(false);
 
-  if (!logueado) return <Login onOk={() => setLogueado(true)} />;
+  // Cualquier llamado del panel que devuelva 401 (token vencido o inválido,
+  // ver api/admin.ts) dispara esto — vuelve a mostrar el login en vez de
+  // dejar el panel mostrando el JSON crudo del error.
+  useEffect(() => {
+    suscribirseAExpiracion(() => { setExpirada(true); setLogueado(false); });
+  }, []);
+
+  if (!logueado) {
+    return <Login mensaje={expirada ? 'Tu sesión expiró. Volvé a ingresar.' : null} onOk={() => { setExpirada(false); setLogueado(true); }} />;
+  }
   return <Panel onSalir={() => { clearToken(); setLogueado(false); }} />;
 }
 
 // ── Login ───────────────────────────────────────────────────────────────
-function Login({ onOk }: { onOk: () => void }) {
+function Login({ mensaje, onOk }: { mensaje?: string | null; onOk: () => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +85,7 @@ function Login({ onOk }: { onOk: () => void }) {
         <p className="muted" style={{ marginTop: '-0.5rem', marginBottom: '1rem' }}>
           Ingresá con tu cuenta de super-admin.
         </p>
+        {mensaje && <div className="alerta">{mensaje}</div>}
         <label>
           Email
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -143,6 +155,7 @@ function Panel({ onSalir }: { onSalir: () => void }) {
   const [cargando, setCargando] = useState(true);
   const [pagosResumen, setPagosResumen] = useState<ResumenPagoOrg[]>([]);
   const [ganancias, setGanancias] = useState<GananciasPeriodo | null>(null);
+  const [pagosPendientes, setPagosPendientes] = useState<PagoPendiente[]>([]);
 
   async function cargarOrgs() {
     setCargando(true); setError(null);
@@ -156,6 +169,7 @@ function Panel({ onSalir }: { onSalir: () => void }) {
   function cargarPagos() {
     resumenPagos().then(setPagosResumen).catch(() => {});
     gananciasPorPeriodo().then(setGanancias).catch(() => {});
+    listarPagosPendientes().then(setPagosPendientes).catch(() => {});
   }
   useEffect(() => {
     cargarOrgs();
@@ -169,7 +183,7 @@ function Panel({ onSalir }: { onSalir: () => void }) {
       {error && <div className="alerta" style={{ marginBottom: 12 }}>{error}</div>}
 
       {seccion === 'home' && (
-        <Home resumen={pagosResumen} ganancias={ganancias} onPagoRegistrado={cargarPagos} />
+        <Home resumen={pagosResumen} ganancias={ganancias} pendientes={pagosPendientes} onPagoRegistrado={cargarPagos} />
       )}
 
       {seccion === 'organizaciones' && (
@@ -249,8 +263,119 @@ function formatoMes(periodo: string): string {
   return `${nombres[Number(mes) - 1]} ${año}`;
 }
 
-function Home({ resumen, ganancias, onPagoRegistrado }: {
-  resumen: ResumenPagoOrg[]; ganancias: GananciasPeriodo | null; onPagoRegistrado: () => void;
+/** Pagos cargados por las propias organizaciones (comprobante de transferencia) esperando aprobación. */
+function PagosPendientes({ pendientes, onRevisado }: { pendientes: PagoPendiente[]; onRevisado: () => void }) {
+  const [trabajandoId, setTrabajandoId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function revisar(id: string, aprobar: boolean) {
+    setTrabajandoId(id); setError(null);
+    try {
+      await revisarPago(id, aprobar);
+      onRevisado();
+    } catch (e: any) {
+      setError(e.message ?? 'No se pudo revisar el pago');
+    } finally {
+      setTrabajandoId(null);
+    }
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: '1rem' }}>
+      <h4 className="form-titulo">
+        Pagos pendientes de revisión
+        {pendientes.length > 0 && (
+          <span className="chip" style={{ marginLeft: '0.5rem', background: 'var(--advertencia-bg)', color: 'var(--advertencia)' }}>
+            {pendientes.length}
+          </span>
+        )}
+      </h4>
+      {error && <div className="alerta">{error}</div>}
+      {pendientes.length === 0 ? (
+        <p className="muted">No hay pagos esperando revisión.</p>
+      ) : (
+        <table className="tabla">
+          <thead>
+            <tr>
+              <th>Organización</th>
+              <th>Período</th>
+              <th>Monto</th>
+              <th>Comprobante</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {pendientes.map((p) => (
+              <tr key={p.id}>
+                <td><b>{p.organizacionNombre}</b></td>
+                <td className="muted">{formatoMes(p.periodo)}</td>
+                <td>${Number(p.monto).toLocaleString('es-AR')}</td>
+                <td>
+                  {p.comprobanteUrl
+                    ? <a href={p.comprobanteUrl} target="_blank" rel="noreferrer">Ver</a>
+                    : <span className="muted">—</span>}
+                </td>
+                <td>
+                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    <button className="btn-ghost" disabled={trabajandoId === p.id} onClick={() => revisar(p.id, true)}>
+                      Aprobar
+                    </button>
+                    <button
+                      className="btn-ghost"
+                      style={{ color: 'var(--danger)', borderColor: '#fca5a5' }}
+                      disabled={trabajandoId === p.id}
+                      onClick={() => revisar(p.id, false)}
+                    >
+                      Rechazar
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Botón por fila que manda el recordatorio de pago a los propietarios/admins
+ * activos de esa organización. Disparo manual a propósito (no hay ningún
+ * scheduler en el backend hoy) — `AdminService.enviarRecordatorioPago()`
+ * queda como un método de servicio aparte para que, el día que se agregue
+ * un job automático, sólo haga falta llamarlo desde ahí sin duplicar nada.
+ */
+function BotonRecordatorio({ orgId }: { orgId: string }) {
+  const [estado, setEstado] = useState<'idle' | 'enviando' | 'enviado' | 'error'>('idle');
+
+  async function enviar() {
+    setEstado('enviando');
+    try {
+      await enviarRecordatorioPago(orgId);
+      setEstado('enviado');
+    } catch {
+      setEstado('error');
+    }
+  }
+
+  if (estado === 'enviado') {
+    return <span className="muted" style={{ fontSize: '0.8rem' }}>✓ Enviado</span>;
+  }
+  return (
+    <button
+      className="btn-ghost"
+      disabled={estado === 'enviando'}
+      onClick={enviar}
+      title={estado === 'error' ? 'No se pudo enviar — reintentar' : undefined}
+    >
+      {estado === 'enviando' ? 'Enviando…' : estado === 'error' ? 'Reintentar recordatorio' : 'Enviar recordatorio'}
+    </button>
+  );
+}
+
+function Home({ resumen, ganancias, pendientes, onPagoRegistrado }: {
+  resumen: ResumenPagoOrg[]; ganancias: GananciasPeriodo | null; pendientes: PagoPendiente[]; onPagoRegistrado: () => void;
 }) {
   const [orgPago, setOrgPago] = useState<ResumenPagoOrg | null>(null);
   const hoy = new Date();
@@ -258,6 +383,7 @@ function Home({ resumen, ganancias, onPagoRegistrado }: {
   return (
     <div>
       <h3>Home</h3>
+      <PagosPendientes pendientes={pendientes} onRevisado={onPagoRegistrado} />
       <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <div style={{ flex: '2 1 480px', minWidth: 0 }} className="card">
           <h4 className="form-titulo">Pago por organización</h4>
@@ -290,7 +416,10 @@ function Home({ resumen, ganancias, onPagoRegistrado }: {
                           : <EstadoChip texto="pendiente" tono="peligro" />}
                       </td>
                       <td>
-                        <button className="btn-ghost" onClick={() => setOrgPago(o)}>Registrar pago</button>
+                        <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          <button className="btn-ghost" onClick={() => setOrgPago(o)}>Registrar pago</button>
+                          <BotonRecordatorio orgId={o.id} />
+                        </div>
                       </td>
                     </tr>
                   );
@@ -375,9 +504,13 @@ function RegistrarPagoModal({ org, onClose, onGuardado }: {
             <p className="muted" style={{ fontSize: '0.82rem', marginBottom: '0.25rem' }}>Pagos anteriores</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', maxHeight: 120, overflowY: 'auto' }}>
               {historial.slice(0, 6).map((p) => (
-                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem' }}>
+                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem' }}>
                   <span className="muted">{formatoMes(p.periodo)}</span>
-                  <span>${Number(p.monto).toLocaleString('es-AR')}</span>
+                  <span>
+                    ${Number(p.monto).toLocaleString('es-AR')}
+                    {p.estado === 'pendiente' && <> <EstadoChip texto="pendiente de revisión" /></>}
+                    {p.estado === 'rechazado' && <> <EstadoChip texto="rechazado" tono="peligro" /></>}
+                  </span>
                 </div>
               ))}
             </div>
@@ -907,8 +1040,11 @@ function Planes({ planes, onCambio }: { planes: Plan[]; onCambio: () => void }) 
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
 
-  const [editandoLimites, setEditandoLimites] = useState<string | null>(null);
+  const [editando, setEditando] = useState<string | null>(null);
+  const [nombreEdit, setNombreEdit] = useState('');
+  const [descripcionEdit, setDescripcionEdit] = useState('');
   const [limitesEdit, setLimitesEdit] = useState<Record<string, string>>({});
+  const [errorEdit, setErrorEdit] = useState<string | null>(null);
   const [guardandoLimites, setGuardandoLimites] = useState(false);
 
   async function crear() {
@@ -938,17 +1074,26 @@ function Planes({ planes, onCambio }: { planes: Plan[]; onCambio: () => void }) 
     try { await eliminarPlan(p.id); onCambio(); }
     catch (e: any) { setError(e.message ?? 'No se pudo eliminar'); }
   }
-  function abrirEditarLimites(p: Plan) {
-    setEditandoLimites(editandoLimites === p.id ? null : p.id);
+  function abrirEditar(p: Plan) {
+    if (editando === p.id) { setEditando(null); return; }
+    setEditando(p.id);
+    setNombreEdit(p.nombre);
+    setDescripcionEdit(p.descripcion ?? '');
     setLimitesEdit(limitesAStrings(p.limitesRoles));
+    setErrorEdit(null);
   }
-  async function guardarLimites(p: Plan) {
-    setGuardandoLimites(true); setError(null);
+  async function guardarEdicion(p: Plan) {
+    if (nombreEdit.trim().length < 2) { setErrorEdit('Poné un nombre'); return; }
+    setGuardandoLimites(true); setErrorEdit(null);
     try {
-      await actualizarPlan(p.id, { limitesRoles: limitesANumeros(limitesEdit) });
-      setEditandoLimites(null);
+      await actualizarPlan(p.id, {
+        nombre: nombreEdit.trim(),
+        descripcion: descripcionEdit.trim() || undefined,
+        limitesRoles: limitesANumeros(limitesEdit),
+      });
+      setEditando(null);
       onCambio();
-    } catch (e: any) { setError(e.message ?? 'No se pudieron guardar los límites'); }
+    } catch (e: any) { setErrorEdit(e.message ?? 'No se pudieron guardar los cambios'); }
     finally { setGuardandoLimites(false); }
   }
 
@@ -992,8 +1137,8 @@ function Planes({ planes, onCambio }: { planes: Plan[]; onCambio: () => void }) 
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: '0.4rem' }}>
-                  <button className="btn-ghost" onClick={() => abrirEditarLimites(p)}>
-                    {editandoLimites === p.id ? 'Cancelar' : 'Editar límites'}
+                  <button className="btn-ghost" onClick={() => abrirEditar(p)}>
+                    {editando === p.id ? 'Cancelar' : 'Editar'}
                   </button>
                   <button className="btn-ghost" onClick={() => toggleActivo(p)} title="Un plan no disponible no puede asignarse a organizaciones nuevas, pero las que ya lo tienen no se ven afectadas">
                     {p.activo ? 'Deshabilitar para altas nuevas' : 'Habilitar para altas nuevas'}
@@ -1001,14 +1146,29 @@ function Planes({ planes, onCambio }: { planes: Plan[]; onCambio: () => void }) 
                   <button className="btn-ghost" style={{ color: 'var(--danger)', borderColor: '#fca5a5' }} onClick={() => eliminar(p)}>Eliminar</button>
                 </div>
               </div>
-              {editandoLimites === p.id && (
+              {editando === p.id && (
                 <div style={{ marginTop: '0.75rem', borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
-                  <p className="muted" style={{ fontSize: '0.82rem', marginTop: 0 }}>
+                  {errorEdit && <div className="alerta">{errorEdit}</div>}
+                  <div className="form-grid">
+                    <label>
+                      Nombre
+                      <input value={nombreEdit} onChange={(e) => setNombreEdit(e.target.value)} />
+                    </label>
+                    <label>
+                      Descripción
+                      <input
+                        value={descripcionEdit}
+                        onChange={(e) => setDescripcionEdit(e.target.value)}
+                        placeholder="Se muestra en la landing pública"
+                      />
+                    </label>
+                  </div>
+                  <p className="muted" style={{ fontSize: '0.82rem' }}>
                     Cupo máximo de miembros por rol en las organizaciones de este plan.
                   </p>
                   <LimitesRolesEditor valores={limitesEdit} onChange={setLimitesEdit} />
-                  <button className="btn" disabled={guardandoLimites} onClick={() => guardarLimites(p)}>
-                    {guardandoLimites ? 'Guardando…' : 'Guardar límites'}
+                  <button className="btn" disabled={guardandoLimites} onClick={() => guardarEdicion(p)}>
+                    {guardandoLimites ? 'Guardando…' : 'Guardar cambios'}
                   </button>
                 </div>
               )}

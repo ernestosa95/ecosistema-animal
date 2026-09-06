@@ -148,6 +148,7 @@ export function FarmaciaPage({ sesion }: { sesion: Sesion }) {
         <IngresoStockForm
           sesion={sesion}
           productos={productos}
+          onProductoCreado={(p) => setProductos((prev) => [...prev, p])}
           onCreado={() => {
             setMostrarIngreso(false);
             cargar();

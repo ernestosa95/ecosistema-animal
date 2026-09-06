@@ -10,6 +10,7 @@ import { BuscadorCatalogoVacunas } from '../components/BuscadorCatalogoVacunas';
 import { BuscadorCatalogoDiagnosticos } from '../components/BuscadorCatalogoDiagnosticos';
 import { useFormularioPersistente, hayBorrador } from '../hooks/useFormularioPersistente';
 import { comprimirImagen } from '../utils/comprimirImagen';
+import { tieneAlguno, ROLES_CLINICO } from '../nav/config';
 
 export function PacienteDetallePage({
   sesion,
@@ -171,6 +172,12 @@ export function PacienteDetallePage({
   }
 
   const identificador = animal.microchip || animal.codigoLegible || '—';
+  // Mismos roles que exige el backend en consultas/vacunaciones/indicaciones/
+  // dispensa (todas `propietario`/`admin`/`veterinario`) — sin esto, un rol
+  // sin acceso clínico (ej. recepción) veía estos botones igual acá dentro
+  // de la ficha (a diferencia del Home, que ya los ocultaba) y sólo se
+  // enteraba de que no podía al recibir un 403 al guardar.
+  const puedeClinico = tieneAlguno(sesion.roles, ROLES_CLINICO);
 
   return (
     <div>
@@ -242,18 +249,20 @@ export function PacienteDetallePage({
 
       <div className="page-head">
         <h2>Historia clínica</h2>
-        <button
-          className="btn"
-          onClick={() => {
-            setEditandoConsultaId(null);
-            setMostrarConsulta((v) => !v);
-          }}
-        >
-          {mostrarConsulta ? 'Cerrar' : '+ Nueva consulta'}
-        </button>
+        {puedeClinico && (
+          <button
+            className="btn"
+            onClick={() => {
+              setEditandoConsultaId(null);
+              setMostrarConsulta((v) => !v);
+            }}
+          >
+            {mostrarConsulta ? 'Cerrar' : '+ Nueva consulta'}
+          </button>
+        )}
       </div>
 
-      {mostrarConsulta && (
+      {puedeClinico && mostrarConsulta && (
         <ConsultaForm
           sesion={sesion}
           animalId={animal.id}
@@ -326,6 +335,7 @@ export function PacienteDetallePage({
                       <td>{c.pesoKg ? `${c.pesoKg} kg` : '—'}</td>
                       <td>{c.costo != null ? `$${c.costo}` : '—'}</td>
                       <td className="menu-fila">
+                        {puedeClinico && (
                         <button
                           className="menu-fila-btn"
                           aria-label="Acciones de esta consulta"
@@ -333,7 +343,8 @@ export function PacienteDetallePage({
                         >
                           ⋮
                         </button>
-                        {menuConsultaId === c.id && (
+                        )}
+                        {puedeClinico && menuConsultaId === c.id && (
                           <>
                             <div className="overlay-transparente" onClick={() => setMenuConsultaId(null)} />
                             <div className="menu-fila-dropdown">
@@ -446,9 +457,11 @@ export function PacienteDetallePage({
         <div className="card card-vacunas-side">
           <div className="card-vacunas-head">
             <h3 className="form-titulo">Vacunas</h3>
-            <button className="btn btn-compacto" onClick={() => setMostrarVacuna(true)}>
-              + Nueva
-            </button>
+            {puedeClinico && (
+              <button className="btn btn-compacto" onClick={() => setMostrarVacuna(true)}>
+                + Nueva
+              </button>
+            )}
           </div>
           {cargando ? (
             <p className="muted">Cargando…</p>
@@ -498,7 +511,7 @@ export function PacienteDetallePage({
       </div>
       </div>
 
-      {mostrarVacuna && (
+      {puedeClinico && mostrarVacuna && (
         <div className="drawer-overlay" onClick={() => setMostrarVacuna(false)}>
           <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
             <div className="drawer-head">

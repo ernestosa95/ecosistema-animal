@@ -44,5 +44,19 @@ export function useSesion() {
     });
   }
 
-  return { sesion, iniciar, cerrar, actualizarTokens };
+  /**
+   * Reemplaza sólo los roles — para cuando el propio usuario se edita sus
+   * roles a sí mismo (ej. wizard de configuración rápida, paso "Tu equipo")
+   * y la sesión ya cargada quedaría desactualizada hasta el próximo login.
+   */
+  function actualizarRoles(roles: string[]) {
+    setSesionState((actual) => {
+      if (!actual) return actual;
+      const nueva = { ...actual, roles };
+      localStorage.setItem(CLAVE, JSON.stringify(nueva));
+      return nueva;
+    });
+  }
+
+  return { sesion, iniciar, cerrar, actualizarTokens, actualizarRoles };
 }

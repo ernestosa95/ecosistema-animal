@@ -2,7 +2,7 @@ import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { and, eq, desc, asc, gte, isNull, inArray } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDB } from '../../database/drizzle.provider';
 import {
-  animales, especies, personas, vacunaciones, consultas, turnos, indicaciones, productos,
+  animales, especies, personas, vacunaciones, consultas, turnos, indicaciones, productos, organizaciones,
 } from '../../database/schema';
 
 // Estados de turno que siguen "vigentes" (para mostrar próximos turnos).
@@ -41,6 +41,12 @@ export class PortalService {
       .limit(1);
 
     if (!a) throw new NotFoundException('No encontramos ninguna mascota con este código');
+
+    const [org] = await this.db
+      .select({ nombre: organizaciones.nombre, logoUrl: organizaciones.logoUrl })
+      .from(organizaciones)
+      .where(eq(organizaciones.id, a.organizacionId))
+      .limit(1);
 
     const vacunas = await this.db
       .select({
@@ -109,6 +115,10 @@ export class PortalService {
     const datos = (a.datosEspecificos ?? {}) as Record<string, any>;
 
     return {
+      organizacion: {
+        nombre: org?.nombre ?? '—',
+        logoUrl: org?.logoUrl ?? null,
+      },
       animal: {
         nombre: a.nombre,
         especie: a.especieNombre ?? '—',

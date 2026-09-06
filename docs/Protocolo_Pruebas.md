@@ -7,6 +7,10 @@
 > Un segundo lote del mismo día (rango de fechas en Turnos — 6.7; descartar/filtrar recordatorios — 4.6/4.7; foto en la ficha — 2.7; "⚙ Agendas" movido a Usuarios — 10.7; auto-cierre de caja — 14.9; ingreso de stock desde Home + su egreso — 11.9b/13.8) sólo tiene verificación automática (`tsc`/build/los 18 `test:*-demo`) — **todavía no una pasada en el navegador**, ni headless ni humana.
 >
 > **Lote 2026-09-04/05** (analítica de uso — 8.9/15.10; catálogos de referencia con búsqueda — 3.1c/4.1b/11.1b; landing page — 1.0; recuperar contraseña — 1.8/1.8b/15.9; y todo el bloque 15 nuevo de mobile) fue usado y verificado por el usuario en su propio dispositivo Android físico durante el desarrollo, pero **sin una pasada formal punto por punto contra este checklist todavía** — priorizarlo en la próxima sesión de pruebas, junto con lo que quedó pendiente del lote anterior.
+>
+> **Segundo lote del 2026-09-05** (wizard de alta pública rediseñado — 1.1; fix de login de `/admin` — 8.1b/8.1c; edición de nombre/descripción de planes — 8.8b; cola de pagos pendientes — 8.7b; wizard de configuración rápida sin "Saltar" y con el paso de equipo rediseñado — 10b.2/10b.4/10b.5; "Mi plan" y pago por transferencia con comprobante — bloque 10c nuevo): el rediseño del alta pública (1.1) sí se probó en vivo en el navegador (de ahí salieron los ajustes de esa entrada del `CHANGELOG.md`); el resto sólo tiene verificación automática (`tsc`, los 18 `test:*-demo`) — sin ninguna pasada visual todavía.
+>
+> **Tercer y cuarto lote del mismo día** (verificación de email por código en el alta — paso 4 de 1.1; recordatorio de pago manual — 8.7c; fix de seguridad de auto-promoción a propietario — 10b.9; logo propio de la organización en carnet/ficha/portal — 5.4, 7.3b, 7.5b, 10c.0): tampoco tienen ninguna pasada visual todavía, sólo `tsc` + los 18 `test:*-demo`.
 
 **Convención:** 🌐 = pasos en el navegador. 💻 = pasos en la terminal (para armar el entorno o revisar algo que la UI no muestra).
 
@@ -24,7 +28,12 @@
 ## 1. Cuenta y sesión
 
 - [ ] **1.0 — Landing page pública:** deslogueado, abrir **http://localhost:5173/** (sin `/login`) → debe verse la landing de marketing (hero, pasos, features, precios), no el formulario de login. Los precios deben coincidir con los planes reales cargados en `/admin`. Click en cualquier plan → debe llevar a `/login?plan=<id>` con el modo "Solicitar acceso" ya activo y ese plan preseleccionado en el selector.
-- [ ] **1.1 — Alta de cuenta (solicitud):** en la pantalla de login, "¿No tenés cuenta?" → "Solicitar acceso". El form ya no ofrece elegir entre "crear"/"unirse" — sólo cuenta nueva. Completá nombre/apellido/teléfono/DNI (ahora los cuatro obligatorios) y los datos de la institución (nombre/tipo obligatorios, dirección/localidad/provincia/teléfono/email opcionales). Elegí un **plan** — debajo debe aparecer qué incluye (cupos por rol) y el bloque colapsable "¿Qué puede hacer cada rol?". Tildar términos y enviar. Debe aparecer "Solicitud enviada" — **no** te loguea directo (a propósito: pasa por aprobación, ver bloque 8).
+- [ ] **1.1 — Alta de cuenta (solicitud), paso a paso:** en la pantalla de login, "¿No tenés cuenta?" → "Solicitar acceso" → arranca un wizard de 4 pasos ("Tus datos" → "Tu organización" → "Tu plan" → "Tu acceso") con una barra de progreso arriba. No hay forma de saltar el wizard entero ni de mandar la solicitud antes del último paso.
+  - **Paso 1 (Tus datos):** nombre/apellido/teléfono/DNI, los cuatro obligatorios. "Siguiente" sin completar alguno debe bloquear con el aviso nativo del navegador sobre ese campo, no avanzar en silencio.
+  - **Paso 2 (Tu organización):** nombre de la institución obligatorio. "Tipo" sólo ofrece "Clínica veterinaria o similares" (fijo, sin otra opción para elegir). Localidad y Provincia son obligatorias — Provincia es un buscador (escribí, por ejemplo, "bue" y debe filtrar a Buenos Aires/Ciudad Autónoma de Buenos Aires, sin dejar mandar texto libre). Dirección/teléfono/email de la institución siguen opcionales.
+  - **Paso 3 (Tu plan):** elegir un plan — debajo debe aparecer "Este plan incluye" (sólo los roles con cupo mayor a 0, nunca algo como "Hasta 0 Administrador") y el bloque colapsable "¿Qué puede hacer cada rol?" filtrado a esos mismos roles.
+  - **Paso 4 (Tu acceso):** cargar el email → "Enviar código de verificación". Con `RESEND_API_KEY` sin configurar (ver 1.8), el código de 6 dígitos queda logueado en la consola del backend. Ingresarlo y "Confirmar código" → debe mostrar "✓ Email verificado" y el campo email pasa a de solo lectura ("Cambiar email" lo vuelve a habilitar y pide verificar de nuevo). Probar también un código incorrecto (debe rechazar sin bloquear el reintento) y "Reenviar código". Completar contraseña + tildar términos. Intentar enviar la solicitud **sin** haber verificado el email → debe rechazar con un aviso, incluso si el resto de los campos están completos. **Sin** tildar el checkbox de términos → debe mostrar el aviso nativo del navegador apuntando al checkbox, no quedarse sin reaccionar al click.
+  - Al enviar, debe aparecer "Solicitud enviada" — **no** te loguea directo (a propósito: pasa por aprobación, ver bloque 8).
 - [ ] **1.1b — Datos completos visibles al aprobar:** en el bloque 8.1, la tarjeta de la solicitud debe mostrar el DNI junto al email/teléfono, el plan solicitado, y una línea aparte con la dirección/localidad/provincia/teléfono/email de la institución (si se cargaron).
 - [ ] **1.1c — Un plan deshabilitado no aparece para elegir:** desde 8.8 dejá un plan "deshabilitado para altas nuevas" → volver al form de solicitud (recargar la página) → ese plan no debe aparecer en el selector.
 - [ ] **1.2 — Login sin aprobar:** intentar entrar con ese mismo email/contraseña antes de aprobar la solicitud → debe rechazar (no existe usuario todavía, la solicitud es una tabla aparte hasta que se aprueba).
@@ -42,6 +51,7 @@
 
 - [ ] **2.1 — Alta de animal con dueño existente:** "Animales" → "+ Nuevo animal". Completá nombre + especie, elegí un dueño ya cargado (si no hay ninguno, cargá uno primero desde "Dueños" → "+ Nuevo dueño"). Guardar. Debe aparecer en el listado con su código legible generado.
 - [ ] **2.2 — Alta de animal con dueño nuevo (quick-create):** "+ Nuevo animal" de nuevo, en "Dueño" elegí "＋ Crear dueño nuevo…" y completá nombre/apellido (celular y DNI opcionales) ahí mismo, sin salir del formulario. Guardar. Verificar en "Dueños" que la persona quedó creada.
+- [ ] **2.2b — Dueño obligatorio (regresión, 2026-09-05):** en los tres formularios de alta de animal que existen ("Animales" → "+ Nuevo animal", el modal de accesos rápidos del Home, y el alta de paciente embebida en "Turnos" → "+ Nuevo turno"), confirmar que ya **no** existe una opción para dejar el campo "Dueño" vacío — el `<select>` debe pedir elegir uno (existente o "＋ Crear dueño nuevo…") antes de dejar guardar.
 - [ ] **2.3 — Datos por especie:** al elegir una especie en el alta, deberían aparecer campos extra específicos (raza, pelaje, etc. según `config/especieDatos.ts`). Cargar alguno y guardar.
 - [ ] **2.4 — Búsqueda:** en "Animales", escribir en el buscador por nombre, por especie y por nombre de dueño — los tres deberían filtrar la tabla.
 - [ ] **2.5 — Editar animal:** abrir la ficha ("Ver ficha →") → "Editar" → cambiar algo (sexo, estado, un dato de especie) → "Guardar cambios". Confirmar que se refleja en la ficha.
@@ -87,6 +97,7 @@ Seguís en la ficha de un animal:
 - [ ] **5.1 — Descargar carnet:** en la ficha del animal, botón "Descargar carnet" → debe abrir un PDF en una pestaña nueva.
 - [ ] **5.2 — Datos reales:** confirmar que el PDF trae el nombre/especie/sexo/dueño reales (no "—" en todo) y que la(s) vacuna(s) cargada(s) en el bloque 4 aparecen en el carnet.
 - [ ] **5.3 — QR:** el carnet debe traer un código QR — no hace falta escanearlo, pero debe estar presente (apunta al portal público, bloque 7).
+- [ ] **5.4 — Logo propio en el carnet/ficha:** después de subir un logo (bloque 10c), volver a descargar el carnet y la ficha (`GET /animales/:id/ficha.pdf`, desde la ficha del animal) → el encabezado, antes fijo "🐾 Huella", debe mostrar el logo cargado + el nombre de la organización. Probar con un logo de fondo transparente — no debería verse "roto" ni recortado contra el fondo de color del encabezado. Sin logo cargado, confirmar que ambos siguen mostrando "🐾 Huella" como siempre.
 
 ---
 
@@ -111,6 +122,7 @@ Hay **dos caminos** de acceso, ambos con UI completa desde el 2026-08-28. Desde 
 - [ ] **7.1 — Acceso público por código:** copiá el "Código" (no el microchip) de la ficha de un animal (bloque 2, campo `Dato etiqueta="Código"`, formato tipo `CAN-AR-000001-D`). En una pestaña **sin sesión de staff** (ventana privada o cerrando sesión primero), andá a `http://localhost:5173/c/<ese-código>`.
 - [ ] **7.2 — Contenido del portal:** debe mostrar el resumen del animal: datos básicos, vacunas, historia clínica (motivo/diagnóstico, sin datos sensibles de más), y turnos próximos — sin haber iniciado sesión en ningún momento.
 - [ ] **7.3 — Código inexistente:** probar `http://localhost:5173/c/CODIGO-QUE-NO-EXISTE` → debe mostrar un mensaje de "no encontrado", no un error roto en blanco.
+- [ ] **7.3b — Logo propio en el header:** con un logo cargado (bloque 10c), el header de este portal debe mostrar ese logo en vez de "🐾 Huella".
 
 ### 7b. Acceso por magic-link (todas las mascotas del dueño)
 
@@ -120,6 +132,7 @@ Hay **dos caminos** de acceso, ambos con UI completa desde el 2026-08-28. Desde 
 - [ ] **7.7 — Verificar del lado staff:** el turno solicitado debe aparecer en "Turnos" con estado "solicitado" y canal "portal".
 - [ ] **7.8 — Enlace inválido:** entrar con `?token=esto-no-es-un-token` → debe mostrar un mensaje de "enlace inválido o vencido", no un error en blanco.
 - [ ] **7.9 — Subir foto de perfil:** en cualquiera de las mascotas del magic-link (7.5), botón "+ Agregar foto" → elegir una imagen del dispositivo (probar con una pesada, varios MB, para confirmar que igual sube rápido) → debe aparecer como avatar de esa mascota. Volver a entrar con el mismo link (o refrescar) → la foto tiene que seguir ahí.
+- [ ] **7.5b — Logo propio en el header:** mismo criterio que 7.3b, para este acceso.
 - [ ] **7.9b — La foto no está disponible en el portal por código:** confirmar que el acceso público por código (7a) sólo *muestra* la foto si ya se cargó desde el magic-link — no tiene botón para subirla (a propósito: ese acceso no tiene ningún token, sólo el código impreso del carnet).
 
 ---
@@ -129,14 +142,19 @@ Hay **dos caminos** de acceso, ambos con UI completa desde el 2026-08-28. Desde 
 Requiere que tu usuario esté en `SUPERADMIN_EMAILS` (ver bloque 0.3). Es un login **separado** del de la app normal — no reutiliza la sesión de staff.
 
 - [ ] **8.1 — Login admin + aprobar solicitud:** ir a `http://localhost:5173/admin`, loguearte con tu cuenta super-admin. Arriba debería aparecer "Solicitudes pendientes" con la del bloque 1.1. Aprobarla (no hace falta elegir nada más). Confirmar que desaparece de la bandeja, y que la organización creada ya tiene asignado el plan solicitado y una "Fecha de activación" (hoy) en su tarjeta de Acceso — sin tener que cargarlos a mano.
+- [ ] **8.1b — Un usuario normal no puede entrar al panel:** deslogueado de `/admin`, intentar loguearte ahí con una cuenta de staff normal (no incluida en `SUPERADMIN_EMAILS`) → debe rechazar en la propia pantalla de login con "Tu cuenta no tiene permisos de administración de la plataforma", **sin** llegar a mostrar el panel.
+- [ ] **8.1c — Sesión de admin vencida vuelve sola al login:** con el panel de `/admin` abierto, borrar a mano la clave `ecosistema.admin.token` de localStorage (DevTools → Application) y después hacer cualquier acción (cambiar de pestaña dentro del panel) → debe volver solo a la pantalla de login con "Tu sesión expiró. Volvé a ingresar." en vez de mostrar el panel con un JSON de error.
 - [ ] **8.2 — Rechazar una solicitud:** crear otra solicitud de prueba desde el login normal y rechazarla desde acá. Confirmar que también desaparece (y que esa persona sigue sin poder loguearse).
 - [ ] **8.3 — Nueva veterinaria manual:** columna "Veterinarias" → "Nueva veterinaria" → crear una sin pasar por el flujo de solicitud. Debe aparecer en la lista al instante.
 - [ ] **8.4 — Miembros de una veterinaria:** click en una veterinaria de la lista → columna derecha debería mostrar sus miembros, con opción de agregar uno nuevo y de activar/desactivar.
 - [ ] **8.5 — Desactivar una organización:** si hay un botón para eso, probarlo con la veterinaria de prueba del 8.3 (no con una que estés usando para el resto del protocolo) y confirmar que un usuario de esa organización no puede loguearse mientras está inactiva.
 - [ ] **8.6 — Home: fecha de activación y próximo vencimiento:** columna "Organizaciones" → elegí una veterinaria → tarjeta "Acceso" → cargar una "Fecha de activación" y guardar. Volver a la pestaña "Home": la fila de esa organización debe mostrar esa fecha y un "Próximo vencimiento" calculado con el mismo día del mes.
 - [ ] **8.7 — Home: registrar un pago:** en la tabla de Home, "Registrar pago" sobre una organización → cargar un monto → guardar. La fila debe pasar a "pagó" (este mes) y la tarjeta "Ganancias acumuladas" debe sumar ese monto en el mes en curso.
+- [ ] **8.7c — Recordatorio de pago:** en la tabla "Pago por organización", "Enviar recordatorio" sobre una organización → debe cambiar a "✓ Enviado". Con `RESEND_API_KEY` sin configurar, revisar la consola del backend: debe loguear un intento de mail a cada propietario/admin activo de esa organización (no a otros roles).
+- [ ] **8.7b — Cola de pagos pendientes:** después de cargar un pago con comprobante desde "Mi plan" (bloque 10c.3, con la cuenta del propietario de otra organización) → volver a `/admin` → Home → debe aparecer en "Pagos pendientes de revisión" con el monto, la organización, y un link "Ver" que abre el comprobante subido. "Aprobar" → desaparece de la cola y esa organización pasa a "pagó" (este mes) en "Pago por organización". Repetir con otro pago pero "Rechazar" → también desaparece de la cola, pero la organización sigue "pendiente".
 - [ ] **8.9 — Analítica de uso:** antes de este paso, andar un poco por la app con tu usuario de staff (abrir un par de pantallas distintas, dar de alta algo en Tropera y en Farmacia, atender un turno). Después, en `/admin`, pestaña "Analítica" → deben verse tarjetas de totales y las tablas de "top pantallas"/"top acciones" reflejando lo que acabás de hacer (los nombres de pantalla/acción no van a ser 1:1 con lo que clickeaste, son identificadores internos tipo `tropera-establecimiento-crear` — confirmar que aparece *algo* nuevo, no que el texto coincide literal). Cambiar el rango de fechas a uno que no incluya hoy → los números deben bajar a 0 o a lo que hubiera en ese rango.
 - [ ] **8.8 — Planes: deshabilitar para altas nuevas:** pestaña "Planes" → en un plan, "Deshabilitar para altas nuevas". Volver a "Organizaciones" → tarjeta "Acceso" de cualquier veterinaria → intentar asignarle ese plan → debe rechazarlo. Una organización que ya tenía ese plan asignado antes de deshabilitarlo no debe verse afectada.
+- [ ] **8.8b — Editar nombre y descripción de un plan:** pestaña "Planes" → "Editar" sobre un plan (antes decía "Editar límites") → cambiar el nombre y la descripción, además de los límites por rol de siempre → "Guardar cambios". Volver a la landing pública (bloque 1.0) y al paso "Tu plan" del alta (bloque 1.1) → deben reflejar el nombre/descripción nuevos.
 
 ---
 
@@ -178,12 +196,28 @@ Sólo visible en la nav para roles `propietario`/`admin`.
 Se dispara solo, una única vez, al loguearse por primera vez con la cuenta `propietario` de una organización recién aprobada (bloque 8.1). Para volver a verlo hay que borrar la clave `ecosistema.wizard.visto.<usuarioId>` de localStorage.
 
 - [ ] **10b.1 — Se dispara solo:** loguearse por primera vez con el usuario aprobado en 8.1 → antes de ver la app normal, debe aparecer la pantalla de bienvenida del wizard (no el rail de navegación).
-- [ ] **10b.2 — Paso usuarios:** "Empezar" → dar de alta uno o dos usuarios (con distintos roles) → deben aparecer como chips "agregados" en la misma pantalla, y también quedar visibles después en "Usuarios".
+- [ ] **10b.2 — Paso "Tu equipo":** "Empezar" → debe verse primero el listado de miembros existentes (al menos vos, el propietario) con checkboxes por rol. Tildar un rol adicional sobre el propietario (ej. Veterinario) → se guarda solo, sin botón aparte, y queda reflejado después en "Usuarios". "+ Agregar usuario" al final del listado → abre el formulario de alta de siempre; dar de alta uno o dos usuarios con distintos roles → deben aparecer en el listado del propio paso al instante (no como chips sueltos, como miembros más de la lista).
 - [ ] **10b.3 — Paso agenda de veterinario:** elegir un veterinario (tiene que ser uno de los que tenga rol veterinario o sea el propio propietario), tildar algunos días, cargar horario → "+ Crear esta agenda". Debe aparecer como chip "✓ agenda creada" y, después de terminar el wizard, verse en "Turnos → ⚙ Agendas" con sus bloques horarios correctos.
-- [ ] **10b.4 — Paso peluquería (opcional):** igual que 10b.3 pero sin elegir profesional — la agenda resultante debe quedar "sin profesional" en "⚙ Agendas".
-- [ ] **10b.5 — Saltar un paso:** en cualquier paso, "Saltar por ahora" debe cerrar el wizard entero y dejar entrar a la app normal.
+- [ ] **10b.4 — Paso "Agenda no médica":** a diferencia del paso anterior, acá no se elige un profesional — hay que escribir a mano el nombre de la agenda (placeholder "Ej: Peluquería canina", pero puede ser cualquier servicio). "+ Crear esta agenda" sin nombre debe rechazar con un aviso. Con nombre, la agenda debe quedar "sin profesional" en "⚙ Agendas".
+- [ ] **10b.5 — No se puede saltar el wizard:** confirmar que en ningún paso (bienvenida, equipo, ambas agendas) hay ya un botón "Saltar por ahora" — la única forma de avanzar es "Continuar"/"Empezar", paso por paso, hasta llegar a "¡Listo!".
 - [ ] **10b.6 — No se repite solo:** cerrar sesión y volver a entrar con el mismo usuario → el wizard NO debe volver a aparecer.
 - [ ] **10b.7 — No aplica a otros roles:** loguearse con un usuario `admin`/`veterinario`/etc. (no propietario) → nunca debe aparecer el wizard, ni siquiera la primera vez.
+- [ ] **10b.8 — Hay cómo salir sin terminar:** en cualquier paso salvo "¡Listo!" debe haber un link "Cerrar sesión" debajo de las acciones del paso — usarlo debe volver al login. Loguearse de nuevo con el mismo usuario → el wizard debe retomar desde "bienvenida" (no marca nada como visto).
+- [ ] **10b.9 — Un admin (no propietario) no puede autopromoverse a propietario:** esto NO se puede probar desde la UI todavía — el checkbox de roles del paso "Tu equipo" sólo existe dentro del wizard, y el wizard sólo lo ve el propietario (10b.7). Probar por API: logueado como el `admin` agregado en 10b.2 (tomar su `accessToken` de `POST /auth/login`), `curl -X PATCH http://localhost:3000/usuarios/<idDelPropioAdmin>/roles -H "Authorization: Bearer <token>" -H "X-Organizacion-Id: <orgId>" -H "Content-Type: application/json" -d '{"roles":["admin","propietario"]}'` → debe rechazar con 403. Repetir con el token del propietario real → debe aceptar (200, ahora es propietario).
+
+---
+
+## 10c. Mi plan (pago por transferencia)
+
+Menú desplegable del usuario (ícono arriba a la derecha, mismo lugar que "Usuarios") → "Mi plan". Sólo visible para `propietario`/`admin`.
+
+- [ ] **10c.0 — Subir el logo de la organización:** card "Logo de tu organización" arriba de todo → elegir una imagen (jpg/png/webp) → "Subir logo". Debe verse la preview actualizada al toque, sin recargar la página. Volver a esta pantalla (recargar) → el logo tiene que seguir ahí. Subir uno nuevo → "Reemplazar logo" reemplaza el anterior (no lo suma). Probar un PDF o un SVG → debe rechazar con un aviso claro de qué formatos acepta.
+- [ ] **10c.1 — Resumen del plan:** debe mostrar el nombre del plan actual, el próximo vencimiento, si la cuenta está activa, y si ya pagó este mes (en una organización recién aprobada, "Todavía no").
+- [ ] **10c.2 — Qué incluye el plan:** debajo debe aparecer una tarjeta con la descripción del plan y los roles que incluye (sólo los que tienen cupo mayor a 0).
+- [ ] **10c.3 — Registrar un pago:** completar el monto (puede venir sugerido desde el precio del plan) y adjuntar un comprobante (una imagen o un PDF cualquiera sirve para probar) → "Registrar pago". Debe confirmar "Pago cargado — queda pendiente de revisión" y aparecer en el historial de abajo con el chip "Pendiente de revisión".
+- [ ] **10c.4 — No deja cargar un segundo pago mientras hay uno pendiente:** con el pago del 10c.3 todavía sin revisar, recargar la página → en vez del formulario debe aparecer el aviso de que ya hay un pago pendiente.
+- [ ] **10c.5 — La aprobación se refleja acá:** después de aprobar el pago desde `/admin` (bloque 8.7b), volver a "Mi plan" → el pago debe figurar "Confirmado" en el historial, y "¿Pagó este mes?" debe pasar a "Sí".
+- [ ] **10c.6 — El rechazo se refleja acá:** repetir 10c.3 con otro pago y rechazarlo desde `/admin` → debe figurar "Rechazado" en el historial de "Mi plan".
 
 ---
 

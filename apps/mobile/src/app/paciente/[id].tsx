@@ -24,6 +24,7 @@ import { BuscadorCatalogoDiagnosticos } from '@/components/BuscadorCatalogoDiagn
 import { CampoColapsable } from '@/components/CampoColapsable';
 import { CampoFecha } from '@/components/CampoFecha';
 import { api } from '@/api/client';
+import { tieneAlguno, ROLES_CLINICO } from '@/nav/roles';
 
 // `seccion` (?seccion=consulta|vacunacion) llega desde los accesos rápidos
 // del Home ("Nueva consulta"/"Registro de vacuna" en (app)/home.tsx vía
@@ -58,6 +59,12 @@ export default function PacienteDetalleScreen() {
   const [seccion, setSeccion] = useState<SeccionParam | null>(
     seccionInicial === 'consulta' || seccionInicial === 'vacunacion' ? seccionInicial : null,
   );
+
+  // Mismos roles que exige el backend en consultas/vacunaciones (`propietario`/
+  // `admin`/`veterinario`) — sin esto, un rol sin acceso clínico (ej.
+  // recepción) llegaba igual a esta pantalla desde la pestaña Turnos y veía
+  // los botones de alta, que el servidor le iba a rechazar con 403.
+  const puedeClinico = tieneAlguno(sesion?.roles, ROLES_CLINICO);
 
   // Consulta
   const [motivo, setMotivo] = useState('');
@@ -204,18 +211,20 @@ export default function PacienteDetalleScreen() {
                 ListEmptyComponent={<EmptyState mensaje="Sin consultas cargadas todavía." />}
               />
             </Card>
-            <Pressable
-              style={styles.linkButton}
-              onPress={() => {
-                setSeccion(seccion === 'consulta' ? null : 'consulta');
-                setError(null);
-                setOk(false);
-              }}
-            >
-              <Text style={styles.link}>{seccion === 'consulta' ? '‹ Cancelar' : '+ Nueva consulta'}</Text>
-            </Pressable>
+            {puedeClinico && (
+              <Pressable
+                style={styles.linkButton}
+                onPress={() => {
+                  setSeccion(seccion === 'consulta' ? null : 'consulta');
+                  setError(null);
+                  setOk(false);
+                }}
+              >
+                <Text style={styles.link}>{seccion === 'consulta' ? '‹ Cancelar' : '+ Nueva consulta'}</Text>
+              </Pressable>
+            )}
 
-            {seccion === 'consulta' && (
+            {puedeClinico && seccion === 'consulta' && (
               <View>
                 <CampoColapsable label="Motivo" valor={motivo} abiertoInicial>
                   <Field label="" value={motivo} onChangeText={setMotivo} />
@@ -273,18 +282,20 @@ export default function PacienteDetalleScreen() {
                 ListEmptyComponent={<EmptyState mensaje="Sin vacunaciones cargadas todavía." />}
               />
             </Card>
-            <Pressable
-              style={styles.linkButton}
-              onPress={() => {
-                setSeccion(seccion === 'vacunacion' ? null : 'vacunacion');
-                setError(null);
-                setOk(false);
-              }}
-            >
-              <Text style={styles.link}>{seccion === 'vacunacion' ? '‹ Cancelar' : '+ Nueva vacunación'}</Text>
-            </Pressable>
+            {puedeClinico && (
+              <Pressable
+                style={styles.linkButton}
+                onPress={() => {
+                  setSeccion(seccion === 'vacunacion' ? null : 'vacunacion');
+                  setError(null);
+                  setOk(false);
+                }}
+              >
+                <Text style={styles.link}>{seccion === 'vacunacion' ? '‹ Cancelar' : '+ Nueva vacunación'}</Text>
+              </Pressable>
+            )}
 
-            {seccion === 'vacunacion' && (
+            {puedeClinico && seccion === 'vacunacion' && (
               <View>
                 <BuscadorCatalogoVacunas
                   especieId={animal.especieId}

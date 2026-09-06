@@ -27,6 +27,7 @@ export interface TratamientoPortal {
 }
 
 export interface PortalResumen {
+  organizacion: { nombre: string; logoUrl: string | null };
   animal: {
     nombre: string; especie: string; raza: string; sexo: string;
     nacimiento: string | null; codigoLegible: string; microchip: string; fotoUrl?: string | null; dueno: string;

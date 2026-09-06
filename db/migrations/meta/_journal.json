@@ -225,6 +225,20 @@
       "when": 1788578353315,
       "tag": "0031_gorgeous_madripoor",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1788623508512,
+      "tag": "0032_fantastic_malcolm_colcord",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1788632469860,
+      "tag": "0033_useful_agent_brand",
+      "breakpoints": true
     }
   ]
 }

@@ -68,13 +68,20 @@ export function SeleccionarAnimalModal({
       setError('Nombre y especie son obligatorios');
       return;
     }
+    // Todo animal identificado en Huella tiene que tener un dueño — no existe
+    // el paciente "suelto". El <select required> ya lo exige, esto es sólo
+    // el resguardo si de alguna forma se llega a este punto sin elegir uno.
+    if (!personaId) {
+      setError('Elegí un dueño para el paciente (o creá uno nuevo)');
+      return;
+    }
     if (personaId === '__nuevo__' && (!dNombre.trim() || !dApellido.trim())) {
       setError('Completá nombre y apellido del dueño nuevo');
       return;
     }
     setGuardando(true);
     try {
-      let duenoId = personaId && personaId !== '__nuevo__' ? personaId : undefined;
+      let duenoId = personaId !== '__nuevo__' ? personaId : undefined;
       if (personaId === '__nuevo__') {
         const dueno = await api.crearPersona(sesion, {
           nombre: dNombre.trim(),
@@ -87,7 +94,7 @@ export function SeleccionarAnimalModal({
       const animal = await api.crearAnimal(sesion, {
         nombre: nombre.trim(),
         especieId,
-        ...(duenoId ? { personaId: duenoId } : {}),
+        personaId: duenoId,
       });
       refrescar();
       onSeleccionar(animal);
@@ -127,9 +134,9 @@ export function SeleccionarAnimalModal({
               </select>
             </label>
             <label className="span-2">
-              Dueño (opcional)
-              <select value={personaId} onChange={(e) => setPersonaId(e.target.value)}>
-                <option value="">Sin dueño asignado</option>
+              Dueño
+              <select value={personaId} onChange={(e) => setPersonaId(e.target.value)} required>
+                <option value="" disabled>Elegí un dueño…</option>
                 <option value="__nuevo__">＋ Crear dueño nuevo…</option>
                 {personas.map((p) => (
                   <option key={p.id} value={p.id}>

@@ -210,7 +210,7 @@ export function LandingPage() {
           <div className="landing-planes">
             {planes.map((p, i) => {
               const destacado = planes.length >= 3 && i === Math.floor(planes.length / 2);
-              const cupos = Object.entries(p.limitesRoles ?? {});
+              const cupos = Object.entries(p.limitesRoles ?? {}).filter(([, cupo]) => cupo > 0);
               return (
                 <div key={p.id} className={`landing-plan${destacado ? ' destacado' : ''}`}>
                   {destacado && <span className="landing-plan-badge">Recomendado</span>}

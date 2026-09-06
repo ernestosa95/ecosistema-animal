@@ -29,7 +29,11 @@ export default function PortalDuenoPage() {
     <div className="pd-page">
       <style>{CSS_PORTAL}</style>
       <header className="pd-top">
-        <span className="pd-logo">🐾 Huella</span>
+        {data?.organizacion.logoUrl ? (
+          <img src={data.organizacion.logoUrl} alt={data.organizacion.nombre} className="pd-logo-img" />
+        ) : (
+          <span className="pd-logo">🐾 Huella</span>
+        )}
         <span className="pd-top-sub">Portal del dueño</span>
       </header>
 

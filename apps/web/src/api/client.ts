@@ -348,11 +348,45 @@ export const api = {
     return pedir(s, '/usuarios/limites-plan');
   },
 
+  /** Reemplaza el conjunto completo de roles de un miembro activo (propietario/admin). */
+  actualizarRolesMiembro(s: Sesion, usuarioId: string, roles: string[]): Promise<{ ok: boolean; roles: string[] }> {
+    return pedir(s, `/usuarios/${usuarioId}/roles`, { method: 'PATCH', body: JSON.stringify({ roles }) });
+  },
+
   resetearPassword(s: Sesion, usuarioId: string, nuevaPassword?: string): Promise<ResetPasswordResultado> {
     return pedir(s, `/usuarios/${usuarioId}/password`, {
       method: 'PATCH',
       body: JSON.stringify(nuevaPassword ? { nuevaPassword } : {}),
     });
+  },
+
+  /** Plan actual de la organización, próximo vencimiento y si ya hay un pago confirmado este mes / uno pendiente de revisión. */
+  miPlan(s: Sesion): Promise<MiPlan> {
+    return pedir(s, '/organizacion/plan');
+  },
+
+  /** Historial de pagos de la organización, más recientes primero (incluye pendientes/rechazados). */
+  misPagos(s: Sesion): Promise<PagoOrganizacion[]> {
+    return pedir(s, '/organizacion/pagos');
+  },
+
+  /** Carga un pago con comprobante de transferencia — queda pendiente de revisión del super-admin. */
+  registrarPagoTransferencia(s: Sesion, data: {
+    monto: number; periodo?: string; observaciones?: string; comprobante: File;
+  }): Promise<PagoOrganizacion> {
+    const form = new FormData();
+    form.append('monto', String(data.monto));
+    if (data.periodo) form.append('periodo', data.periodo);
+    if (data.observaciones) form.append('observaciones', data.observaciones);
+    form.append('comprobante', data.comprobante);
+    return pedirArchivo(s, '/organizacion/pagos', form);
+  },
+
+  /** Sube/reemplaza el logo de la organización — se muestra en carnet, ficha y el portal del dueño. */
+  subirLogoOrganizacion(s: Sesion, logo: File): Promise<{ id: string; logoUrl: string }> {
+    const form = new FormData();
+    form.append('logo', logo, logo.name);
+    return pedirArchivo(s, '/organizacion/logo', form);
   },
 
   /** Emite el magic-link de acceso al portal para un dueño (vale 30 días). */
@@ -638,6 +672,36 @@ export interface Miembro {
   nombre: string | null;
   apellido: string | null;
   roles: string[];
+}
+
+export interface MiPlan {
+  nombre: string;
+  logoUrl: string | null;
+  activo: boolean;
+  plan: {
+    id: string; nombre: string; descripcion: string | null;
+    precioMensual: string | null; precioAnual: string | null;
+    limitesRoles: Record<string, number>;
+  } | null;
+  fechaActivacion: string | null;
+  proximoVencimiento: string;
+  accesoHasta: string | null;
+  pagoEsteMes: boolean;
+  tienePagoPendiente: boolean;
+}
+
+export interface PagoOrganizacion {
+  id: string;
+  organizacionId: string;
+  periodo: string;
+  monto: string;
+  fechaPago: string;
+  medioPago: string | null;
+  observaciones: string | null;
+  estado: 'pendiente' | 'confirmado' | 'rechazado';
+  comprobanteUrl: string | null;
+  motivoRechazo: string | null;
+  createdAt: string;
 }
 
 export interface ResetPasswordResultado {

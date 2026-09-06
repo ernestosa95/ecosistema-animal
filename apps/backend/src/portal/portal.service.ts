@@ -1,7 +1,7 @@
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, gte, isNull, notInArray } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDB } from '../database/drizzle.provider';
-import { animales, especies, vacunaciones, turnos, consultas, indicaciones, productos } from '../database/schema';
+import { animales, especies, vacunaciones, turnos, consultas, indicaciones, productos, organizaciones } from '../database/schema';
 import { SolicitarTurnoDto } from './dto/solicitar-turno.dto';
 
 interface PersonaCtx {
@@ -38,6 +38,12 @@ export class PortalService {
    * El shape está pensado para que lo consuma tal cual el mapResumen() del front.
    */
   async resumen(persona: PersonaCtx) {
+    const [org] = await this.db
+      .select({ nombre: organizaciones.nombre, logoUrl: organizaciones.logoUrl })
+      .from(organizaciones)
+      .where(eq(organizaciones.id, persona.organizacionId))
+      .limit(1);
+
     const mascotas = await this.db
       .select({
         id: animales.id,
@@ -146,6 +152,7 @@ export class PortalService {
     );
 
     return {
+      organizacion: { nombre: org?.nombre ?? '—', logoUrl: org?.logoUrl ?? null },
       dueno: { nombre: `${persona.nombre} ${persona.apellido}`.trim() },
       animales: animalesConDatos,
     };

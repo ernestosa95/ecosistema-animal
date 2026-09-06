@@ -52,6 +52,7 @@ export interface AnimalPortal {
 }
 
 export interface ResumenPortalDueno {
+  organizacion: { nombre: string; logoUrl: string | null };
   dueno: { nombre: string };
   animales: AnimalPortal[];
 }

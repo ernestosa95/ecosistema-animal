@@ -33,15 +33,21 @@ export const planes = plataforma.table('planes', {
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
 });
 
-// Registro manual de pagos recibidos por organización (no hay integración
-// con ninguna pasarela todavía — el super-admin lo carga a mano desde
-// /admin al confirmar una transferencia/depósito). `periodo` es siempre el
-// primer día del mes calendario que el pago cubre (ej. "2026-09-01"), sin
-// relación con el día-del-mes real de facturación de la organización
-// (`organizaciones.fechaActivacion`) — así "¿pagó este mes?" es una
-// búsqueda simple por mes calendario, y "próximo vencimiento" se calcula
-// aparte a partir de fechaActivacion. Sin soft-delete: un pago cargado mal
-// se corrige con una nota en `observaciones`, no se borra un cobro real.
+// Registro de pagos recibidos por organización (no hay integración con
+// ninguna pasarela todavía). Dos orígenes posibles:
+//  - el super-admin lo carga a mano desde /admin al confirmar una
+//    transferencia/depósito → nace `confirmado`.
+//  - la propia organización lo carga (self-service, `core/organizacion/`)
+//    subiendo el comprobante de una transferencia → nace `pendiente`, y el
+//    super-admin lo aprueba/rechaza desde la cola en /admin (`revisarPago`).
+// `periodo` es siempre el primer día del mes calendario que el pago cubre
+// (ej. "2026-09-01"), sin relación con el día-del-mes real de facturación
+// de la organización (`organizaciones.fechaActivacion`) — así "¿pagó este
+// mes?" es una búsqueda simple por mes calendario, y "próximo vencimiento"
+// se calcula aparte a partir de fechaActivacion. Sin soft-delete: un pago
+// cargado mal se corrige con una nota en `observaciones`, no se borra un
+// cobro real (y un pago rechazado se conserva con `estado: 'rechazado'`,
+// no se borra, para que quede historial de qué se intentó cargar).
 export const pagos = plataforma.table('pagos', {
   id: uuid('id').primaryKey().defaultRandom(),
   organizacionId: uuid('organizacion_id').notNull().references(() => organizaciones.id, { onDelete: 'cascade' }),
@@ -51,6 +57,18 @@ export const pagos = plataforma.table('pagos', {
   medioPago: text('medio_pago'),
   observaciones: text('observaciones'),
   registradoPor: uuid('registrado_por').references(() => usuarios.id),
+  // 'pendiente' | 'confirmado' | 'rechazado' — texto libre, no enum, mismo
+  // criterio que solicitudes.tipo/estado. Default 'confirmado': un pago
+  // cargado por el super-admin (el único origen hasta ahora) ya está
+  // confirmado por definición.
+  estado: text('estado').notNull().default('confirmado'),
+  // Sólo se completa en pagos self-service (comprobante de transferencia
+  // subido por la organización) — un pago cargado a mano por el super-admin
+  // no tiene comprobante adjunto, sólo su propia palabra.
+  comprobanteUrl: text('comprobante_url'),
+  revisadoPor: uuid('revisado_por').references(() => usuarios.id),
+  revisadoEn: timestamp('revisado_en', { withTimezone: true }),
+  motivoRechazo: text('motivo_rechazo'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

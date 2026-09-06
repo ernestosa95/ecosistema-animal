@@ -3,7 +3,11 @@
 // dueño de una organización recién aprobada (ver App.tsx, mismo criterio de
 // "una sola vez por usuario, localStorage" que TutorialGuiado). A diferencia
 // del tutorial (overlay no bloqueante), esto reemplaza toda la app mientras
-// está activo — es guiar un setup, no explicar la UI ya armada.
+// está activo — es guiar un setup, no explicar la UI ya armada. Es
+// obligatorio completarlo paso a paso hasta "fin": no hay forma de saltarlo
+// entero (a pedido del negocio — antes cada paso tenía un botón "Saltar por
+// ahora" que terminaba el wizard de golpe, y usuarios nuevos lo usaban sin
+// llegar a configurar nada).
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { crearAgenda, crearBloque } from '../api/turnos';
@@ -11,20 +15,20 @@ import type { Sesion } from '../api/types';
 import type { Miembro } from '../api/client';
 import { FormAltaMiembro, type LimitesPlan } from './FormAltaMiembro';
 import { ROLES_ATIENDEN } from '../nav/config';
+import { ROLES_INFO } from '../config/rolesInfo';
 
 const DIAS = [
   { v: 1, label: 'Lun' }, { v: 2, label: 'Mar' }, { v: 3, label: 'Mié' },
   { v: 4, label: 'Jue' }, { v: 5, label: 'Vie' }, { v: 6, label: 'Sáb' }, { v: 0, label: 'Dom' },
 ];
 
-type Paso = 'bienvenida' | 'usuarios' | 'agendaVet' | 'agendaPeluqueria' | 'fin';
+type Paso = 'bienvenida' | 'usuarios' | 'agendaVet' | 'agendaNoMedica' | 'fin';
 
-export function WizardConfiguracionRapida({ sesion, onFinalizar }: { sesion: Sesion; onFinalizar: () => void }) {
+export function WizardConfiguracionRapida({ sesion, miUsuarioId, onFinalizar, onCerrarSesion, onRolesPropiosActualizados }: {
+  sesion: Sesion; miUsuarioId: string | undefined; onFinalizar: () => void; onCerrarSesion: () => void;
+  onRolesPropiosActualizados: (roles: string[]) => void;
+}) {
   const [paso, setPaso] = useState<Paso>('bienvenida');
-  const [limites, setLimites] = useState<LimitesPlan | null>(null);
-  const [agregados, setAgregados] = useState<string[]>([]);
-
-  useEffect(() => { api.limitesPlan(sesion).then(setLimites).catch(() => {}); }, [sesion]);
 
   const siguienteTrasUsuarios: Paso = sesion.huellaActiva ? 'agendaVet' : 'fin';
 
@@ -41,37 +45,20 @@ export function WizardConfiguracionRapida({ sesion, onFinalizar }: { sesion: Ses
             <h1>¡Bienvenido/a!</h1>
             <p>
               Antes de arrancar, te ayudamos a dar de alta a tu equipo y armar la agenda en un par de pasos.
-              Podés saltar cualquier paso y completarlo después desde "Usuarios" o "Turnos".
             </p>
             <div className="acciones">
               <button className="btn" onClick={() => setPaso('usuarios')}>Empezar</button>
-              <button className="btn-ghost" onClick={onFinalizar}>Saltar por ahora</button>
             </div>
           </>
         )}
 
         {paso === 'usuarios' && (
-          <>
-            <h1>Tu equipo</h1>
-            <p className="muted">Dá de alta a los usuarios que tu plan tiene disponibles. Cada uno recibe su propio email y contraseña.</p>
-            <FormAltaMiembro
-              sesion={sesion}
-              limites={limites}
-              onCreado={(u, roles) => {
-                setAgregados((prev) => [...prev, `${u.nombre ?? u.email} (${roles.join(' + ')})`]);
-                api.limitesPlan(sesion).then(setLimites).catch(() => {});
-              }}
-            />
-            {agregados.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', margin: '0.75rem 0' }}>
-                {agregados.map((a, i) => <span key={i} className="chip">{a}</span>)}
-              </div>
-            )}
-            <div className="acciones" style={{ marginTop: '0.75rem' }}>
-              <button className="btn" onClick={() => setPaso(siguienteTrasUsuarios)}>Continuar</button>
-              <button className="btn-ghost" onClick={onFinalizar}>Saltar por ahora</button>
-            </div>
-          </>
+          <PasoEquipo
+            sesion={sesion}
+            miUsuarioId={miUsuarioId}
+            onRolesPropiosActualizados={onRolesPropiosActualizados}
+            onSiguiente={() => setPaso(siguienteTrasUsuarios)}
+          />
         )}
 
         {paso === 'agendaVet' && (
@@ -80,20 +67,18 @@ export function WizardConfiguracionRapida({ sesion, onFinalizar }: { sesion: Ses
             descripcion="Elegí un veterinario y los días/horarios en que atiende. Podés repetir esto para cada uno."
             sesion={sesion}
             conProfesional
-            onSiguiente={() => setPaso('agendaPeluqueria')}
-            onSaltar={onFinalizar}
+            onSiguiente={() => setPaso('agendaNoMedica')}
           />
         )}
 
-        {paso === 'agendaPeluqueria' && (
+        {paso === 'agendaNoMedica' && (
           <PasoAgenda
-            titulo="Peluquería canina (opcional)"
-            descripcion="Si ofrecés peluquería, armá acá su agenda. Si no, saltá este paso."
+            titulo="Agenda no médica"
+            descripcion="Si ofrecés algún servicio sin veterinario de por medio (por ejemplo, peluquería canina), armá acá su agenda. Si no ofrecés ninguno, continuá sin cargar nada."
             sesion={sesion}
             conProfesional={false}
-            nombreFijo="Peluquería canina"
+            placeholderNombre="Ej: Peluquería canina"
             onSiguiente={() => setPaso('fin')}
-            onSaltar={onFinalizar}
           />
         )}
 
@@ -104,18 +89,141 @@ export function WizardConfiguracionRapida({ sesion, onFinalizar }: { sesion: Ses
             <button className="btn" onClick={onFinalizar}>Empezar a usar el sistema</button>
           </>
         )}
+
+        {paso !== 'fin' && (
+          <p className="switch" style={{ marginTop: '1rem' }}>
+            <button type="button" className="link" onClick={onCerrarSesion}>
+              Cerrar sesión
+            </button>
+          </p>
+        )}
       </div>
     </div>
   );
 }
 
-/** Sub-paso reutilizado para "agenda de veterinario" y "agenda de peluquería" — mismo modelo simplificado: un solo horario para todos los días elegidos. */
-function PasoAgenda({ titulo, descripcion, sesion, conProfesional, nombreFijo, onSiguiente, onSaltar }: {
-  titulo: string; descripcion: string; sesion: Sesion; conProfesional: boolean; nombreFijo?: string;
-  onSiguiente: () => void; onSaltar: () => void;
+/**
+ * Paso "Tu equipo": en vez de arrancar directo con un form de alta (poco
+ * claro sobre qué hacer cuando en principio el único miembro es uno
+ * mismo), primero muestra los miembros que ya existen — al menos el
+ * propietario — para asignarles roles adicionales in place (ej. el
+ * propietario también atiende como veterinario). "+ Agregar usuario" queda
+ * al final, para cuando el rol que hace falta todavía no lo cubre nadie.
+ */
+function PasoEquipo({ sesion, miUsuarioId, onRolesPropiosActualizados, onSiguiente }: {
+  sesion: Sesion; miUsuarioId: string | undefined; onRolesPropiosActualizados: (roles: string[]) => void;
+  onSiguiente: () => void;
+}) {
+  const [miembros, setMiembros] = useState<Miembro[]>([]);
+  const [limites, setLimites] = useState<LimitesPlan | null>(null);
+  const [mostrarAlta, setMostrarAlta] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Miembro cuyo cambio de rol está en vuelo — sus checkboxes se deshabilitan
+  // mientras tanto, para no calcular `nuevosRoles` dos veces a partir del
+  // mismo `m.roles` desactualizado si se tildan dos roles rápido seguido.
+  const [guardandoId, setGuardandoId] = useState<string | null>(null);
+
+  function cargar() {
+    api.miembros(sesion).then(setMiembros).catch(() => {});
+    api.limitesPlan(sesion).then(setLimites).catch(() => {});
+  }
+  useEffect(cargar, [sesion]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function cambiarRol(m: Miembro, rolId: string, marcado: boolean) {
+    const nuevosRoles = marcado ? [...m.roles, rolId] : m.roles.filter((r) => r !== rolId);
+    if (nuevosRoles.length === 0) { setError('Un usuario necesita al menos un rol asignado'); return; }
+    setError(null);
+    setGuardandoId(m.usuarioId);
+    try {
+      await api.actualizarRolesMiembro(sesion, m.usuarioId, nuevosRoles);
+      if (m.usuarioId === miUsuarioId) onRolesPropiosActualizados(nuevosRoles);
+      cargar();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo actualizar el rol');
+    } finally {
+      setGuardandoId(null);
+    }
+  }
+
+  return (
+    <>
+      <h1>Tu equipo</h1>
+      <p className="muted">
+        Asignale roles a quienes ya forman parte de la organización — por ejemplo, el propietario
+        también puede atender como veterinario. Si necesitás sumar a alguien que todavía no está,
+        usá "+ Agregar usuario" al final de la lista.
+      </p>
+      {error && <div className="alerta">{error}</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1rem' }}>
+        {miembros.map((m) => (
+          <div key={m.usuarioId} className="card" style={{ padding: '0.75rem 0.9rem' }}>
+            <b>{m.nombre} {m.apellido}</b>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.5rem' }}>
+              {ROLES_INFO.map((r) => {
+                const tiene = m.roles.includes(r.id);
+                const lim = limites?.[r.id];
+                const sinCupo = !tiene && !!lim && lim.limite != null && lim.usados >= lim.limite;
+                const guardando = guardandoId === m.usuarioId;
+                return (
+                  <label
+                    key={r.id}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', opacity: sinCupo ? 0.5 : 1 }}
+                  >
+                    <input
+                      type="checkbox"
+                      style={{ width: 'auto', margin: 0 }}
+                      checked={tiene}
+                      disabled={sinCupo || guardando}
+                      onChange={(e) => cambiarRol(m, r.id, e.target.checked)}
+                    />
+                    {r.label}
+                    {lim && lim.limite != null && (
+                      <span className="muted" style={{ fontSize: '0.78rem' }}>({lim.usados}/{lim.limite})</span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {mostrarAlta ? (
+        <div className="card" style={{ padding: '0.9rem', marginBottom: '0.75rem' }}>
+          <p className="muted" style={{ marginTop: 0, fontSize: '0.85rem' }}>
+            Para cuando el rol que necesitás todavía no lo tiene nadie en la organización (ej. no
+            contás con un administrativo).
+          </p>
+          <FormAltaMiembro
+            sesion={sesion}
+            limites={limites}
+            onCreado={() => { setMostrarAlta(false); cargar(); }}
+          />
+        </div>
+      ) : (
+        <button className="btn-ghost" onClick={() => setMostrarAlta(true)}>+ Agregar usuario</button>
+      )}
+
+      <div className="acciones" style={{ marginTop: '0.75rem' }}>
+        <button className="btn" onClick={onSiguiente}>Continuar</button>
+      </div>
+    </>
+  );
+}
+
+/**
+ * Sub-paso reutilizado para "agenda de veterinario" y "agenda no médica"
+ * (ej. peluquería canina, sólo un ejemplo — el nombre real de la agenda es
+ * texto libre) — mismo modelo simplificado: un solo horario para todos los
+ * días elegidos.
+ */
+function PasoAgenda({ titulo, descripcion, sesion, conProfesional, placeholderNombre, onSiguiente }: {
+  titulo: string; descripcion: string; sesion: Sesion; conProfesional: boolean; placeholderNombre?: string;
+  onSiguiente: () => void;
 }) {
   const [miembros, setMiembros] = useState<Miembro[]>([]);
   const [usuarioId, setUsuarioId] = useState('');
+  const [nombreAgenda, setNombreAgenda] = useState('');
   const [dias, setDias] = useState<number[]>([1, 2, 3, 4, 5]);
   const [horaInicio, setHoraInicio] = useState('09:00');
   const [horaFin, setHoraFin] = useState('13:00');
@@ -138,12 +246,15 @@ function PasoAgenda({ titulo, descripcion, sesion, conProfesional, nombreFijo, o
   async function crear() {
     setError(null);
     if (conProfesional && !usuarioId) { setError('Elegí un veterinario'); return; }
+    if (!conProfesional && !nombreAgenda.trim()) { setError('Ponele un nombre a la agenda'); return; }
     if (dias.length === 0) { setError('Elegí al menos un día'); return; }
     if (horaFin <= horaInicio) { setError('El horario de fin tiene que ser posterior al de inicio'); return; }
     setGuardando(true);
     try {
       const miembro = miembros.find((m) => m.usuarioId === usuarioId);
-      const nombre = nombreFijo ?? `Agenda de ${miembro?.nombre ?? 'profesional'} ${miembro?.apellido ?? ''}`.trim();
+      const nombre = conProfesional
+        ? `Agenda de ${miembro?.nombre ?? 'profesional'} ${miembro?.apellido ?? ''}`.trim()
+        : nombreAgenda.trim();
       const agenda = await crearAgenda({
         nombre, usuarioId: conProfesional ? usuarioId : undefined, duracionTurnoMinutos,
       });
@@ -151,7 +262,7 @@ function PasoAgenda({ titulo, descripcion, sesion, conProfesional, nombreFijo, o
         await crearBloque(agenda.id, { diaSemana, horaInicio, horaFin });
       }
       setCreadas((prev) => [...prev, nombre]);
-      setUsuarioId(''); setDias([1, 2, 3, 4, 5]);
+      setUsuarioId(''); setNombreAgenda(''); setDias([1, 2, 3, 4, 5]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo crear la agenda');
     } finally {
@@ -163,7 +274,7 @@ function PasoAgenda({ titulo, descripcion, sesion, conProfesional, nombreFijo, o
     <>
       <h1>{titulo}</h1>
       <p className="muted">{descripcion}</p>
-      {conProfesional && (
+      {conProfesional ? (
         <label>
           Veterinario
           <select value={usuarioId} onChange={(e) => setUsuarioId(e.target.value)}>
@@ -172,6 +283,11 @@ function PasoAgenda({ titulo, descripcion, sesion, conProfesional, nombreFijo, o
               <option key={m.usuarioId} value={m.usuarioId}>{m.nombre} {m.apellido}</option>
             ))}
           </select>
+        </label>
+      ) : (
+        <label>
+          Nombre de la agenda
+          <input value={nombreAgenda} onChange={(e) => setNombreAgenda(e.target.value)} placeholder={placeholderNombre} />
         </label>
       )}
       <label>Días</label>
@@ -208,7 +324,6 @@ function PasoAgenda({ titulo, descripcion, sesion, conProfesional, nombreFijo, o
       )}
       <div className="acciones" style={{ marginTop: '0.75rem' }}>
         <button className="btn" onClick={onSiguiente}>Continuar</button>
-        <button className="btn-ghost" onClick={onSaltar}>Saltar por ahora</button>
       </div>
     </>
   );

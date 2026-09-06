@@ -181,13 +181,20 @@ function NuevoPacienteForm({
   async function guardar(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    // Todo animal identificado en Huella tiene que tener un dueño — no existe
+    // el paciente "suelto". El <select required> ya lo exige, esto es sólo
+    // el resguardo si de alguna forma se llega a este punto sin elegir uno.
+    if (!personaId) {
+      setError('Elegí un dueño para el paciente (o creá uno nuevo)');
+      return;
+    }
     if (personaId === '__nuevo__' && (!dNombre.trim() || !dApellido.trim())) {
       setError('Completá nombre y apellido del dueño nuevo');
       return;
     }
     setGuardando(true);
     try {
-      let duenoId = personaId && personaId !== '__nuevo__' ? personaId : undefined;
+      let duenoId = personaId !== '__nuevo__' ? personaId : undefined;
       if (personaId === '__nuevo__') {
         const dueno = await api.crearPersona(sesion, {
           nombre: dNombre.trim(),
@@ -197,8 +204,7 @@ function NuevoPacienteForm({
         });
         duenoId = dueno.id;
       }
-      const data: Record<string, unknown> = { nombre, especieId };
-      if (duenoId) data.personaId = duenoId;
+      const data: Record<string, unknown> = { nombre, especieId, personaId: duenoId };
       if (sexo) data.sexo = sexo;
       if (fechaNacimiento) data.fechaNacimiento = fechaNacimiento;
       if (microchip) data.microchip = microchip;
@@ -232,9 +238,9 @@ function NuevoPacienteForm({
         </select>
       </label>
       <label className="span-2">
-        Dueño (opcional)
-        <select value={personaId} onChange={(e) => campo('personaId')(e.target.value)}>
-          <option value="">Sin dueño asignado</option>
+        Dueño
+        <select value={personaId} onChange={(e) => campo('personaId')(e.target.value)} required>
+          <option value="" disabled>Elegí un dueño…</option>
           <option value="__nuevo__">＋ Crear dueño nuevo…</option>
           {personas.map((p) => (
             <option key={p.id} value={p.id}>

@@ -7,12 +7,19 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { and, asc, desc, eq, isNull } from 'drizzle-orm';
+import { JwtService } from '@nestjs/jwt';
 import { DRIZZLE, DrizzleDB } from '../database/drizzle.provider';
 import { solicitudes, usuarios, organizaciones, membresias, planes } from '../database/schema';
 import { CrearSolicitudDto } from './dto/crear-solicitud.dto';
 import { AprobarSolicitudDto, RechazarSolicitudDto } from './dto/aprobar-solicitud.dto';
+import { MailService } from '../common/mail/mail.service';
 
 type Rol = 'propietario' | 'admin' | 'capataz' | 'veterinario' | 'recepcion';
+
+/** Código de 6 dígitos, siempre con ceros a la izquierda (ej. "004821"). */
+function generarCodigoVerificacion(): string {
+  return Math.floor(Math.random() * 1_000_000).toString().padStart(6, '0');
+}
 
 /**
  * El form público de alta sigue pidiendo un único "tipo" (clínica/
@@ -61,10 +68,72 @@ const TERMINOS_VERSION = '2026-08-30';
 
 @Injectable()
 export class SolicitudesService {
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DrizzleDB,
+    private readonly jwt: JwtService,
+    private readonly mail: MailService,
+  ) {}
+
+  /**
+   * Envía un código de 6 dígitos al email para verificarlo ANTES de poder
+   * mandar la solicitud (a pedido del negocio: evita que lleguen solicitudes
+   * con emails inventados o mal tipeados a la bandeja del super-admin).
+   * Stateless, mismo patrón que el reset de contraseña: el código viaja
+   * embebido en un JWT de vida corta que el cliente retiene y manda de
+   * vuelta en `confirmarCodigoVerificacion()` — no hace falta tabla nueva.
+   */
+  async enviarCodigoVerificacion(email: string): Promise<{ token: string }> {
+    const codigo = generarCodigoVerificacion();
+    const token = this.jwt.sign({ email, codigo, scope: 'verificar_email' }, { expiresIn: '10m' });
+    await this.mail.enviar(
+      email,
+      'Tu código de verificación',
+      `<p>Usá este código para confirmar tu email y terminar de crear tu cuenta:</p>
+       <p style="font-size:1.6rem;font-weight:700;letter-spacing:0.25em">${codigo}</p>
+       <p>Vale por 10 minutos. Si no fuiste vos, podés ignorar este email.</p>`,
+    );
+    return { token };
+  }
+
+  /**
+   * Confirma el código contra el token que devolvió `enviarCodigoVerificacion()`.
+   * Si coincide, emite un segundo token de vida un poco más larga
+   * (`scope: 'email_verificado'`) que el cliente adjunta al mandar la
+   * solicitud — `crear()` valida que el email embebido coincida con el del
+   * formulario antes de aceptarla.
+   */
+  confirmarCodigoVerificacion(token: string, codigo: string): { emailVerificadoToken: string } {
+    let payload: { email?: string; codigo?: string; scope?: string };
+    try {
+      payload = this.jwt.verify(token);
+    } catch {
+      throw new BadRequestException('El código venció, pedí uno nuevo');
+    }
+    if (payload.scope !== 'verificar_email' || !payload.email || !payload.codigo) {
+      throw new BadRequestException('El código venció, pedí uno nuevo');
+    }
+    if (payload.codigo !== codigo.trim()) {
+      throw new BadRequestException('El código no es correcto');
+    }
+    const emailVerificadoToken = this.jwt.sign(
+      { email: payload.email, scope: 'email_verificado' },
+      { expiresIn: '30m' },
+    );
+    return { emailVerificadoToken };
+  }
 
   /** Alta pública de una solicitud de registro. */
   async crear(dto: CrearSolicitudDto) {
+    let verifPayload: { email?: string; scope?: string };
+    try {
+      verifPayload = this.jwt.verify(dto.emailVerificadoToken);
+    } catch {
+      throw new BadRequestException('Verificá tu email antes de enviar la solicitud');
+    }
+    if (verifPayload.scope !== 'email_verificado' || verifPayload.email !== dto.email) {
+      throw new BadRequestException('Verificá tu email antes de enviar la solicitud');
+    }
+
     const [usuarioExistente] = await this.db
       .select({ id: usuarios.id })
       .from(usuarios)

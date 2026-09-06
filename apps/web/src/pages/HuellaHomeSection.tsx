@@ -195,15 +195,25 @@ export function HuellaHomeSection({
     }
   }
 
-  /** Marca el turno como atendido y abre la ficha del paciente con "Nueva consulta" ya abierta — mismo flujo que TurnosPage.tsx. */
+  /**
+   * Marca el turno como atendido. Abre además la ficha del paciente con
+   * "Nueva consulta", salvo que el turno tenga una agenda asignada SIN
+   * profesional (agenda "no médica", ej. peluquería) — ahí no tiene sentido
+   * una consulta clínica. Un turno sin ninguna agenda (el caso más común
+   * históricamente) sigue abriendo la consulta como siempre: la ausencia de
+   * agenda no implica "no médica", sólo que nunca se le asignó una puntual.
+   */
   async function atenderTurno(t: Turno, e: React.MouseEvent) {
     e.stopPropagation();
     try {
       api.registrarEvento(sesion, 'accion', 'home-atender-turno');
       await api.cambiarEstadoTurno(sesion, t.id, { estado: 'atendido' });
       cargarTurnosHoy();
-      const animal = await api.obtenerAnimal(sesion, t.animalId);
-      onAbrirPaciente(animal, { abrirConsulta: true });
+      const esAgendaNoMedica = !!t.agendaId && !t.agendaUsuarioId;
+      if (!esAgendaNoMedica) {
+        const animal = await api.obtenerAnimal(sesion, t.animalId);
+        onAbrirPaciente(animal, { abrirConsulta: true });
+      }
     } catch (e2) {
       alert('No se pudo marcar el turno como atendido: ' + (e2 instanceof Error ? e2.message : 'error'));
     }

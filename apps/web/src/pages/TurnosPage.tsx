@@ -126,7 +126,20 @@ export default function TurnosPage({ onAtender, miVeterinarioId, soloMiosInicial
 
   function onAccion(t: Turno, a: string) {
     if (a === 'confirmar') correr(() => confirmarTurno(t.id), `Turno de ${t.paciente} confirmado`, 'turno-confirmar');
-    else if (a === 'atender') correr(async () => { await atenderTurno(t.id); onAtender?.(t); }, `${t.paciente} atendido`, 'turno-atender');
+    else if (a === 'atender') correr(
+      // Se avisa a App.tsx para que abra la ficha con "Nueva consulta",
+      // salvo que el turno tenga una agenda asignada SIN profesional
+      // (agenda "no médica", ej. peluquería) — un turno sin ninguna agenda
+      // (el caso más común históricamente) sigue abriendo la consulta como
+      // siempre, la ausencia de agenda no implica "no médica".
+      async () => {
+        await atenderTurno(t.id);
+        const esAgendaNoMedica = !!t.agendaId && !t.agendaUsuarioId;
+        if (!esAgendaNoMedica) onAtender?.(t);
+      },
+      `${t.paciente} atendido`,
+      'turno-atender',
+    );
     else if (a === 'cancelar') setModal({ tipo: 'cancelar', turno: t });
     else if (a === 'reprogramar') setModal({ tipo: 'reprogramar', turno: t });
   }
@@ -573,6 +586,9 @@ function ModalNuevo({ fechaDefault, onClose, onOk }: {
 
   async function crearYUsar() {
     if (!nNombre.trim() || !nEspecieId) { setErr('Nombre y especie del paciente son obligatorios.'); return; }
+    // Todo animal identificado en Huella tiene que tener un dueño — no existe
+    // el paciente "suelto".
+    if (!duenoSel) { setErr('Elegí un dueño para el paciente (o creá uno nuevo).'); return; }
     if (duenoSel === '__nuevo__' && (!dNombre.trim() || !dApellido.trim())) {
       setErr('Para crear un dueño nuevo, nombre y apellido son obligatorios.'); return;
     }
@@ -581,7 +597,7 @@ function ModalNuevo({ fechaDefault, onClose, onOk }: {
       const res = await crearPacienteRapido({
         nombre: nNombre.trim(),
         especieId: nEspecieId,
-        personaId: duenoSel && duenoSel !== '__nuevo__' ? duenoSel : undefined,
+        personaId: duenoSel !== '__nuevo__' ? duenoSel : undefined,
         duenoNuevo: duenoSel === '__nuevo__'
           ? { nombre: dNombre.trim(), apellido: dApellido.trim(), celular: dCelular.trim() || undefined, dni: dDni.trim() || undefined }
           : undefined,
@@ -626,8 +642,8 @@ function ModalNuevo({ fechaDefault, onClose, onOk }: {
             </div>
 
             <Field label="Dueño">
-              <select value={duenoSel} onChange={e => setDuenoSel(e.target.value)}>
-                <option value="">Sin dueño</option>
+              <select value={duenoSel} onChange={e => setDuenoSel(e.target.value)} required>
+                <option value="" disabled>Elegí un dueño…</option>
                 <option value="__nuevo__">＋ Crear dueño nuevo…</option>
                 {duenos.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}
               </select>

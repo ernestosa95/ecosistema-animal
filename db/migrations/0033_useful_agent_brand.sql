@@ -1,0 +1,1 @@
+ALTER TABLE "core"."organizaciones" ADD COLUMN "logo_url" text;

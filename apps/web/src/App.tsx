@@ -16,12 +16,14 @@ import {
   TroperaPlantillasSection,
 } from './pages/TroperaPage';
 import { UsuariosPage } from './pages/UsuariosPage';
+import { PlanPage } from './pages/PlanPage';
 import { FarmaciaPage } from './pages/FarmaciaPage';
 import { CajaPage } from './pages/CajaPage';
 import { HuellaHomeSection } from './pages/HuellaHomeSection';
 import { MensajesBanner } from './components/MensajesBanner';
 import { Omnibox } from './components/Omnibox';
 import { TutorialGuiado } from './components/TutorialGuiado';
+import type { SeccionTour } from './tutorial/tours';
 import { WizardConfiguracionRapida } from './components/WizardConfiguracionRapida';
 import { configurarSesionTurnos, configurarRefrescoSesionTurnos, type Turno } from './api/turnos';
 import type { Animal, Persona, Sesion } from './api/types';
@@ -46,6 +48,7 @@ type Vista =
   | { nombre: 'duenos'; personaId?: string }
   | { nombre: 'recordatorios' }
   | { nombre: 'usuarios' }
+  | { nombre: 'plan' }
   | { nombre: 'farmacia' }
   | { nombre: 'caja' }
   | { nombre: 'tropera-home' }
@@ -157,7 +160,7 @@ function IconoRail({ paths }: { paths: string }) {
 }
 
 export default function App() {
-  const { sesion, iniciar, cerrar, actualizarTokens } = useSesion();
+  const { sesion, iniciar, cerrar, actualizarTokens, actualizarRoles } = useSesion();
   const [vista, setVista] = useState<Vista | null>(null);
   const [solucionActiva, setSolucionActiva] = useState<SolucionId>('huella');
   const [menuUsuarioAbierto, setMenuUsuarioAbierto] = useState(false);
@@ -221,7 +224,10 @@ export default function App() {
     return (
       <WizardConfiguracionRapida
         sesion={sesion}
+        miUsuarioId={miUsuarioId}
         onFinalizar={() => { marcarWizardVisto(miUsuarioId); setVista(homeDe(sesion.roles, solucionInicial(sesion))); }}
+        onCerrarSesion={cerrar}
+        onRolesPropiosActualizados={actualizarRoles}
       />
     );
   }
@@ -291,7 +297,7 @@ export default function App() {
   const nombreSolucion = (s: SolucionId) => (s === 'tropera' ? 'Tropera' : 'Huella');
   const tituloActivo =
     itemsSolucionActiva.find((it) => it.id === activoId)?.titulo ??
-    (vistaActual.nombre === 'usuarios' ? 'Usuarios' : '');
+    (vistaActual.nombre === 'usuarios' ? 'Usuarios' : vistaActual.nombre === 'plan' ? 'Mi plan' : '');
 
   return (
     <div className="app app-rail">
@@ -358,6 +364,17 @@ export default function App() {
                   }}
                 >
                   Usuarios
+                </button>
+              )}
+              {tieneAlguno(sesion.roles, ROLES_USUARIOS) && (
+                <button
+                  className="dropdown-item"
+                  onClick={() => {
+                    setMenuUsuarioAbierto(false);
+                    setVista({ nombre: 'plan' });
+                  }}
+                >
+                  Mi plan
                 </button>
               )}
               <button
@@ -433,6 +450,7 @@ export default function App() {
             <RecordatoriosPage sesion={sesion} onAbrirPaciente={(animal) => irA({ nombre: 'detalle', animal })} />
           )}
           {vistaActual.nombre === 'usuarios' && <UsuariosPage sesion={sesion} />}
+          {vistaActual.nombre === 'plan' && <PlanPage sesion={sesion} />}
           {vistaActual.nombre === 'farmacia' && <FarmaciaPage sesion={sesion} />}
           {vistaActual.nombre === 'caja' && <CajaPage sesion={sesion} />}
           {vistaActual.nombre === 'tropera-home' && <TroperaHomeSection sesion={sesion} />}
@@ -446,7 +464,7 @@ export default function App() {
       <TutorialGuiado
         sesion={sesion}
         activo={tutorialActivo}
-        seccionActual={activoId}
+        seccionActual={activoId as SeccionTour}
         onNavegar={(s) => irA({ nombre: s } as Vista)}
         onTerminar={cerrarTutorial}
       />

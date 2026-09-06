@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  ValidateIf,
 } from 'class-validator';
 
 export class UpdateAnimalDto {
@@ -19,7 +20,13 @@ export class UpdateAnimalDto {
   @IsUUID()
   especieId?: string;
 
-  @IsOptional()
+  // No usa @IsOptional(): esa sólo salta la validación cuando el campo no
+  // viene en el body (`undefined`). Acá el caso a cubrir es distinto — un
+  // cliente que mande `personaId: null` a propósito para "vaciarle" el dueño
+  // a un animal ya identificado, algo que nunca tiene que poder pasar. Con
+  // `@ValidateIf` corriendo también sobre `null`, `@IsUUID()` lo rechaza con
+  // un 400 en vez de dejarlo pasar como si fuera "no lo toques".
+  @ValidateIf((_o, value) => value !== undefined)
   @IsUUID()
   personaId?: string;
 

@@ -105,6 +105,13 @@ export interface Turno {
   especie?: string | null;
   duenoNombre?: string | null;
   duenoApellido?: string | null;
+  // Ambos undefined = turno sin agenda asignada (el caso más común
+  // históricamente — no implica "no médica", implica que nunca se le picó
+  // una agenda puntual). `agendaUsuarioId` sólo es null/undefined CON
+  // `agendaId` seteado cuando la agenda es "no médica" (ej. peluquería, sin
+  // profesional) — ver el criterio exacto en HuellaHomeSection.tsx.
+  agendaId?: string | null;
+  agendaUsuarioId?: string | null;
 }
 
 /** `GET /consultas` (drill-down del dashboard, §4.2) — consultas de toda la organización con el nombre del paciente. */

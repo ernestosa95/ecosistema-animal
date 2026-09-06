@@ -20,8 +20,11 @@ const s = StyleSheet.create({
   page: { padding: 0, fontFamily: 'Helvetica', color: C.ink, fontSize: 7 },
 
   header: { backgroundColor: C.teal, paddingHorizontal: 10, paddingVertical: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  brandRow: { flexDirection: 'row', alignItems: 'center' },
+  brandRow: { flexDirection: 'row', alignItems: 'center', maxWidth: 150 },
   wordmark: { color: C.white, fontFamily: 'Helvetica-Bold', fontSize: 11, marginLeft: 4 },
+  orgLogoBox: { width: 22, height: 22, borderRadius: 4, backgroundColor: C.white, alignItems: 'center', justifyContent: 'center', padding: 1 },
+  orgLogo: { width: 18, height: 18, objectFit: 'contain' },
+  orgNombre: { color: C.white, fontFamily: 'Helvetica-Bold', fontSize: 9, marginLeft: 5 },
   kicker: { color: '#BFE4DC', fontSize: 5.5, fontFamily: 'Helvetica-Bold', letterSpacing: 1 },
 
   body: { flexDirection: 'row', paddingHorizontal: 10, paddingTop: 8, gap: 8 },
@@ -53,6 +56,27 @@ function PawLogo(size = 14, color = C.white) {
   ]);
 }
 
+/**
+ * Fila de marca del encabezado: si la organización cargó su propio logo
+ * ("Mi plan" → self-service), reemplaza la marca "Huella" por el logo +
+ * nombre de la organización — esto es lo que el dueño de la mascota ve, así
+ * que es la marca de la veterinaria la que tiene que estar, no la de la
+ * plataforma. Sin logo propio, se mantiene el branding de Huella de siempre.
+ */
+function Brand(data: CarnetData) {
+  const org = data.organizacion;
+  if (org?.logoUrl) {
+    return [
+      h(View, { key: 'logoBox', style: s.orgLogoBox }, h(Image, { style: s.orgLogo, src: org.logoUrl })),
+      h(Text, { key: 'wm', style: s.orgNombre }, org.nombre),
+    ];
+  }
+  return [
+    PawLogo(),
+    h(Text, { key: 'wm', style: s.wordmark }, 'Huella'),
+  ];
+}
+
 /** Devuelve el elemento react-pdf del carnet (tarjeta). El service lo pasa a renderToBuffer. */
 export function CarnetDocument(data: CarnetData) {
   const p = data.paciente;
@@ -66,10 +90,7 @@ export function CarnetDocument(data: CarnetData) {
     h(Page as any, { size: [CARD_WIDTH, CARD_HEIGHT], style: s.page }, [
 
       h(View, { key: 'h', style: s.header }, [
-        h(View, { key: 'brand', style: s.brandRow }, [
-          PawLogo(),
-          h(Text, { key: 'wm', style: s.wordmark }, 'Huella'),
-        ]),
+        h(View, { key: 'brand', style: s.brandRow }, Brand(data)),
         h(Text, { key: 'k', style: s.kicker }, 'CARNET'),
       ]),
 

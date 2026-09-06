@@ -15,6 +15,7 @@ import { eq } from 'drizzle-orm';
 import { TenantGuard } from '../src/common/guards/tenant.guard';
 import { MensajesService } from '../src/mensajes/mensajes.service';
 import { AdminService } from '../src/admin/admin.service';
+import { MailService } from '../src/common/mail/mail.service';
 
 let ok = 0, fail = 0;
 const check = (n: string, c: boolean) => { c ? (ok++, console.log(`  ✓ ${n}`)) : (fail++, console.log(`  ✗ FALLA: ${n}`)); };
@@ -34,11 +35,11 @@ async function main() {
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), nombre text NOT NULL,
       huella_activa boolean NOT NULL DEFAULT true, tropera_activa boolean NOT NULL DEFAULT false, cuit text, direccion text, localidad text, provincia text, telefono text, email text,
       activo boolean NOT NULL DEFAULT true,
-      grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, fecha_activacion timestamptz, es_demo boolean NOT NULL DEFAULT false,
+      grupo_id uuid, plan_id uuid, acceso_hasta timestamptz, fecha_activacion timestamptz, es_demo boolean NOT NULL DEFAULT false, logo_url text,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
     CREATE TABLE core.usuarios (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text NOT NULL UNIQUE, password_hash text NOT NULL,
-      nombre text, apellido text, dni text, email_verificado boolean NOT NULL DEFAULT false, ultimo_login timestamptz,
+      nombre text, apellido text, dni text, email_verificado boolean NOT NULL DEFAULT false, ultimo_login timestamptz, password_changed_at timestamptz,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
     CREATE TABLE core.membresias (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -75,6 +76,8 @@ async function main() {
       periodo date NOT NULL, monto numeric(12,2) NOT NULL,
       fecha_pago timestamptz NOT NULL DEFAULT now(), medio_pago text, observaciones text,
       registrado_por uuid REFERENCES core.usuarios(id),
+      estado text NOT NULL DEFAULT 'confirmado', comprobante_url text,
+      revisado_por uuid REFERENCES core.usuarios(id), revisado_en timestamptz, motivo_rechazo text,
       created_at timestamptz NOT NULL DEFAULT now());
   `);
 
@@ -135,7 +138,7 @@ async function main() {
   check('el broadcast "todas" llega a una org sin grupo', pendientesBTodas.length === 1);
 
   console.log('7) Planes: cupo por rol (AdminService.agregarMiembro/setRoles/setMiembroActivo)');
-  const adminService = new AdminService(db as any);
+  const adminService = new AdminService(db as any, new MailService());
   const [planConCupo] = await db.insert(plataforma.planes).values({
     nombre: 'Plan Chico', limitesRoles: { veterinario: 1 },
   }).returning();

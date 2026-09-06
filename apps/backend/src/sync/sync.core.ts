@@ -12,7 +12,7 @@
  */
 import { and, eq, gt, isNull, getTableColumns } from 'drizzle-orm';
 import { personas, animales } from '../database/schema/core';
-import { consultas, vacunaciones, turnos } from '../database/schema/hce';
+import { consultas, vacunaciones, turnos, agendas } from '../database/schema/hce';
 import {
   establecimientos, existencias, movimientos, eventos,
   animalesCampo, potreros, hallazgos, torosVirtuales, muestras,
@@ -58,6 +58,14 @@ export const REGISTRY: TablaSync[] = [
   },
   { name: 'consultas', table: consultas },
   { name: 'vacunaciones', table: vacunaciones },
+  // Sólo lectura en la práctica: mobile no tiene ninguna UI para crear/editar
+  // agendas (es configuración de escritorio, "⚙ Agendas" en Usuarios) — se
+  // sincroniza nada más para que `turnos.agenda_id` pueda resolverse
+  // localmente (saber si la agenda de un turno tiene profesional asignado,
+  // ver `(app)/turnos.tsx`). El motor no distingue pull-only de
+  // pull+push, pero como el cliente nunca genera cambios locales acá, en
+  // los hechos nunca hay nada que empujar.
+  { name: 'agendas', table: agendas },
   { name: 'turnos', table: turnos },
   // Farmacia (2026-09-02): antes deliberadamente fuera del registry
   // ("desk/online por diseño", ver nota vieja en apps/mobile/src/db/schema.ts)

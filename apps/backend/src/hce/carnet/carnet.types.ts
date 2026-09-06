@@ -28,9 +28,15 @@ export interface CarnetDueno {
   domicilio: string;
 }
 
+export interface CarnetOrganizacion {
+  nombre: string;
+  logoUrl: string | null; // si hay logo propio, reemplaza la marca "Huella" del encabezado
+}
+
 export interface CarnetData {
   emitidoEl: string;                 // dd/mm/aaaa
   qrDataUrl: string;                 // PNG data-url del QR al portal (nuevo)
+  organizacion: CarnetOrganizacion;
   paciente: CarnetPaciente;
   dueno: CarnetDueno;
   vacunaciones: CarnetVacuna[];
