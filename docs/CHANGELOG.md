@@ -2,6 +2,14 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-09-13] — Piezas de Instagram para la campaña de los 10 cupos, armadas en Canva
+
+A pedido del usuario, un post de feed + 3 historias específicas para la estrategia de "conseguir los primeros 10 interesados" (distinto del set de lanzamiento genérico del 2026-09-12) — generadas con el MCP de Canva, mismo criterio de siempre (sin brand kit propio en la cuenta, paleta/tipografía/tono pasados a mano en cada prompt desde `docs/Kit_Marca_Huella.html`).
+
+- Agregadas a la carpeta existente [Huella — Lanzamiento IG](https://www.canva.com/folder/FAHU_beUW3M): 1 post de feed ("Elegimos a mano las primeras 10 veterinarias") y 3 historias (número "10" como pieza central, la "ficha" de `CUPO: 10` con borde perforado, y un CTA directo "Sumate ahora").
+- Vocabulario visual tomado del kit: el sello (huella geométrica plana, nunca la patita ilustrada tierna) y la etiqueta mono `CAMPO: VALOR` de la "ficha perforada" — se usó literalmente `CUPO: 10` como ese tipo de etiqueta.
+- Mismo límite que la vez anterior: el MCP no sube el logo real desde archivo local, así que el sello sigue siendo una recreación por IA, no el SVG real — pendiente arrastrarlo a mano en Canva.
+
 ## [2026-09-13] — Plantilla de marca en mails + flujo de activación de interesados
 
 Dos pedidos del usuario tras probar el mail de confirmación real (ya con Resend andando): que tuviera la cara de Huella, y una forma de convertir a los 10 interesados en cuentas reales cuando la app esté lista, sin que cada uno pase por el circuito de aprobación manual de `solicitudes/` (ya los eligió a mano).
