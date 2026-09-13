@@ -48,6 +48,18 @@ export function configurarRefrescoSesion(cb: typeof _onRefresco) {
   _onRefresco = cb;
 }
 
+// Cuando el refresh token también venció (sesión inactiva más de
+// JWT_REFRESH_EXPIRES_IN), no hay forma de renovar — antes esto se quedaba
+// mostrando el error crudo de la llamada que falló, en la pantalla en la que
+// estuviera el usuario, en vez de sacarlo. Mismo patrón que `alExpirar` en
+// api/admin.ts, acá para el cliente principal (y su duplicado en api/turnos.ts).
+let _alExpirar: (() => void) | null = null;
+
+/** Llamar desde App.tsx: useEffect(() => configurarExpiracionSesion(cerrar), []). */
+export function configurarExpiracionSesion(cb: typeof _alExpirar) {
+  _alExpirar = cb;
+}
+
 async function refrescarTokens(refreshToken: string): Promise<{ accessToken: string; refreshToken: string } | null> {
   try {
     const res = await fetch(`${API}/auth/refresh`, {
@@ -68,7 +80,7 @@ async function pedir(s: Sesion, path: string, options: RequestInit = {}): Promis
   if (res.status !== 401 || !s.refreshToken) return handle(res);
 
   const tokens = await refrescarTokens(s.refreshToken);
-  if (!tokens) return handle(res); // refresh token también vencido: dejamos que falle con el 401 original
+  if (!tokens) { _alExpirar?.(); return handle(res); } // refresh token también vencido
 
   _onRefresco?.(tokens);
   const sNueva: Sesion = { ...s, token: tokens.accessToken, refreshToken: tokens.refreshToken };
@@ -88,7 +100,7 @@ async function pedirArchivo(s: Sesion, path: string, form: FormData): Promise<an
   if (res.status !== 401 || !s.refreshToken) return handle(res);
 
   const tokens = await refrescarTokens(s.refreshToken);
-  if (!tokens) return handle(res);
+  if (!tokens) { _alExpirar?.(); return handle(res); }
 
   _onRefresco?.(tokens);
   const sNueva: Sesion = { ...s, token: tokens.accessToken, refreshToken: tokens.refreshToken };

@@ -27,6 +27,16 @@ export function configurarRefrescoSesionTurnos(cb: typeof _onRefresco) {
   _onRefresco = cb;
 }
 
+// Mismo criterio que `configurarExpiracionSesion` en api/client.ts — este
+// cliente mantiene su propia sesión independiente, así que necesita su
+// propio aviso cuando el refresh token también venció.
+let _alExpirar: (() => void) | null = null;
+
+/** Llamar desde App.tsx: useEffect(() => configurarExpiracionSesionTurnos(cerrar), []). */
+export function configurarExpiracionSesionTurnos(cb: typeof _alExpirar) {
+  _alExpirar = cb;
+}
+
 function auth(): { token?: string; refreshToken?: string; organizacionId?: string } {
   if (_sesion?.token) {
     return { token: _sesion.token, refreshToken: _sesion.refreshToken, organizacionId: _sesion.organizacionId };
@@ -96,7 +106,7 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
   } catch {
     tokens = null;
   }
-  if (!tokens) return manejarRespuesta(res); // refresh también vencido: dejamos que falle con el 401 original
+  if (!tokens) { _alExpirar?.(); return manejarRespuesta(res); } // refresh también vencido
 
   if (_sesion) _sesion = { ..._sesion, token: tokens.accessToken, refreshToken: tokens.refreshToken };
   _onRefresco?.(tokens);

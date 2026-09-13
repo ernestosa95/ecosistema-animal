@@ -2,6 +2,12 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-09-13] — Fix: sesión con refresh token vencido no redirigía al home
+
+El usuario lo notó probando los flujos en producción. `api/admin.ts` ya resolvía esto (`alExpirar`, agregado antes) pero `api/client.ts`/`api/turnos.ts` (el cliente principal de la app) no: cuando el refresh token también vence (sesión inactiva más de `JWT_REFRESH_EXPIRES_IN`), el `pedir()`/`request()` de ambos dejaba que la llamada fallara con el 401 original, mostrando el error crudo en la pantalla en la que estuviera el usuario en vez de sacarlo.
+
+Mismo patrón que ya funcionaba en admin: `configurarExpiracionSesion`/`configurarExpiracionSesionTurnos` (nuevas, en `client.ts`/`turnos.ts`) avisan a `App.tsx` cuando el refresh falla; `App.tsx` llama `cerrar()` (limpia la sesión de `useSesion`), y el `if (!sesion)` ya existente pasa a mostrar la landing pública sola. No se tocó nada del lado del backend — el refresh token en sí sigue funcionando igual, sólo se corrigió qué pasa cuando ya no sirve.
+
 ## [2026-09-13] — Piezas de Instagram para la campaña de los 10 cupos, armadas en Canva
 
 A pedido del usuario, un post de feed + 3 historias específicas para la estrategia de "conseguir los primeros 10 interesados" (distinto del set de lanzamiento genérico del 2026-09-12) — generadas con el MCP de Canva, mismo criterio de siempre (sin brand kit propio en la cuenta, paleta/tipografía/tono pasados a mano en cada prompt desde `docs/Kit_Marca_Huella.html`).

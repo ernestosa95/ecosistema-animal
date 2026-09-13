@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSesion } from './auth/useSesion';
-import { api, configurarRefrescoSesion } from './api/client';
+import { api, configurarRefrescoSesion, configurarExpiracionSesion } from './api/client';
 import { LoginPage } from './pages/LoginPage';
 import { LandingPage } from './pages/LandingPage';
 import { PacientesPage } from './pages/PacientesPage';
@@ -25,7 +25,7 @@ import { Omnibox } from './components/Omnibox';
 import { TutorialGuiado } from './components/TutorialGuiado';
 import type { SeccionTour } from './tutorial/tours';
 import { WizardConfiguracionRapida } from './components/WizardConfiguracionRapida';
-import { configurarSesionTurnos, configurarRefrescoSesionTurnos, type Turno } from './api/turnos';
+import { configurarSesionTurnos, configurarRefrescoSesionTurnos, configurarExpiracionSesionTurnos, type Turno } from './api/turnos';
 import type { Animal, Persona, Sesion } from './api/types';
 import {
   NAV_TROPERA,
@@ -185,11 +185,18 @@ export default function App() {
 
   // Ambos clientes API avisan acá cuando renuevan el access token solos
   // (401 → POST /auth/refresh), para persistirlo en useSesion/localStorage.
+  // Y cuando ni siquiera eso funciona (refresh token también vencido —
+  // sesión inactiva más de JWT_REFRESH_EXPIRES_IN), `cerrar()` limpia la
+  // sesión: el chequeo `if (!sesion)` de más abajo pasa a mostrar la landing
+  // pública sola, sin que la pantalla en la que estaba el usuario se quede
+  // mostrando el error crudo de la llamada que falló.
   useEffect(() => {
     const onRefresco = (tokens: { accessToken: string; refreshToken: string }) =>
       actualizarTokens(tokens.accessToken, tokens.refreshToken);
     configurarRefrescoSesion(onRefresco);
     configurarRefrescoSesionTurnos(onRefresco);
+    configurarExpiracionSesion(cerrar);
+    configurarExpiracionSesionTurnos(cerrar);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
