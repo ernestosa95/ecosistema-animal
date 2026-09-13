@@ -6,15 +6,17 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { PortalController } from './portal.controller';
 import { PortalService } from './portal.service';
 import { PortalTokenService } from './portal-token.service';
+import { PortalCodigoService } from './portal-codigo.service';
 import { PortalGuard } from './portal.guard';
 
 /**
- * Portal del dueño: acceso por magic-link (token), resumen de sus mascotas y
- * solicitud de turnos. Importa AuthModule para reutilizar el JwtService.
+ * Portal del dueño: acceso por magic-link (token), por código legible+DNI
+ * (PortalCodigoService), resumen de sus mascotas y solicitud de turnos.
+ * Importa AuthModule para reutilizar el JwtService.
  */
 @Module({
   imports: [AuthModule],
   controllers: [PortalController],
-  providers: [PortalService, PortalTokenService, PortalGuard, JwtAuthGuard, TenantGuard, RolesGuard],
+  providers: [PortalService, PortalTokenService, PortalCodigoService, PortalGuard, JwtAuthGuard, TenantGuard, RolesGuard],
 })
 export class PortalModule {}

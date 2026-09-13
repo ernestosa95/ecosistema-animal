@@ -36,6 +36,8 @@ export default function RecordatoriosPage({ sesion, onAbrirPaciente }: Props) {
   const [copiadoPortalId, setCopiadoPortalId] = useState<string | null>(null);
   const [descartandoId, setDescartandoId] = useState<string | null>(null);
   const [filtroAnimalId, setFiltroAnimalId] = useState<string>('');
+  const [generandoCodigoId, setGenerandoCodigoId] = useState<string | null>(null);
+  const [codigoPortal, setCodigoPortal] = useState<{ filaId: string; codigo: string; expiraEnMinutos: number } | null>(null);
 
   /**
    * Genera el acceso al portal para el dueño y lo manda. Con teléfono, abre
@@ -62,6 +64,19 @@ export default function RecordatoriosPage({ sesion, onAbrirPaciente }: Props) {
       setError(e instanceof Error ? e.message : 'No se pudo generar el acceso al portal');
     } finally {
       setGenerandoPortalId(null);
+    }
+  }
+
+  async function generarCodigoPortal(filaId: string, personaId: string) {
+    setGenerandoCodigoId(filaId); setError(null); setCodigoPortal(null);
+    try {
+      const r = await api.generarCodigoPortal(sesion, personaId);
+      setCodigoPortal({ filaId, ...r });
+      api.registrarEvento(sesion, 'accion', 'portal-generar-codigo');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo generar el código');
+    } finally {
+      setGenerandoCodigoId(null);
     }
   }
 
@@ -201,6 +216,23 @@ export default function RecordatoriosPage({ sesion, onAbrirPaciente }: Props) {
                               {generandoPortalId === v.id ? 'Generando…' : copiadoPortalId === v.id ? 'Link copiado ✓' : tel ? 'Enviar portal' : 'Copiar link portal'}
                             </button>
                           )}
+                          {dueno && (
+                            codigoPortal?.filaId === v.id ? (
+                              <span className="rc-badge estado mono" title={`Se cierra a los ${codigoPortal.expiraEnMinutos} minutos sin uso, se puede volver a ingresar`}>
+                                {codigoPortal.codigo}
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="rc-btn ghost"
+                                disabled={generandoCodigoId === v.id || !dueno.dni}
+                                title={!dueno.dni ? 'El dueño no tiene DNI cargado' : 'Código para que ingrese en huella.app/portal'}
+                                onClick={() => generarCodigoPortal(v.id, dueno.id)}
+                              >
+                                {generandoCodigoId === v.id ? 'Generando…' : 'Generar código'}
+                              </button>
+                            )
+                          )}
                           <button
                             type="button"
                             className="rc-btn ghost"
@@ -254,6 +286,23 @@ export default function RecordatoriosPage({ sesion, onAbrirPaciente }: Props) {
                             >
                               {generandoPortalId === t.id ? 'Generando…' : copiadoPortalId === t.id ? 'Link copiado ✓' : tel ? 'Enviar portal' : 'Copiar link portal'}
                             </button>
+                          )}
+                          {dueno && (
+                            codigoPortal?.filaId === t.id ? (
+                              <span className="rc-badge estado mono" title={`Se cierra a los ${codigoPortal.expiraEnMinutos} minutos sin uso, se puede volver a ingresar`}>
+                                {codigoPortal.codigo}
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="rc-btn ghost"
+                                disabled={generandoCodigoId === t.id || !dueno.dni}
+                                title={!dueno.dni ? 'El dueño no tiene DNI cargado' : 'Código para que ingrese en huella.app/portal'}
+                                onClick={() => generarCodigoPortal(t.id, dueno.id)}
+                              >
+                                {generandoCodigoId === t.id ? 'Generando…' : 'Generar código'}
+                              </button>
+                            )
                           )}
                         </div>
                       </div>

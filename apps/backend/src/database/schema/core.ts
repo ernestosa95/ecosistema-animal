@@ -11,6 +11,7 @@ import {
   jsonb,
   timestamp,
   numeric,
+  integer,
 } from 'drizzle-orm/pg-core';
 
 export const core = pgSchema('core');
@@ -138,6 +139,31 @@ export const personas = core.table('personas', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
+});
+
+/**
+ * Códigos cortos de acceso al portal del dueño (DNI + código, tercera vía de
+ * acceso además del QR por código legible y el magic-link) — ver
+ * `portal/portal-codigo.service.ts`. Efímero a propósito: lo emite el staff
+ * en el momento, no reemplaza al magic-link (30 días) como credencial de
+ * largo plazo, sólo es otra forma de conseguirlo cuando el dueño no tiene a
+ * mano el link/QR anterior. Reutilizable (no de un solo uso): `expiresAt` es
+ * una ventana de inactividad de 15 min que se corre hacia adelante en cada
+ * canje exitoso — cierra sola si nadie la usa, no al primer login.
+ */
+export const portalCodigos = core.table('portal_codigos', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  personaId: uuid('persona_id')
+    .notNull()
+    .references(() => personas.id, { onDelete: 'cascade' }),
+  organizacionId: uuid('organizacion_id')
+    .notNull()
+    .references(() => organizaciones.id, { onDelete: 'cascade' }),
+  // Nunca texto plano — mismo criterio que un hash de contraseña (bcrypt).
+  codigoHash: text('codigo_hash').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  intentosFallidos: integer('intentos_fallidos').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const especies = core.table('especies', {

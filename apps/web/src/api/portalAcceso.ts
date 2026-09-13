@@ -70,6 +70,24 @@ export async function obtenerResumenPortal(token: string): Promise<ResumenPortal
   return manejar(res);
 }
 
+/**
+ * Canjea DNI + código (emitido por el staff, ver PersonasPage/RecordatoriosPage)
+ * por el mismo token que emite el magic-link — tercera vía de acceso al portal,
+ * para cuando el dueño no tiene a mano el link/QR anterior.
+ */
+export async function canjearCodigoPortal(dni: string, codigo: string): Promise<{ token: string }> {
+  const res = await fetch(`${API}/portal/codigo/canjear`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dni, codigo }),
+  });
+  if (!res.ok) {
+    if (res.status === 401) throw new Error('Código o DNI incorrectos, o el código venció.');
+    throw new Error(`No se pudo validar el acceso (Error ${res.status}).`);
+  }
+  return res.json();
+}
+
 export async function solicitarTurnoPortal(
   token: string,
   data: { animalId: string; motivo?: string; fechaPreferida: string },

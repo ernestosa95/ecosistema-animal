@@ -394,6 +394,11 @@ export const api = {
     return pedir(s, `/portal/acceso/${personaId}`, { method: 'POST' });
   },
 
+  /** Emite un código corto (15 min, un solo uso) para el acceso al portal por DNI + código — ver /portal en la web pública. */
+  generarCodigoPortal(s: Sesion, personaId: string): Promise<{ codigo: string; expiraEnMinutos: number }> {
+    return pedir(s, `/portal/codigo/${personaId}`, { method: 'POST' });
+  },
+
   productos(s: Sesion): Promise<Producto[]> {
     return pedir(s, '/farmacia/productos');
   },
@@ -441,6 +446,11 @@ export const api = {
 
   marcarMensajeLeido(s: Sesion, id: string): Promise<{ ok: boolean }> {
     return pedir(s, `/mensajes/${id}/leido`, { method: 'POST' });
+  },
+
+  /** Responder es opcional — enviarlo también marca el mensaje leído, ver MensajesBanner.tsx. */
+  responderMensaje(s: Sesion, id: string, respuestas: Array<{ preguntaId: string; respuesta: string }>): Promise<{ ok: boolean }> {
+    return pedir(s, `/mensajes/${id}/responder`, { method: 'POST', body: JSON.stringify({ respuestas }) });
   },
 
   // --- Caja (Fase D) ---

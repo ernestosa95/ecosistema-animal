@@ -54,7 +54,10 @@ export default function PortalAccesoPage() {
   );
 }
 
-function Contenido({ token, data }: { token: string; data: ResumenPortalDueno }) {
+// Exportado para que PortalCodigoPage.tsx (acceso por DNI + código) lo reuse
+// tal cual una vez que canjea el código — misma vista, sólo cambia cómo se
+// consiguió el token.
+export function Contenido({ token, data }: { token: string; data: ResumenPortalDueno }) {
   return (
     <>
       <div className="pd-card pd-hero">

@@ -25,13 +25,16 @@ import { personas } from '../database/schema';
 import { PortalGuard } from './portal.guard';
 import { PortalService } from './portal.service';
 import { PortalTokenService } from './portal-token.service';
+import { PortalCodigoService } from './portal-codigo.service';
 import { SolicitarTurnoDto } from './dto/solicitar-turno.dto';
+import { CanjearCodigoDto } from './dto/canjear-codigo.dto';
 
 @Controller('portal')
 export class PortalController {
   constructor(
     private readonly portal: PortalService,
     private readonly tokens: PortalTokenService,
+    private readonly codigos: PortalCodigoService,
     @Inject(DRIZZLE) private readonly db: DrizzleDB,
   ) {}
 
@@ -65,6 +68,30 @@ export class PortalController {
     const token = this.tokens.emitir(persona);
     const base = process.env.PORTAL_BASE_URL ?? 'http://localhost:5173';
     return { token, portalUrl: `${base}/?token=${token}` };
+  }
+
+  /**
+   * DUEÑO — canjea DNI + código por el mismo token que emite el magic-link.
+   * POST /portal/codigo/canjear   (público, sin guards — el código+DNI es la credencial)
+   * Declarada ANTES de 'codigo/:personaId': si no, esa ruta con parámetro
+   * matchea primero y "canjear" se interpretaría como un personaId.
+   */
+  @Post('codigo/canjear')
+  async canjearCodigo(@Body() dto: CanjearCodigoDto) {
+    const persona = await this.codigos.canjear(dto.dni, dto.codigo);
+    return { token: this.tokens.emitir(persona) };
+  }
+
+  /**
+   * STAFF — genera un código corto de acceso (DNI + código, 15 min, un solo
+   * uso) para cuando el dueño no tiene a mano el link/QR anterior.
+   * POST /portal/codigo/:personaId   (requiere sesión de staff + organización)
+   */
+  @Post('codigo/:personaId')
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles('propietario', 'admin', 'veterinario', 'recepcion')
+  generarCodigo(@Param('personaId') personaId: string, @CurrentOrg() organizacionId: string) {
+    return this.codigos.generar(personaId, organizacionId);
   }
 
   /** DUEÑO — su resumen (mascotas, vacunas, turnos, consultas). */

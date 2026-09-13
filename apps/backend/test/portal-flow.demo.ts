@@ -4,20 +4,22 @@
  * a la propia persona+organización (incluida `fotoUrl`), solicitud de turno
  * y actualización de la foto de perfil de una mascota — las tres con el
  * mismo chequeo de propiedad (no se puede tocar/ver una mascota que no es
- * del dueño autenticado), contra Postgres real (PGlite/WASM). Sin test
- * previo de este módulo. No cubre PortalGuard/multer (capa HTTP) — eso
- * necesitaría una app Nest completa levantada, fuera del alcance de estos
- * demos que llaman al service directo.
+ * del dueño autenticado), contra Postgres real (PGlite/WASM). También cubre
+ * PortalCodigoService (tercera vía de acceso, DNI + código corto). Sin test
+ * previo de este módulo. No cubre PortalGuard/multer/los controllers (capa
+ * HTTP) — eso necesitaría una app Nest completa levantada, fuera del alcance
+ * de estos demos que llaman a los services directo.
  *
  * Correr: pnpm --filter backend test:portal-demo
  */
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { eq } from 'drizzle-orm';
-import { organizaciones, personas, especies, animales } from '../src/database/schema/core';
+import { organizaciones, personas, especies, animales, portalCodigos } from '../src/database/schema/core';
 import { turnos, consultas, indicaciones, vacunaciones } from '../src/database/schema/hce';
 import { productos } from '../src/database/schema/farmacia';
 import { PortalService } from '../src/portal/portal.service';
+import { PortalCodigoService } from '../src/portal/portal-codigo.service';
 
 let ok = 0, fail = 0;
 const check = (n: string, c: boolean) => { c ? (ok++, console.log(`  ✓ ${n}`)) : (fail++, console.log(`  ✗ FALLA: ${n}`)); };
@@ -66,7 +68,7 @@ async function main() {
     CREATE TABLE hce.vacunaciones (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
       animal_id uuid NOT NULL REFERENCES core.animales(id), veterinario_id uuid,
-      producto text, vademecum_id uuid, fecha date NOT NULL DEFAULT current_date, proxima_dosis date, lote_producto text, recordatorio_descartado_en timestamptz,
+      producto text, vademecum_id uuid, fecha date NOT NULL DEFAULT current_date, proxima_dosis date, lote_producto text, costo numeric(12,2), recordatorio_descartado_en timestamptz,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
     CREATE TABLE farmacia.productos (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
@@ -81,10 +83,16 @@ async function main() {
       producto_id uuid REFERENCES farmacia.productos(id), origen hce.origen_indicacion NOT NULL DEFAULT 'stock_interno',
       producto_nombre text, dosis text, frecuencia text, duracion_dias int, activo boolean NOT NULL DEFAULT true,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+    CREATE TABLE core.portal_codigos (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      persona_id uuid NOT NULL REFERENCES core.personas(id) ON DELETE CASCADE,
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      codigo_hash text NOT NULL, expires_at timestamptz NOT NULL, intentos_fallidos int NOT NULL DEFAULT 0,
+      created_at timestamptz NOT NULL DEFAULT now());
   `);
 
-  const db = drizzle(client, { schema: { organizaciones, personas, especies, animales, turnos, consultas, vacunaciones, indicaciones, productos } });
+  const db = drizzle(client, { schema: { organizaciones, personas, especies, animales, turnos, consultas, vacunaciones, indicaciones, productos, portalCodigos } });
   const portal = new PortalService(db as any);
+  const codigos = new PortalCodigoService(db as any);
 
   const [orgA] = await db.insert(organizaciones).values({ nombre: 'Vet A' }).returning();
   const [orgB] = await db.insert(organizaciones).values({ nombre: 'Vet B' }).returning();
@@ -144,6 +152,71 @@ async function main() {
   const [duenoB] = await db.insert(personas).values({ organizacionId: orgB.id, nombre: 'Lucas', apellido: 'Gómez' }).returning();
   const resumenB = await portal.resumen({ id: duenoB.id, organizacionId: orgB.id, nombre: duenoB.nombre, apellido: duenoB.apellido });
   check('resumen de una persona sin mascotas en su org da vacío, no las de orgA', resumenB.animales.length === 0);
+
+  console.log('7) PortalCodigoService: generar() exige DNI cargado');
+  let rechazadoSinDni = false;
+  try {
+    await codigos.generar(otroDuenoA.id, orgA.id);
+  } catch (e: any) {
+    rechazadoSinDni = e?.status === 400;
+  }
+  check('rechaza con 400 si la persona no tiene DNI', rechazadoSinDni);
+
+  console.log('8) PortalCodigoService: ciclo completo generar() → canjear(), y es reutilizable (no de un solo uso)');
+  await db.update(personas).set({ dni: '20.111.222' }).where(eq(personas.id, otroDuenoA.id));
+  const emitido1 = await codigos.generar(otroDuenoA.id, orgA.id);
+  check('generar() devuelve un código de 8 caracteres', emitido1.codigo.length === 8);
+  check('vence en 15 minutos', emitido1.expiraEnMinutos === 15);
+
+  const identidad = await codigos.canjear('20111222', emitido1.codigo);
+  check('canjear() con DNI (sin puntos) + código correcto resuelve la persona', identidad.id === otroDuenoA.id);
+
+  const identidadReuso = await codigos.canjear('20.111.222', emitido1.codigo);
+  check('el mismo código se puede volver a canjear (no es de un solo uso)', identidadReuso.id === otroDuenoA.id);
+
+  console.log('9) PortalCodigoService: DNI incorrecto se rechaza sin revelar cuál dato falló');
+  const emitido2 = await codigos.generar(otroDuenoA.id, orgA.id);
+  let rechazadoDniIncorrecto = false;
+  try {
+    await codigos.canjear('11111111', emitido2.codigo);
+  } catch (e: any) {
+    rechazadoDniIncorrecto = e?.status === 401;
+  }
+  check('DNI incorrecto con código correcto se rechaza igual', rechazadoDniIncorrecto);
+
+  console.log('10) PortalCodigoService: un código activo por vez (generar() invalida el anterior)');
+  const emitido3 = await codigos.generar(otroDuenoA.id, orgA.id);
+  let rechazadoCodigoSuperado = false;
+  try {
+    await codigos.canjear('20.111.222', emitido2.codigo);
+  } catch (e: any) {
+    rechazadoCodigoSuperado = e?.status === 401;
+  }
+  check('el código emitido antes del último queda invalidado', rechazadoCodigoSuperado);
+
+  console.log('11) PortalCodigoService: un código vencido (15 min de inactividad) se rechaza');
+  const [vigente] = await db.select().from(portalCodigos).where(eq(portalCodigos.personaId, otroDuenoA.id));
+  await db.update(portalCodigos).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(portalCodigos.id, vigente.id));
+  let rechazadoVencido = false;
+  try {
+    await codigos.canjear('20.111.222', emitido3.codigo);
+  } catch (e: any) {
+    rechazadoVencido = e?.status === 401;
+  }
+  check('vencido, no se puede canjear aunque el código sea correcto', rechazadoVencido);
+
+  console.log('12) PortalCodigoService: cada canje exitoso corre la ventana de inactividad 15 min hacia adelante');
+  const emitido4 = await codigos.generar(otroDuenoA.id, orgA.id);
+  await codigos.canjear('20.111.222', emitido4.codigo);
+  // Simula que casi se cumplieron los 15 min desde el canje anterior.
+  const [rowCasiVencida] = await db.select().from(portalCodigos).where(eq(portalCodigos.personaId, otroDuenoA.id));
+  await db.update(portalCodigos).set({ expiresAt: new Date(Date.now() + 500) }).where(eq(portalCodigos.id, rowCasiVencida.id));
+  await codigos.canjear('20.111.222', emitido4.codigo);
+  const [rowExtendida] = await db.select().from(portalCodigos).where(eq(portalCodigos.personaId, otroDuenoA.id));
+  check(
+    'un canje exitoso justo antes de vencer extiende otros 15 min, en vez de dejarlo morir',
+    rowExtendida.expiresAt.getTime() > Date.now() + 10 * 60_000,
+  );
 
   console.log(`\nRESULTADO: ${ok} OK, ${fail} fallas`);
   await client.close();

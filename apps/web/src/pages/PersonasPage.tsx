@@ -157,6 +157,9 @@ function PersonaFila({
 }) {
   const [animales, setAnimales] = useState<Animal[] | null>(null);
   const [portalUrl, setPortalUrl] = useState<string | null>(null);
+  const [codigoPortal, setCodigoPortal] = useState<{ codigo: string; expiraEnMinutos: number } | null>(null);
+  const [generandoCodigo, setGenerandoCodigo] = useState(false);
+  const [errorCodigo, setErrorCodigo] = useState<string | null>(null);
   const [generando, setGenerando] = useState(false);
   const [errorPortal, setErrorPortal] = useState<string | null>(null);
 
@@ -180,6 +183,20 @@ function PersonaFila({
       setErrorPortal(err instanceof Error ? err.message : 'No se pudo generar el acceso');
     } finally {
       setGenerando(false);
+    }
+  }
+
+  async function generarCodigo() {
+    setErrorCodigo(null);
+    setGenerandoCodigo(true);
+    try {
+      const r = await api.generarCodigoPortal(sesion, persona.id);
+      setCodigoPortal(r);
+      api.registrarEvento(sesion, 'accion', 'portal-generar-codigo');
+    } catch (err) {
+      setErrorCodigo(err instanceof Error ? err.message : 'No se pudo generar el código');
+    } finally {
+      setGenerandoCodigo(false);
     }
   }
 
@@ -230,6 +247,27 @@ function PersonaFila({
                 </button>
               )}
               {errorPortal && <div className="alerta">{errorPortal}</div>}
+            </div>
+
+            <div style={{ marginTop: '0.5rem', paddingTop: '0.6rem', borderTop: '1px solid #f0f1ee' }}>
+              {codigoPortal ? (
+                <div className="dato">
+                  <span className="dato-label">
+                    Código de acceso a huella.app/portal (se cierra a los {codigoPortal.expiraEnMinutos} minutos sin uso, se puede volver a ingresar) — decíselo o anotáselo al dueño
+                  </span>
+                  <span className="mono" style={{ fontSize: '1.1rem', letterSpacing: '0.08em' }}>{codigoPortal.codigo}</span>
+                </div>
+              ) : (
+                <button
+                  className="btn-ghost"
+                  onClick={generarCodigo}
+                  disabled={generandoCodigo || !persona.dni}
+                  title={!persona.dni ? 'Cargá el DNI del dueño primero' : undefined}
+                >
+                  {generandoCodigo ? 'Generando…' : 'Generar código'}
+                </button>
+              )}
+              {errorCodigo && <div className="alerta">{errorCodigo}</div>}
             </div>
           </td>
         </tr>
