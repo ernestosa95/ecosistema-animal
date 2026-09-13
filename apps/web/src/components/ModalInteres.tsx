@@ -20,7 +20,8 @@ export function ModalInteres({
 }) {
   const [nombre, setNombre] = useState('');
   const [nombreVeterinaria, setNombreVeterinaria] = useState('');
-  const [contacto, setContacto] = useState('');
+  const [email, setEmail] = useState('');
+  const [celular, setCelular] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +31,7 @@ export function ModalInteres({
     setError(null);
     setEnviando(true);
     try {
-      await crearInteresado({ nombre, nombreVeterinaria, contacto });
+      await crearInteresado({ nombre, nombreVeterinaria, email, celular: celular.trim() || undefined });
       setEnviado(true);
       onEnviado();
     } catch (err) {
@@ -53,7 +54,8 @@ export function ModalInteres({
         {enviado ? (
           <div style={{ marginTop: '0.75rem' }}>
             <p>
-              ¡Listo! Ya te anotamos. Te vamos a contactar para coordinar el alta y los primeros 3 meses gratis.
+              ¡Listo! Ya te anotamos y te mandamos un mail de confirmación. Te vamos a contactar para coordinar el
+              alta y los primeros 3 meses gratis.
             </p>
             <button className="btn" onClick={onCerrar} style={{ marginTop: '0.5rem' }}>
               Cerrar
@@ -75,8 +77,12 @@ export function ModalInteres({
                 <input value={nombreVeterinaria} onChange={(e) => setNombreVeterinaria(e.target.value)} required />
               </label>
               <label className="span-2">
-                Email o celular
-                <input value={contacto} onChange={(e) => setContacto(e.target.value)} required />
+                Email
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              </label>
+              <label className="span-2">
+                Celular (opcional)
+                <input value={celular} onChange={(e) => setCelular(e.target.value)} />
               </label>
               {error && <div className="alerta span-2">{error}</div>}
               <div className="span-2">

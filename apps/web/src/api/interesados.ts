@@ -23,7 +23,8 @@ export async function consultarCupoInteresados(): Promise<CupoInteresados> {
 
 export async function crearInteresado(dto: {
   nombre: string;
-  contacto: string;
+  email: string;
+  celular?: string;
   nombreVeterinaria: string;
 }): Promise<{ ok: true }> {
   const res = await fetch(`${API}/interesados`, {
@@ -45,7 +46,8 @@ export async function crearInteresado(dto: {
 export interface Interesado {
   id: string;
   nombre: string;
-  contacto: string;
+  email: string | null;
+  celular: string | null;
   nombreVeterinaria: string;
   createdAt: string;
 }

@@ -171,7 +171,16 @@ export const eventosUso = plataforma.table('eventos_uso', {
 export const interesados = plataforma.table('interesados', {
   id: uuid('id').primaryKey().defaultRandom(),
   nombre: text('nombre').notNull(),
-  contacto: text('contacto').notNull(), // email o celular, texto libre — lo que el interesado prefiera dejar
+  // Obligatorio a nivel de DTO desde que se agregó (2026-09-13) — nullable acá
+  // para no romper la fila cargada antes, mismo criterio que consultas.costo.
+  // Es lo que recibe la confirmación automática y lo que usa el super-admin
+  // para contactar al interesado.
+  email: text('email'),
+  // Columna física sigue llamándose "contacto" (dato real ya cargado antes
+  // de este cambio, ver CHANGELOG 2026-09-13) — el nombre en TS pasa a
+  // `celular` porque ahora es sólo eso, opcional (para WhatsApp), ya que
+  // `email` es el contacto obligatorio.
+  celular: text('contacto'),
   nombreVeterinaria: text('nombre_veterinaria').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

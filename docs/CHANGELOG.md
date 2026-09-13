@@ -2,6 +2,12 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-09-13] — Interesados: email obligatorio + confirmación y aviso automáticos
+
+Llegó el primer interesado real (post-deploy) con sólo un teléfono como "contacto" — no había forma de mandarle nada automático ni de contactarlo por mail. `plataforma.interesados` suma `email` (obligatorio a nivel de DTO, migración `0038`); la columna física sigue llamándose `contacto` pero pasa a representar sólo el celular (opcional, para WhatsApp) — sin romper el dato ya cargado. `InteresadosService.crear()` ahora dispara, sin bloquear el alta si falla, dos mails vía `MailService`: confirmación al interesado y un aviso a cada email de `SUPERADMIN_EMAILS` con nombre/veterinaria/contacto, para que el seguimiento no dependa de entrar al panel. Web: `ModalInteres.tsx` separa "Email" (obligatorio) de "Celular" (opcional); `AdminPage.tsx` muestra ambos. Las 19 `test:*-demo` pasan.
+
+**Pendiente para que esto mande mails de verdad**: sigue sin haber `RESEND_API_KEY` configurada en producción — hasta que se resuelva (ver Plan_Despliegue.md), estos dos mails quedan sólo logueados en el backend, igual que "olvidé mi contraseña".
+
 ## [2026-09-13] — Primer deploy en producción: Huella corriendo en `huella.site`
 
 F0.1 del Roadmap pasa de ⏳ a ✅. Antes de tocar la VPS hubo que resolver un bloqueante que no era de infraestructura: `feat/turnero-web-y-datos-especie` tenía 82 archivos sin commitear (rediseño de marca, costo de vacunación, portal por DNI+código, feedback en mensajes con preguntas, captura de interesados para el lanzamiento, plantillas de Instagram) y 3 commits sin pushear, con `main` 45 commits atrás — clonar tal cual estaba el remoto se hubiera llevado una versión vieja sin nada de esto.

@@ -19,12 +19,15 @@ async function main() {
   await client.exec(`
     CREATE SCHEMA plataforma;
     CREATE TABLE plataforma.interesados (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-      nombre text NOT NULL, contacto text NOT NULL, nombre_veterinaria text NOT NULL,
+      nombre text NOT NULL, email text, contacto text, nombre_veterinaria text NOT NULL,
       created_at timestamptz NOT NULL DEFAULT now());
   `);
 
   const db = drizzle(client, { schema: { interesados } });
-  const service = new InteresadosService(db as any);
+  // Sin RESEND_API_KEY en este entorno, un MailService real ya loguea en vez
+  // de enviar — este stub evita instanciar Nest sólo para eso.
+  const mailStub = { enviar: async () => {} } as any;
+  const service = new InteresadosService(db as any, mailStub);
 
   console.log('1) cupo() arranca con las 10 plazas disponibles');
   const cupoInicial = await service.cupo();
@@ -32,13 +35,13 @@ async function main() {
   check('restantes: 10', cupoInicial.restantes === 10);
 
   console.log('2) crear() registra un interesado y descuenta el cupo');
-  await service.crear({ nombre: 'Marta Ruiz', contacto: 'marta@vet.com', nombreVeterinaria: 'Vet Marta' });
+  await service.crear({ nombre: 'Marta Ruiz', email: 'marta@vet.com', nombreVeterinaria: 'Vet Marta' });
   const cupoTrasUno = await service.cupo();
   check('restantes: 9', cupoTrasUno.restantes === 9);
 
   console.log('3) llenar el cupo (9 interesados más) y confirmar que se cierra solo');
   for (let i = 0; i < 9; i++) {
-    await service.crear({ nombre: `Interesado ${i}`, contacto: `i${i}@vet.com`, nombreVeterinaria: `Vet ${i}` });
+    await service.crear({ nombre: `Interesado ${i}`, email: `i${i}@vet.com`, nombreVeterinaria: `Vet ${i}` });
   }
   const cupoLleno = await service.cupo();
   check('restantes: 0', cupoLleno.restantes === 0);
@@ -47,7 +50,7 @@ async function main() {
   console.log('4) crear() rechaza el número 11 con un mensaje claro, no un 500 genérico');
   let rechazado = false;
   try {
-    await service.crear({ nombre: 'Once', contacto: 'once@vet.com', nombreVeterinaria: 'Vet Once' });
+    await service.crear({ nombre: 'Once', email: 'once@vet.com', nombreVeterinaria: 'Vet Once' });
   } catch (e: any) {
     rechazado = e?.status === 409 && typeof e?.message === 'string' && e.message.includes('10');
   }

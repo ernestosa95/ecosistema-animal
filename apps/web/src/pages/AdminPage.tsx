@@ -1690,7 +1690,9 @@ function Interesados() {
           >
             <div>
               <b>{i.nombre}</b> — {i.nombreVeterinaria}
-              <div className="muted" style={{ fontSize: '0.85rem' }}>{i.contacto}</div>
+              <div className="muted" style={{ fontSize: '0.85rem' }}>
+                {i.email}{i.celular ? ` · ${i.celular}` : ''}
+              </div>
             </div>
             <span className="muted" style={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
               {new Date(i.createdAt).toLocaleDateString('es-AR')}
