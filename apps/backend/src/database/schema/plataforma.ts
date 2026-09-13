@@ -92,6 +92,16 @@ export const mensajes = plataforma.table('mensajes', {
   organizacionId: uuid('organizacion_id').references(() => organizaciones.id, { onDelete: 'cascade' }),
   grupoId: uuid('grupo_id').references(() => gruposOrganizaciones.id, { onDelete: 'cascade' }),
   creadoPor: uuid('creado_por').references(() => usuarios.id),
+  // Preguntas de feedback opcionales, embebidas — un mensaje no comparte
+  // preguntas con otro ni se consulta por pregunta suelta desde afuera, así
+  // que no amerita una tabla relacional aparte (mismo criterio que
+  // `planes.limitesRoles`). Array de
+  // { id: string; tipo: 'si_no'|'opcion_multiple'|'texto_breve'; texto: string; opciones?: string[] },
+  // el `id` de cada pregunta lo asigna el server al crear el mensaje
+  // (MensajesAdminService.crear()) y es lo que referencia
+  // `mensaje_respuestas.pregunta_id` más abajo — sin FK real posible contra
+  // un elemento de un jsonb, se valida en el service al guardar la respuesta.
+  preguntas: jsonb('preguntas').notNull().default([]),
   publicadoEn: timestamp('publicado_en', { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -105,6 +115,27 @@ export const mensajesLeidos = plataforma.table('mensajes_leidos', {
   mensajeId: uuid('mensaje_id').notNull().references(() => mensajes.id, { onDelete: 'cascade' }),
   usuarioId: uuid('usuario_id').notNull().references(() => usuarios.id, { onDelete: 'cascade' }),
   leidoEn: timestamp('leido_en', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Respuestas al feedback opcional de un mensaje (ver `mensajes.preguntas`
+// arriba) — responder es opcional, así que esto NO reemplaza a
+// `mensajesLeidos`: `MensajesService.responder()` marca ambas cosas en la
+// misma llamada. `organizacionId` queda denormalizado (no sólo vía
+// usuarioId) para que el admin pueda agrupar/filtrar respuestas por
+// organización sin tener que resolver membresías. Sin constraint compuesta
+// a nivel DB por lo mismo que `mensajesLeidos` — el service resuelve
+// reenvíos borrando las respuestas previas del usuario para ese mensaje
+// antes de insertar las nuevas (ver `MensajesService.responder()`).
+export const mensajeRespuestas = plataforma.table('mensaje_respuestas', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  mensajeId: uuid('mensaje_id').notNull().references(() => mensajes.id, { onDelete: 'cascade' }),
+  preguntaId: text('pregunta_id').notNull(),
+  usuarioId: uuid('usuario_id').notNull().references(() => usuarios.id, { onDelete: 'cascade' }),
+  organizacionId: uuid('organizacion_id').notNull().references(() => organizaciones.id, { onDelete: 'cascade' }),
+  // 'si'/'no' para si_no, el texto de la opción elegida para opcion_multiple,
+  // texto libre para texto_breve — un solo campo alcanza para los tres tipos.
+  respuesta: text('respuesta').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const tipoEventoUso = plataforma.enum('tipo_evento_uso', ['pantalla', 'accion']);
@@ -127,5 +158,20 @@ export const eventosUso = plataforma.table('eventos_uso', {
   // texto, no un enum: el catálogo de pantallas/acciones instrumentadas va
   // a crecer con el tiempo y no vale la pena una migración por cada una.
   nombre: text('nombre').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Captura de interés para el lanzamiento (landing, botón "Estoy interesado")
+// — NO es una `solicitudes` (esa crea cuenta+organización con aprobación);
+// esto es sólo una lista de contacto sin organización todavía, para que el
+// dueño del negocio haga el alta a mano de las primeras 10 veterinarias
+// (ver interesados/interesados.service.ts, cupo fijo en el código). Sin
+// estado/aprobación ni soft-delete a propósito: es un ledger simple de
+// lectura para seguimiento manual, mismo espíritu que `eventos_uso`.
+export const interesados = plataforma.table('interesados', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  nombre: text('nombre').notNull(),
+  contacto: text('contacto').notNull(), // email o celular, texto libre — lo que el interesado prefiera dejar
+  nombreVeterinaria: text('nombre_veterinaria').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

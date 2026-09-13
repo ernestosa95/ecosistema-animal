@@ -7,13 +7,15 @@ import {
   setAcceso, setSoluciones,
   listarGrupos, crearGrupo, actualizarGrupo, eliminarGrupo,
   listarPlanes, crearPlan, actualizarPlan, eliminarPlan,
-  listarMensajesAdmin, crearMensaje, eliminarMensaje,
+  listarMensajesAdmin, crearMensaje, eliminarMensaje, respuestasMensaje,
   resumenPagos, gananciasPorPeriodo, listarPagosOrg, registrarPago, resumenAnalitica,
   listarPagosPendientes, revisarPago, enviarRecordatorioPago,
   type Organizacion, type Miembro, type Grupo, type Plan, type MensajeAdmin, type DestinatarioTipo,
   type ResumenPagoOrg, type GananciasPeriodo, type Pago, type ResumenAnalitica, type PagoPendiente,
+  type Pregunta, type TipoPregunta, type RespuestasMensaje,
 } from '../api/admin';
 import { listarSolicitudes, aprobarSolicitud, rechazarSolicitud, type Solicitud } from '../api/solicitudes';
+import { listarInteresadosAdmin, type Interesado } from '../api/interesados';
 import { InfoRoles } from '../components/InfoRoles';
 
 const ROLES: Array<{ v: string; label: string }> = [
@@ -188,6 +190,7 @@ function Panel({ onSalir }: { onSalir: () => void }) {
 
       {seccion === 'organizaciones' && (
         <>
+          <Interesados />
           <Solicitudes orgs={orgs} planes={planes} onCambio={() => { cargarOrgs(); cargarPagos(); }} />
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
             <div style={{ flex: '1 1 320px', minWidth: 0 }}>
@@ -1268,6 +1271,12 @@ function Grupos({ grupos, onCambio }: { grupos: Grupo[]; onCambio: () => void })
 }
 
 // ── Mensajes de la plataforma ─────────────────────────────────────────────
+const ETIQUETA_TIPO_PREGUNTA: Record<TipoPregunta, string> = {
+  si_no: 'Sí / No',
+  opcion_multiple: 'Opción múltiple (una sola)',
+  texto_breve: 'Respuesta escrita breve',
+};
+
 function Mensajes({ orgs, grupos }: { orgs: Organizacion[]; grupos: Grupo[] }) {
   const [items, setItems] = useState<MensajeAdmin[]>([]);
   const [titulo, setTitulo] = useState('');
@@ -1275,8 +1284,10 @@ function Mensajes({ orgs, grupos }: { orgs: Organizacion[]; grupos: Grupo[] }) {
   const [destinatarioTipo, setDestinatarioTipo] = useState<DestinatarioTipo>('todas');
   const [organizacionId, setOrganizacionId] = useState('');
   const [grupoId, setGrupoId] = useState('');
+  const [preguntas, setPreguntas] = useState<Pregunta[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
+  const [respuestasAbiertas, setRespuestasAbiertas] = useState<Record<string, RespuestasMensaje | 'cargando' | null>>({});
 
   async function cargar() {
     try { setItems(await listarMensajesAdmin()); }
@@ -1284,18 +1295,49 @@ function Mensajes({ orgs, grupos }: { orgs: Organizacion[]; grupos: Grupo[] }) {
   }
   useEffect(() => { cargar(); }, []);
 
+  function agregarPregunta(tipo: TipoPregunta) {
+    setPreguntas((ps) => [...ps, { tipo, texto: '', opciones: tipo === 'opcion_multiple' ? ['', ''] : undefined }]);
+  }
+  function actualizarTextoPregunta(idx: number, texto: string) {
+    setPreguntas((ps) => ps.map((p, i) => (i === idx ? { ...p, texto } : p)));
+  }
+  function quitarPregunta(idx: number) {
+    setPreguntas((ps) => ps.filter((_, i) => i !== idx));
+  }
+  function actualizarOpcion(idx: number, opIdx: number, valor: string) {
+    setPreguntas((ps) => ps.map((p, i) => (i === idx ? { ...p, opciones: p.opciones?.map((o, j) => (j === opIdx ? valor : o)) } : p)));
+  }
+  function agregarOpcion(idx: number) {
+    setPreguntas((ps) => ps.map((p, i) => (i === idx ? { ...p, opciones: [...(p.opciones ?? []), ''] } : p)));
+  }
+  function quitarOpcion(idx: number, opIdx: number) {
+    setPreguntas((ps) => ps.map((p, i) => (i === idx ? { ...p, opciones: p.opciones?.filter((_, j) => j !== opIdx) } : p)));
+  }
+
   async function enviar() {
     if (titulo.trim().length < 2 || cuerpo.trim().length < 2) { setError('Completá título y cuerpo'); return; }
     if (destinatarioTipo === 'organizacion' && !organizacionId) { setError('Elegí la organización destino'); return; }
     if (destinatarioTipo === 'grupo' && !grupoId) { setError('Elegí el grupo destino'); return; }
+    for (const p of preguntas) {
+      if (p.texto.trim().length < 2) { setError('Completá el texto de todas las preguntas (o quitá las vacías)'); return; }
+      if (p.tipo === 'opcion_multiple' && (p.opciones ?? []).filter((o) => o.trim().length > 0).length < 2) {
+        setError('Cada pregunta de opción múltiple necesita al menos 2 opciones'); return;
+      }
+    }
     setCargando(true); setError(null);
     try {
       await crearMensaje({
         titulo: titulo.trim(), cuerpo: cuerpo.trim(), destinatarioTipo,
         organizacionId: destinatarioTipo === 'organizacion' ? organizacionId : undefined,
         grupoId: destinatarioTipo === 'grupo' ? grupoId : undefined,
+        preguntas: preguntas.length > 0
+          ? preguntas.map((p) => ({
+              tipo: p.tipo, texto: p.texto.trim(),
+              opciones: p.tipo === 'opcion_multiple' ? p.opciones?.map((o) => o.trim()).filter(Boolean) : undefined,
+            }))
+          : undefined,
       });
-      setTitulo(''); setCuerpo('');
+      setTitulo(''); setCuerpo(''); setPreguntas([]);
       cargar();
     } catch (e: any) { setError(e.message ?? 'No se pudo enviar'); }
     finally { setCargando(false); }
@@ -1303,6 +1345,18 @@ function Mensajes({ orgs, grupos }: { orgs: Organizacion[]; grupos: Grupo[] }) {
   async function eliminar(m: MensajeAdmin) {
     try { await eliminarMensaje(m.id); cargar(); }
     catch (e: any) { setError(e.message ?? 'No se pudo eliminar'); }
+  }
+
+  async function verRespuestas(m: MensajeAdmin) {
+    if (respuestasAbiertas[m.id]) { setRespuestasAbiertas((r) => ({ ...r, [m.id]: null })); return; }
+    setRespuestasAbiertas((r) => ({ ...r, [m.id]: 'cargando' }));
+    try {
+      const r = await respuestasMensaje(m.id);
+      setRespuestasAbiertas((prev) => ({ ...prev, [m.id]: r }));
+    } catch (e: any) {
+      setError(e.message ?? 'No se pudieron cargar las respuestas');
+      setRespuestasAbiertas((prev) => ({ ...prev, [m.id]: null }));
+    }
   }
 
   function destinoLabel(m: MensajeAdmin) {
@@ -1314,7 +1368,7 @@ function Mensajes({ orgs, grupos }: { orgs: Organizacion[]; grupos: Grupo[] }) {
   return (
     <div>
       <h3>Mensajes de la plataforma</h3>
-      <p className="muted">Anuncios (no chat) que se muestran como banner al loguearse — ej. avisos de precio o de funcionalidades nuevas.</p>
+      <p className="muted">Anuncios (no chat) que se muestran como banner al loguearse — ej. avisos de precio o de funcionalidades nuevas. Sumales preguntas para pedir feedback: sí/no, opción múltiple o una respuesta escrita breve.</p>
       {error && <div className="alerta">{error}</div>}
 
       <div className="card">
@@ -1355,6 +1409,45 @@ function Mensajes({ orgs, grupos }: { orgs: Organizacion[]; grupos: Grupo[] }) {
             </label>
           )}
         </div>
+
+        <h4 className="form-titulo" style={{ marginTop: '1rem' }}>Preguntas de feedback (opcional)</h4>
+        {preguntas.length === 0 && <p className="muted" style={{ fontSize: '0.85rem' }}>Sin preguntas — el mensaje sale como un simple anuncio.</p>}
+        {preguntas.map((p, idx) => (
+          <div key={idx} className="card" style={{ marginBottom: '0.5rem', background: 'var(--hover-bg, #f5f5f5)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem' }}>
+              <span className="chip">{ETIQUETA_TIPO_PREGUNTA[p.tipo]}</span>
+              <button className="link" onClick={() => quitarPregunta(idx)}>Quitar</button>
+            </div>
+            <label style={{ marginTop: '0.4rem' }}>
+              Pregunta
+              <input value={p.texto} onChange={(e) => actualizarTextoPregunta(idx, e.target.value)} placeholder="Ej: ¿Probaste el turnero nuevo?" />
+            </label>
+            {p.tipo === 'opcion_multiple' && (
+              <div style={{ marginTop: '0.3rem' }}>
+                {(p.opciones ?? []).map((op, opIdx) => (
+                  <div key={opIdx} style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.3rem' }}>
+                    <input
+                      value={op}
+                      onChange={(e) => actualizarOpcion(idx, opIdx, e.target.value)}
+                      placeholder={`Opción ${opIdx + 1}`}
+                      style={{ flex: 1 }}
+                    />
+                    {(p.opciones?.length ?? 0) > 2 && (
+                      <button className="link" onClick={() => quitarOpcion(idx, opIdx)}>✕</button>
+                    )}
+                  </div>
+                ))}
+                <button className="link" onClick={() => agregarOpcion(idx)}>+ Agregar opción</button>
+              </div>
+            )}
+          </div>
+        ))}
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+          <button className="btn-ghost" onClick={() => agregarPregunta('si_no')}>+ Pregunta sí/no</button>
+          <button className="btn-ghost" onClick={() => agregarPregunta('opcion_multiple')}>+ Opción múltiple</button>
+          <button className="btn-ghost" onClick={() => agregarPregunta('texto_breve')}>+ Respuesta breve</button>
+        </div>
+
         <button className="btn" disabled={cargando} onClick={enviar}>
           {cargando ? 'Enviando…' : 'Enviar'}
         </button>
@@ -1363,17 +1456,61 @@ function Mensajes({ orgs, grupos }: { orgs: Organizacion[]; grupos: Grupo[] }) {
       <h4 className="dato-label" style={{ marginTop: '1.25rem' }}>Enviados</h4>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
         {items.length === 0 && <p className="muted">Todavía no se envió ningún mensaje.</p>}
-        {items.map((m) => (
-          <div key={m.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <div>
-              <b>{m.titulo}</b>
-              <div className="muted" style={{ fontSize: '0.85rem' }}>
-                {destinoLabel(m)} · {new Date(m.publicadoEn).toLocaleDateString()}
+        {items.map((m) => {
+          const respuestas = respuestasAbiertas[m.id];
+          return (
+            <div key={m.id} className="card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <div>
+                  <b>{m.titulo}</b>
+                  <div className="muted" style={{ fontSize: '0.85rem' }}>
+                    {destinoLabel(m)} · {new Date(m.publicadoEn).toLocaleDateString()}
+                    {m.preguntas.length > 0 && <> · {m.preguntas.length} pregunta{m.preguntas.length === 1 ? '' : 's'}</>}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  {m.preguntas.length > 0 && (
+                    <button className="btn-ghost" onClick={() => verRespuestas(m)}>
+                      {respuestas ? 'Ocultar respuestas' : 'Ver respuestas'}
+                    </button>
+                  )}
+                  <button className="btn-ghost" style={{ color: 'var(--danger)', borderColor: '#fca5a5' }} onClick={() => eliminar(m)}>Eliminar</button>
+                </div>
               </div>
+
+              {respuestas === 'cargando' && <p className="muted" style={{ marginTop: '0.5rem' }}>Cargando respuestas…</p>}
+              {respuestas && respuestas !== 'cargando' && (
+                <div style={{ marginTop: '0.75rem', paddingTop: '0.6rem', borderTop: '1px solid var(--border)' }}>
+                  <p className="muted" style={{ fontSize: '0.85rem' }}>{respuestas.totalRespondieron} persona{respuestas.totalRespondieron === 1 ? '' : 's'} respondieron.</p>
+                  {respuestas.preguntas.map((p) => (
+                    <div key={p.id} style={{ marginBottom: '0.6rem' }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{p.texto}</div>
+                      {p.tipo === 'texto_breve' ? (
+                        p.respuestas.length === 0 ? (
+                          <p className="muted" style={{ fontSize: '0.85rem' }}>Sin respuestas todavía.</p>
+                        ) : (
+                          <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.2rem', fontSize: '0.85rem' }}>
+                            {p.respuestas.map((r, i) => (
+                              <li key={i}>"{r.respuesta}" — <span className="muted">{r.organizacion}</span></li>
+                            ))}
+                          </ul>
+                        )
+                      ) : Object.keys(p.conteos).length === 0 ? (
+                        <p className="muted" style={{ fontSize: '0.85rem' }}>Sin respuestas todavía.</p>
+                      ) : (
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                          {Object.entries(p.conteos).map(([valor, cantidad]) => (
+                            <span key={valor} className="chip">{valor}: {cantidad}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <button className="btn-ghost" style={{ color: 'var(--danger)', borderColor: '#fca5a5' }} onClick={() => eliminar(m)}>Eliminar</button>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -1514,6 +1651,57 @@ function Analitica() {
 }
 
 // ── Bandeja de solicitudes ────────────────────────────────────────────────
+/**
+ * Interesados del lanzamiento (botón "Estoy interesado" de la landing, cupo
+ * fijo de 10 — ver InteresadosService en el backend). Sólo lectura: el alta
+ * real de la organización se hace a mano acá mismo, en "Organizaciones",
+ * usando el contacto que dejaron. No tiene aprobar/rechazar como
+ * Solicitudes porque no es un flujo de aprobación, es una lista de contacto.
+ */
+function Interesados() {
+  const [items, setItems] = useState<Interesado[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    listarInteresadosAdmin()
+      .then(setItems)
+      .catch((e) => setError(e.message ?? 'Error al cargar interesados'))
+      .finally(() => setCargando(false));
+  }, []);
+
+  if (cargando) return null;
+  if (error) return <div className="alerta" style={{ marginBottom: 12 }}>{error}</div>;
+  if (items.length === 0) return null;
+
+  return (
+    <div style={{ marginBottom: '1.25rem' }}>
+      <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        Interesados del lanzamiento <EstadoChip texto={`${items.length}/10`} />
+      </h3>
+      <div className="card">
+        {items.map((i, idx) => (
+          <div
+            key={i.id}
+            style={{
+              display: 'flex', justifyContent: 'space-between', gap: '0.5rem', padding: '0.5rem 0',
+              borderTop: idx > 0 ? '1px solid var(--border)' : undefined,
+            }}
+          >
+            <div>
+              <b>{i.nombre}</b> — {i.nombreVeterinaria}
+              <div className="muted" style={{ fontSize: '0.85rem' }}>{i.contacto}</div>
+            </div>
+            <span className="muted" style={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+              {new Date(i.createdAt).toLocaleDateString('es-AR')}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Solicitudes({ orgs, planes, onCambio }: { orgs: Organizacion[]; planes: Plan[]; onCambio: () => void }) {
   const [items, setItems] = useState<Solicitud[]>([]);
   const [cargando, setCargando] = useState(true);

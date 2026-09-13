@@ -12,6 +12,7 @@ import { HceModule } from './hce/hce.module';
 import { PortalModule } from './portal/portal.module';
 import { AdminModule } from './admin/admin.module';
 import { SolicitudesModule } from './solicitudes/solicitudes.module';
+import { InteresadosModule } from './interesados/interesados.module';
 import { UsuariosModule } from './core/usuarios/usuarios.module';
 import { OrganizacionModule } from './core/organizacion/organizacion.module';
 import { TroperaModule } from './tropera/tropera.module';
@@ -50,6 +51,7 @@ import { HealthModule } from './health/health.module';
     PortalModule,
     AdminModule,
     SolicitudesModule,
+    InteresadosModule,
     UsuariosModule,
     OrganizacionModule,
     TroperaModule,

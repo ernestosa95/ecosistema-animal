@@ -1,8 +1,9 @@
-import { Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { TenantGuard } from '../common/guards/tenant.guard';
 import { CurrentOrg, CurrentUser } from '../common/decorators/current-context.decorator';
 import { MensajesService } from './mensajes.service';
+import { ResponderMensajeDto } from './dto/responder-mensaje.dto';
 
 @Controller('mensajes')
 @UseGuards(JwtAuthGuard, TenantGuard)
@@ -17,5 +18,15 @@ export class MensajesController {
   @Post(':id/leido')
   marcarLeido(@Param('id') id: string, @CurrentUser() user: { sub: string }) {
     return this.mensajes.marcarLeido(id, user.sub);
+  }
+
+  @Post(':id/responder')
+  responder(
+    @Param('id') id: string,
+    @CurrentOrg() organizacionId: string,
+    @CurrentUser() user: { sub: string },
+    @Body() dto: ResponderMensajeDto,
+  ) {
+    return this.mensajes.responder(id, user.sub, organizacionId, dto);
   }
 }

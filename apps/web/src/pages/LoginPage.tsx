@@ -4,7 +4,9 @@ import {
   crearSolicitud, listarPlanesPublicos, enviarCodigoVerificacion, confirmarCodigoVerificacion,
   type PlanPublico,
 } from '../api/solicitudes';
+import { consultarCupoInteresados, type CupoInteresados } from '../api/interesados';
 import { TerminosModal } from '../components/TerminosModal';
+import { ModalInteres } from '../components/ModalInteres';
 import { InfoRoles } from '../components/InfoRoles';
 import { SelectorBusqueda } from '../components/SelectorBusqueda';
 import { rolInfoDe } from '../config/rolesInfo';
@@ -21,14 +23,20 @@ import type { Sesion } from '../api/types';
 const PASOS_REGISTRO = ['Tus datos', 'Tu organización', 'Tu plan', 'Tu acceso'] as const;
 
 export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
-  // La landing pública pasa el plan elegido como ?plan=<id> al mandar acá
-  // (ver LandingPage.tsx) — si viene, arranca directo en modo registro con
-  // ese plan preseleccionado en cuanto la lista de planes carga.
+  // Estrategia de lanzamiento (temporal, ver LandingPage.tsx): el alta
+  // self-service directa ("modo registro" acá abajo) queda pausada, sin
+  // reemplazar el código — sólo sin ningún botón que la dispare, para poder
+  // restaurarla fácil cuando se levante el cupo de 10. "Solicitar acceso"
+  // abre el mismo ModalInteres que la landing en vez de pasar a modo
+  // registro; si no, este link quedaba como una vía paralela para saltearse
+  // el cupo sin pasar por la landing.
   const [planIdInicial] = useState(() => new URLSearchParams(window.location.search).get('plan'));
-  const [modo, setModo] = useState<'login' | 'registro' | 'olvide'>(planIdInicial ? 'registro' : 'login');
+  const [modo, setModo] = useState<'login' | 'registro' | 'olvide'>('login');
   const [paso, setPaso] = useState(0);
   const [enviada, setEnviada] = useState(false);
   const [olvideEnviado, setOlvideEnviado] = useState(false);
+  const [cupo, setCupo] = useState<CupoInteresados | null>(null);
+  const [modalInteresAbierta, setModalInteresAbierta] = useState(!!planIdInicial);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -110,6 +118,12 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
       }).catch(() => {});
     }
   }, [modo]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    consultarCupoInteresados()
+      .then(setCupo)
+      .catch(() => setCupo({ disponible: true, restantes: 10 })); // si falla la consulta, no bloquear el link
+  }, []);
 
   const planElegido = planes.find((p) => p.id === planId);
 
@@ -503,23 +517,36 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
               ‹ Volver a ingresar
             </button>
           </p>
+        ) : modo === 'registro' ? (
+          <p className="switch">
+            ¿Ya tenés cuenta?{' '}
+            <button type="button" className="link" onClick={() => { setError(null); setModo('login'); setPaso(0); }}>
+              Ingresar
+            </button>
+          </p>
         ) : (
           <p className="switch">
-            {modo === 'login' ? '¿No tenés cuenta?' : '¿Ya tenés cuenta?'}{' '}
-            <button
-              type="button"
-              className="link"
-              onClick={() => {
-                setError(null);
-                setModo(modo === 'login' ? 'registro' : 'login');
-                setPaso(0);
-              }}
-            >
-              {modo === 'login' ? 'Solicitar acceso' : 'Ingresar'}
-            </button>
+            {cupo && !cupo.disponible ? (
+              'Ya completamos las primeras 10 solicitudes de esta etapa.'
+            ) : (
+              <>
+                ¿No tenés cuenta?{' '}
+                <button type="button" className="link" onClick={() => setModalInteresAbierta(true)}>
+                  Solicitar acceso
+                </button>
+              </>
+            )}
           </p>
         )}
       </form>
+
+      {modalInteresAbierta && (
+        <ModalInteres
+          restantes={cupo?.restantes ?? 10}
+          onCerrar={() => setModalInteresAbierta(false)}
+          onEnviado={() => setCupo((c) => (c ? { disponible: c.restantes > 1, restantes: c.restantes - 1 } : c))}
+        />
+      )}
     </div>
   );
 }

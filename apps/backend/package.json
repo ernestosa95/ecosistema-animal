@@ -28,6 +28,7 @@
     "test:solicitudes-demo": "tsx test/solicitudes-flow.demo.ts",
     "test:usuarios-demo": "tsx test/usuarios-flow.demo.ts",
     "test:portal-demo": "tsx test/portal-flow.demo.ts",
+    "test:interesados-demo": "tsx test/interesados-flow.demo.ts",
     "db:local-init": "node scripts/init-local-db.mjs",
     "db:seed": "node scripts/seed-especies.mjs",
     "db:seed:vademecum": "node scripts/seed-vademecum-senasa.mjs",

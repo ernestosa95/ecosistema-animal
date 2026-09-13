@@ -1,7 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, desc, eq, inArray, isNull, or } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDB } from '../database/drizzle.provider';
-import { mensajes, mensajesLeidos, organizaciones } from '../database/schema';
+import { mensajes, mensajesLeidos, mensajeRespuestas, organizaciones } from '../database/schema';
+import { ResponderMensajeDto } from './dto/responder-mensaje.dto';
 
 @Injectable()
 export class MensajesService {
@@ -53,6 +54,56 @@ export class MensajesService {
     if (!existente) {
       await this.db.insert(mensajesLeidos).values({ mensajeId, usuarioId });
     }
+    return { ok: true };
+  }
+
+  /**
+   * Guarda las respuestas del feedback opcional de un mensaje y lo marca
+   * leído en el mismo paso — responder ya implica descartar el banner, ver
+   * MensajesBanner.tsx. Reenvío = pisa SÓLO las preguntas incluidas en este
+   * envío (borra esas filas puntuales del mismo usuario+mensaje e inserta de
+   * nuevo) — no todas las respuestas previas del usuario a este mensaje,
+   * porque un mensaje puede tener varias preguntas y un reenvío parcial (ej.
+   * corregir una sola respuesta) no debe borrar las demás ya contestadas.
+   */
+  async responder(mensajeId: string, usuarioId: string, organizacionId: string, dto: ResponderMensajeDto) {
+    const [mensaje] = await this.db
+      .select({ preguntas: mensajes.preguntas })
+      .from(mensajes)
+      .where(and(eq(mensajes.id, mensajeId), isNull(mensajes.deletedAt)))
+      .limit(1);
+    if (!mensaje) throw new NotFoundException('Mensaje no encontrado');
+
+    const idsValidos = new Set((mensaje.preguntas as Array<{ id: string }>).map((p) => p.id));
+    for (const r of dto.respuestas) {
+      if (!idsValidos.has(r.preguntaId)) {
+        throw new BadRequestException(`La pregunta ${r.preguntaId} no pertenece a este mensaje`);
+      }
+    }
+
+    await this.db
+      .delete(mensajeRespuestas)
+      .where(
+        and(
+          eq(mensajeRespuestas.mensajeId, mensajeId),
+          eq(mensajeRespuestas.usuarioId, usuarioId),
+          inArray(
+            mensajeRespuestas.preguntaId,
+            dto.respuestas.map((r) => r.preguntaId),
+          ),
+        ),
+      );
+    await this.db.insert(mensajeRespuestas).values(
+      dto.respuestas.map((r) => ({
+        mensajeId,
+        preguntaId: r.preguntaId,
+        usuarioId,
+        organizacionId,
+        respuesta: r.respuesta,
+      })),
+    );
+
+    await this.marcarLeido(mensajeId, usuarioId);
     return { ok: true };
   }
 }

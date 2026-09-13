@@ -1,4 +1,6 @@
-import { IsIn, IsString, IsUUID, MinLength, ValidateIf } from 'class-validator';
+import { IsArray, IsIn, IsOptional, IsString, IsUUID, MinLength, ValidateIf, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { PreguntaDto } from './pregunta.dto';
 
 export class CrearMensajeDto {
   @IsString()
@@ -19,4 +21,11 @@ export class CrearMensajeDto {
   @ValidateIf((o) => o.destinatarioTipo === 'grupo')
   @IsUUID()
   grupoId?: string;
+
+  /** Feedback opcional (sí/no, opción múltiple, texto breve) — ver PreguntaDto. Responder queda a criterio del usuario, ver MensajesBanner.tsx. */
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PreguntaDto)
+  preguntas?: PreguntaDto[];
 }

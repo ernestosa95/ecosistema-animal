@@ -81,9 +81,25 @@ export interface Plan {
   descripcion?: string | null; activo: boolean;
 }
 export type DestinatarioTipo = 'todas' | 'organizacion' | 'grupo';
+export type TipoPregunta = 'si_no' | 'opcion_multiple' | 'texto_breve';
+/** `id` sólo viene presente en una pregunta ya guardada (lo asigna el server, ver MensajesAdminService.crear()). */
+export interface Pregunta {
+  id?: string;
+  tipo: TipoPregunta;
+  texto: string;
+  opciones?: string[];
+}
 export interface MensajeAdmin {
   id: string; titulo: string; cuerpo: string; destinatarioTipo: DestinatarioTipo;
   organizacionId?: string | null; grupoId?: string | null; publicadoEn: string;
+  preguntas: Pregunta[];
+}
+export interface RespuestasMensaje {
+  mensajeId: string; titulo: string; totalRespondieron: number;
+  preguntas: Array<
+    | { id: string; tipo: 'si_no' | 'opcion_multiple'; texto: string; opciones?: string[]; conteos: Record<string, number> }
+    | { id: string; tipo: 'texto_breve'; texto: string; respuestas: Array<{ respuesta: string; organizacion: string; fecha: string }> }
+  >;
 }
 
 /**
@@ -233,9 +249,13 @@ export const listarMensajesAdmin = (): Promise<MensajeAdmin[]> => req('/admin/me
 export const crearMensaje = (d: {
   titulo: string; cuerpo: string; destinatarioTipo: DestinatarioTipo;
   organizacionId?: string; grupoId?: string;
+  preguntas?: Pregunta[];
 }): Promise<MensajeAdmin> => req('/admin/mensajes', { method: 'POST', body: JSON.stringify(d) });
 
 export const eliminarMensaje = (id: string) => req(`/admin/mensajes/${id}`, { method: 'DELETE' });
+
+/** Feedback recibido para un mensaje — conteos por opción y texto libre, ver MensajesAdminService.respuestas(). */
+export const respuestasMensaje = (id: string): Promise<RespuestasMensaje> => req(`/admin/mensajes/${id}/respuestas`);
 
 /** Descarga el respaldo JSON de una organización. */
 export async function exportarOrg(orgId: string, nombre?: string) {

@@ -24,4 +24,9 @@ export class MensajesAdminController {
   eliminar(@Param('id') id: string) {
     return this.mensajes.eliminar(id);
   }
+
+  @Get(':id/respuestas')
+  respuestas(@Param('id') id: string) {
+    return this.mensajes.respuestas(id);
+  }
 }

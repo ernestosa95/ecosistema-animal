@@ -14,6 +14,7 @@ import * as plataforma from '../src/database/schema/plataforma';
 import { eq } from 'drizzle-orm';
 import { TenantGuard } from '../src/common/guards/tenant.guard';
 import { MensajesService } from '../src/mensajes/mensajes.service';
+import { MensajesAdminService } from '../src/admin/mensajes/mensajes-admin.service';
 import { AdminService } from '../src/admin/admin.service';
 import { MailService } from '../src/common/mail/mail.service';
 
@@ -63,6 +64,7 @@ async function main() {
       organizacion_id uuid REFERENCES core.organizaciones(id) ON DELETE CASCADE,
       grupo_id uuid REFERENCES plataforma.grupos_organizaciones(id) ON DELETE CASCADE,
       creado_por uuid REFERENCES core.usuarios(id),
+      preguntas jsonb NOT NULL DEFAULT '[]'::jsonb,
       publicado_en timestamptz NOT NULL DEFAULT now(),
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
     CREATE TABLE plataforma.mensajes_leidos (
@@ -70,6 +72,14 @@ async function main() {
       mensaje_id uuid NOT NULL REFERENCES plataforma.mensajes(id) ON DELETE CASCADE,
       usuario_id uuid NOT NULL REFERENCES core.usuarios(id) ON DELETE CASCADE,
       leido_en timestamptz NOT NULL DEFAULT now());
+    CREATE TABLE plataforma.mensaje_respuestas (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      mensaje_id uuid NOT NULL REFERENCES plataforma.mensajes(id) ON DELETE CASCADE,
+      pregunta_id text NOT NULL,
+      usuario_id uuid NOT NULL REFERENCES core.usuarios(id) ON DELETE CASCADE,
+      organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
+      respuesta text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now());
     CREATE TABLE plataforma.pagos (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
@@ -253,6 +263,64 @@ async function main() {
   const totalEsperado = 15000 + 9999;
   check('el total acumulado suma todos los pagos cargados en esta prueba', ganancias.totalAcumulado === totalEsperado);
   check('hay al menos dos períodos distintos (mes actual + el histórico de 2020)', ganancias.porPeriodo.length >= 2);
+
+  console.log('14) MensajesAdminService.crear(): asigna un id a cada pregunta (sí/no, opción múltiple, texto breve)');
+  const mensajesAdminService = new MensajesAdminService(db as any);
+  const mensajeConPreguntas = await mensajesAdminService.crear(usuarioA.id, {
+    titulo: '¿Qué te parece el turnero nuevo?',
+    cuerpo: 'Queremos tu opinión sobre la última actualización.',
+    destinatarioTipo: 'todas',
+    preguntas: [
+      { tipo: 'si_no', texto: '¿Probaste el turnero nuevo?' },
+      { tipo: 'opcion_multiple', texto: '¿Qué tan fácil te resultó?', opciones: ['Muy fácil', 'Normal', 'Difícil'] },
+      { tipo: 'texto_breve', texto: '¿Qué le agregarías?' },
+    ],
+  } as any);
+  const preguntasGuardadas = mensajeConPreguntas.preguntas as Array<{ id: string; tipo: string }>;
+  check('quedaron las 3 preguntas', preguntasGuardadas.length === 3);
+  check('cada una tiene un id propio asignado por el server', preguntasGuardadas.every((p) => typeof p.id === 'string' && p.id.length > 0));
+  const [pSiNo, pOpcion, pTexto] = preguntasGuardadas;
+
+  console.log('15) MensajesService.responder(): guarda las respuestas y marca el mensaje leído en el mismo paso');
+  await mensajesService.responder(mensajeConPreguntas.id, usuarioB.id, orgSinGrupo.id, {
+    respuestas: [
+      { preguntaId: pSiNo.id, respuesta: 'si' },
+      { preguntaId: pOpcion.id, respuesta: 'Muy fácil' },
+      { preguntaId: pTexto.id, respuesta: 'Que se pueda arrastrar el turno de horario' },
+    ],
+  } as any);
+  const pendientesBTrasResponder = await mensajesService.pendientes(orgSinGrupo.id, usuarioB.id);
+  check('responder también lo saca de "pendientes" (queda leído)', !pendientesBTrasResponder.some((m) => m.id === mensajeConPreguntas.id));
+
+  console.log('16) MensajesService.responder(): rechaza una preguntaId que no pertenece a este mensaje');
+  let rechazadoPreguntaAjena = false;
+  try {
+    await mensajesService.responder(mensajeConPreguntas.id, usuarioC.id, orgVencida.id, {
+      respuestas: [{ preguntaId: 'no-existe', respuesta: 'si' }],
+    } as any);
+  } catch (e: any) {
+    rechazadoPreguntaAjena = e?.status === 400 || e?.name === 'BadRequestException';
+  }
+  check('rechaza con 400, no inserta una respuesta huérfana', rechazadoPreguntaAjena);
+
+  console.log('17) MensajesService.responder(): un reenvío pisa la respuesta anterior del mismo usuario, no la duplica');
+  await mensajesService.responder(mensajeConPreguntas.id, usuarioB.id, orgSinGrupo.id, {
+    respuestas: [{ preguntaId: pSiNo.id, respuesta: 'no' }],
+  } as any);
+
+  console.log('18) MensajesAdminService.respuestas(): agrega conteos por opción y junta el texto libre');
+  // Un segundo usuario responde para que el conteo de sí/no tenga más de un valor.
+  await mensajesService.responder(mensajeConPreguntas.id, usuarioA.id, orgConGrupo.id, {
+    respuestas: [{ preguntaId: pSiNo.id, respuesta: 'si' }],
+  } as any);
+  const resultado = await mensajesAdminService.respuestas(mensajeConPreguntas.id);
+  check('totalRespondieron cuenta usuarios distintos (B y A), no filas', resultado.totalRespondieron === 2);
+  const resSiNo = resultado.preguntas.find((p) => p.id === pSiNo.id) as any;
+  check('el reenvío de B quedó en "no" (pisó al "si" anterior), A quedó en "si"', resSiNo.conteos.no === 1 && resSiNo.conteos.si === 1);
+  const resTexto = resultado.preguntas.find((p) => p.id === pTexto.id) as any;
+  check('la pregunta de texto breve trae la respuesta libre de B', resTexto.respuestas[0]?.respuesta === 'Que se pueda arrastrar el turno de horario');
+  const resOpcion = resultado.preguntas.find((p) => p.id === pOpcion.id) as any;
+  check('opción múltiple: sólo B respondió, "Muy fácil" tiene 1 y las otras no aparecen', resOpcion.conteos['Muy fácil'] === 1 && resOpcion.conteos['Difícil'] === undefined);
 
   console.log(`\nRESULTADO: ${ok} OK, ${fail} fallas`);
   await client.close();
