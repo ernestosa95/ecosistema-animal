@@ -2,6 +2,19 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-09-13] — Primer deploy en producción: Huella corriendo en `huella.site`
+
+F0.1 del Roadmap pasa de ⏳ a ✅. Antes de tocar la VPS hubo que resolver un bloqueante que no era de infraestructura: `feat/turnero-web-y-datos-especie` tenía 82 archivos sin commitear (rediseño de marca, costo de vacunación, portal por DNI+código, feedback en mensajes con preguntas, captura de interesados para el lanzamiento, plantillas de Instagram) y 3 commits sin pushear, con `main` 45 commits atrás — clonar tal cual estaba el remoto se hubiera llevado una versión vieja sin nada de esto.
+
+- **Repo:** el trabajo se separó en 6 commits temáticos (uno por feature, siguiendo las migraciones nuevas 0034-0037 como límite natural entre ellos), se corrieron las 19 suites `test:*-demo` + `tsc --noEmit` (backend) + `vite build` (web) — todo verde — y se mergeó (fast-forward, sin conflictos) a `main`. El deploy clonó `main`, no la rama feature.
+- **VPS**: DonWeb Cloud Server (4 vCPU/8GB/30GB, Ubuntu 24.04 mínima — nada de paneles tipo Easypanel/CloudPanel, que hubieran peleado por los puertos 80/443 con el Caddy de Docker). Usuario `deploy` con SSH sólo por clave (root y login por password deshabilitados), `ufw` + `fail2ban`, Docker + red `edge` + stack de Caddy compartido — sección 3 del plan sin desvíos.
+- **Dominio**: `huella.site` (el gratis de DonWeb, decisión consciente por rapidez — sigue pendiente evaluar un `.com.ar` más adelante). DNS de `app.`/`api.` propagó en minutos, no en las 1-4hs que anunciaba DonWeb.
+- **App**: `docker compose build && up -d`, 37 migraciones + los 4 seeds corridos sin error contra el Postgres 16 real. `https://api.huella.site/health` y `https://app.huella.site` responden con HTTPS válido (Let's Encrypt vía `caddy-docker-proxy`).
+- **Primera cuenta**: no existía ningún usuario en la base nueva, así que `SUPERADMIN_EMAILS` por sí solo no alcanzaba para entrar a `/admin` (el guard sólo chequea el email de un usuario *ya* autenticado). Se creó a mano contra `POST /auth/register` — endpoint que la web ya no llama pero que sigue activo — para tener la primera cuenta dueño/superadmin.
+- **Backups**: cron diario (`pg_dump` + volumen `uploads`) probado con un restore real contra un Postgres descartable — 48 tablas y conteos de especies/usuarios/vademécum verificados iguales. Sigue pendiente una copia fuera de la VPS.
+- **Mobile**: `app.json` pasa del placeholder `com.anonymous.mobile` a `com.huella.app` (nombre/slug/scheme también renombrados a "Huella"), y se agrega `eas.json` con un perfil `preview` (`buildType: apk`) para poder generar un APK instalable sin pasar por el dev-client de la PC. Falta correr el build en sí.
+- **Pendiente antes de invitar una clínica real**: verificar el dominio en `huella.site` en Resend (hoy los emails transaccionales sólo se logean, no se envían), error tracking, y correr `Protocolo_Pruebas.md` contra el ambiente real. Detalle completo en `docs/Plan_Despliegue.md`, sección 0.
+
 ## [2026-09-12] — Plantillas de Instagram para el lanzamiento de Huella, armadas en Canva
 
 A pedido del usuario, generación de un primer set de plantillas editables para el lanzamiento de Huella en Instagram, con la sesión ya autenticada contra el MCP de Canva (sin brand kit propio en la cuenta todavía — la paleta/tipografía/tono se pasaron a mano en cada generación, tomados de `docs/Kit_Marca_Huella.html`).

@@ -1,6 +1,6 @@
 # 🚀 Plan de despliegue — Ecosistema de Salud Animal
 
-**Fecha:** 2026-09-03, revisado 2026-09-05 (arquitectura pasada a Docker — ver nota abajo) y 2026-09-10 (compra de la VPS confirmada para el **sábado 12/09** — ver la sección 0, cronograma). Estado: **VPS a comprarse el 12/09** (F0.1 del Roadmap pasa de ⏳ a en curso esta semana — nada de esto corrió contra una VPS real todavía).
+**Fecha:** 2026-09-03, revisado 2026-09-05 (arquitectura pasada a Docker — ver nota abajo), 2026-09-10 (compra de la VPS confirmada para el **sábado 12/09**) y 2026-09-13 (**deploy ejecutado de punta a punta** — ver la sección 0). Estado: **en producción** — `https://app.huella.site` / `https://api.huella.site`, IP `149.34.225.152`, DonWeb Cloud Server (4 vCPU/8GB/30GB, Ubuntu 24.04). F0.1 del Roadmap pasa de ⏳ a ✅. Pendiente antes de invitar una clínica real: verificar el dominio en Resend y correr `Protocolo_Pruebas.md` — ver el detalle al final de la sección 0.
 
 > Este documento asume una **VPS paga** contratada por el usuario (self-hosted, no un PaaS tipo Railway/Render). Se descartó la idea original del Roadmap de una VM de Oracle Cloud Always Free — ver la sección de recursos más abajo para por qué.
 
@@ -10,30 +10,31 @@
 
 ---
 
-## 0. Cronograma para este despliegue (semana del 10/09)
+## 0. Cronograma de este despliegue — ejecutado el 13/09
 
-### Hoy → viernes 11/09, antes de comprar
+Se corrió un día más tarde de lo planeado (domingo 13/09 en vez del sábado 12/09), sin cambios de fondo respecto al plan.
 
-- [ ] **Decidir qué se despliega, commitear y pushear.** A la fecha de esta revisión el trabajo vive en la rama `feat/turnero-web-y-datos-especie`, sin commitear — ni el rediseño de marca (paleta, tipografía, logo/favicon) ni la columna `costo` nueva en vacunaciones llegan al servidor el sábado si esto sigue así: `git clone`/`git pull` sólo trae lo que está pusheado a la rama que se vaya a desplegar. Cerrar lo que se quiera llevar, mergear a `main` (o decidir que el deploy apunta a esta rama) y `git push` antes del sábado.
-- [x] **Migraciones re-verificadas** (10/09/2026): las 35 actuales (`0000`–`0034`, incluida la nueva `costo` de `hce.vacunaciones`) corren de punta a punta contra un Postgres 16 recién creado + el seed de especies, sin ningún error. Ver el detalle actualizado en la sección 5.
-- [ ] **Elegir el dominio real** — leer la nota de abajo antes de aceptar el dominio gratis de DonWeb como el dominio principal que va a ver una clínica.
-- [ ] Crear la cuenta de Resend (gratis) si todavía no existe, para tener el panel a mano en cuanto haya un dominio para verificar — no se puede verificar nada sin el dominio, pero la cuenta se crea antes.
-- [ ] Opcional, 10 minutos: crear una cuenta de Sentry gratuita — no hace falta cablearla todavía, pero tenerla creada agiliza el ítem de "error tracking" de la sección 8 cuando llegue el momento.
+- [x] **Commiteado y pusheado a `main`.** Todo lo que vivía sin commitear en `feat/turnero-web-y-datos-especie` (rediseño de marca, costo de vacunación, portal por DNI+código, feedback en mensajes, captura de interesados, plantillas de Instagram) se separó en 6 commits temáticos, se corrieron las 19 suites `test:*-demo` + `tsc --noEmit` + `vite build` (todo verde), se pusheó la rama y se mergeó (fast-forward) a `main`. El deploy clonó `main`, no la rama feature.
+- [x] **Migraciones verificadas**: las 37 (`0000`–`0037`) corrieron sin error contra el Postgres 16 real de producción.
+- [x] **Dominio elegido: el gratis de DonWeb, `huella.site`** — no el `.com.ar` que sugiere la nota de abajo. Decisión consciente por rapidez el día del deploy; sigue siendo válido migrar a un `.com.ar` más adelante sin tocar nada de la arquitectura (sólo DNS + variables de entorno + rebuild de la imagen `web`).
+- [ ] Cuenta de Resend — todavía no se creó. `RESEND_API_KEY` quedó vacía en producción: los emails transaccionales (recuperar contraseña, verificación de email) sólo se logean en el backend, no se envían.
+- [ ] Cuenta de Sentry / error tracking — no se creó.
 
-### Sábado 12/09 — compra y primer deploy
+**Ejecución real (13/09):**
+1. VPS comprada (DonWeb Cloud Server, 4 vCPU/8GB/30GB, Ubuntu 24.04, IP `149.34.225.152`) y dominio gratis `huella.site` activado y delegado a los NS de DonWeb.
+2. DNS: registros A de `app.huella.site` y `api.huella.site` → `149.34.225.152`, ya resolviendo (propagación fue rápida, sin la espera de 1-4hs anunciada).
+3. Secciones 3 a 7 completas: usuario `deploy` (SSH sólo por clave, root/password deshabilitados, `ufw` + `fail2ban`), Docker + red `edge` + Caddy compartido, repo clonado desde `main`, `.env` de raíz y de `apps/backend/.env` armados, `docker compose build && up -d`, migraciones + los 4 seeds corridos.
+4. Confirmado: `https://app.huella.site` y `https://api.huella.site/health` responden con HTTPS válido (Let's Encrypt vía `caddy-docker-proxy`).
+5. Primera cuenta creada a mano contra `POST /auth/register` (endpoint todavía activo aunque la web ya no lo llame) — necesaria para poder loguear siquiera una vez, ya que `SuperAdminGuard` sólo chequea el email de un usuario ya autenticado, no reemplaza tener una cuenta.
+6. Backups: script + cron diario (sección 9) **probados con un restore real** contra un Postgres descartable — 48 tablas, conteos de especies/usuarios/vademécum verificados iguales.
 
-1. Comprar el Cloud Server (4 vCPU / 8GB RAM / 30GB SSD, 12 meses) y activar el dominio gratis incluido.
-2. **DNS primero, en cuanto se tenga la IP**: apuntar `app.<dominio>` y `api.<dominio>` a la IP de la VPS (sección 2). La propagación tarda de minutos a un par de horas — conviene lanzar este paso y seguir con el resto del deploy mientras propaga, no esperarlo con los brazos cruzados.
-3. Secciones 3 a 7, en orden: usuario `deploy` + firewall + Docker + red `edge` + Caddy (sección 3) → clonar el repo, `.env` de raíz y de `apps/backend/.env`, `docker compose build && up -d`, migraciones + los 4 seeds (sección 5) → confirmar que Caddy levantó HTTPS en los dos subdominios (sección 7).
-4. No seguir al endurecimiento (sección 8) hasta confirmar que `https://app.<dominio>` y `https://api.<dominio>/health` responden.
+**Pendiente, antes de mandarle el link a una clínica real:**
+- [ ] Verificar el dominio en Resend (sección 8) — sigue siendo el ítem más importante.
+- [ ] Backups fuera de la VPS (hoy sólo protegen contra "borré algo", no "se rompió el disco").
+- [ ] Bloques 0/1/8 de `Protocolo_Pruebas.md` contra `https://app.huella.site` real.
+- [ ] `eas.json`/`app.json` de mobile ya están listos (package `com.huella.app`, perfil `preview` → APK) — falta correr el build en sí con una cuenta de Expo.
 
-### Después del sábado, antes de mandarle el link a una clínica real
-
-- [ ] Verificar el dominio en Resend — recién es posible una vez que el DNS del dominio nuevo está armado (no antes). Sigue siendo el ítem más importante de la sección 8.
-- [ ] El resto del checklist de la sección 8: `JWT_SECRET` random, `SUPERADMIN_EMAILS` real, `BACKEND_PUBLIC_URL` correcto, backups corriendo y **probados** con un restore real.
-- [ ] Bloques 0/1/8 de `Protocolo_Pruebas.md` contra el ambiente real.
-
-**Nota sobre el dominio gratis**: DonWeb ofrece `.ONLINE`, `.SITE`, `.WEBSITE` o `.UNO` gratis al comprar 12 meses. Ninguno transmite la misma confianza que un `.com`/`.com.ar` frente a una veterinaria evaluando pagar por un software — encaja raro con que "confiable" sea uno de los cinco rasgos de personalidad de la marca (Ficha de Marca, `docs/Kit_Marca_Huella.html`). Alternativas: usar el dominio gratis para algo secundario (una landing de prueba, un link corto) y registrar aparte un `.com.ar` (por NIC.ar, no hace falta que sea DonWeb) para `app.`/`api.` — es lo que ve el cliente y cuesta poco. Si el sábado no da el tiempo para eso, arrancar con el gratis no bloquea nada técnico — es una decisión de marca a revisar después, no de infraestructura.
+**Nota sobre el dominio gratis (vigente, no se aplicó hoy)**: DonWeb ofrece `.ONLINE`, `.SITE`, `.WEBSITE` o `.UNO` gratis al comprar 12 meses. Ninguno transmite la misma confianza que un `.com`/`.com.ar` frente a una veterinaria evaluando pagar por un software — encaja raro con que "confiable" sea uno de los cinco rasgos de personalidad de la marca (Ficha de Marca, `docs/Kit_Marca_Huella.html`). Sigue siendo válido registrar aparte un `.com.ar` (por NIC.ar) para `app.`/`api.` más adelante — es una decisión de marca a revisar, no de infraestructura, y no bloquea nada técnico mientras tanto.
 
 ---
 
@@ -384,16 +385,16 @@ En cuanto `docker compose up -d` levanta el contenedor con esos labels conectado
 
 Nada de esto bloquea un primer deploy de prueba, pero **sí antes de dar el link a una clínica real**:
 
-- [ ] **`JWT_SECRET` nuevo y random**, nunca el valor de dev committeado en ningún `.env` local. Generarlo con `openssl rand -hex 32`.
-- [ ] **`SUPERADMIN_EMAILS`** con tu email real, no el de prueba.
+- [x] **`JWT_SECRET` nuevo y random** — generado con `openssl rand -hex 32` al armar el `.env` de producción (2026-09-13), nunca el valor de dev.
+- [x] **`SUPERADMIN_EMAILS`** con el email real (`ridelernesto@gmail.com`), no uno de prueba.
 - [x] **CORS** — resuelto (2026-09-05, commit `bfd10aeb`): `main.ts` ahora lee `CORS_ORIGIN` de env (`app.enableCors(corsOrigin ? { origin: corsOrigin.split(',').map(o => o.trim()) } : undefined)`); sin la variable, sigue abierto a cualquier origen (dev local). Sólo falta **cargar la variable en el `.env` de prod** con el dominio real (`CORS_ORIGIN=https://app.tudominio.com`, separado por coma si hace falta más de un origen).
 - [x] **Rate-limiting en los endpoints de auth** — resuelto (2026-09-05, mismo commit): `/auth/login`, `/auth/forgot-password`, `/auth/reset-password` (y desde esa misma sesión, `/solicitudes/verificar-email` y su `/confirmar`) tienen `@Throttle` a 5 intentos / 15 min por IP, sobre el límite global de 100/min de toda la API.
 - [ ] **Dominio propio verificado en Resend.** `MAIL_FROM` hoy usa el dominio de pruebas de Resend (`onboarding@resend.dev`), que en modo sandbox **sólo entrega a la casilla dueña de la cuenta de Resend** — ningún usuario real va a recibir el mail de "olvidé mi contraseña" (ni el código de verificación de email, ni el recordatorio de pago) hasta que se verifique un dominio propio (unos registros DNS, agregados desde el panel de Resend). Sigue siendo el gap más importante de los que quedan en esta lista.
 - [x] **`GET /health`** — resuelto (2026-09-05, mismo commit): sin guards, confirma que el proceso responde y que la conexión a Postgres está viva (`SELECT 1`), pensado para el `healthcheck:` de Docker Compose o un servicio de uptime externo (sección 10).
 - [ ] **Error tracking** (Sentry o similar) — hoy no hay ninguno; un error en producción sólo se nota si el usuario se queja o alguien mira los logs a mano.
-- [ ] **`BACKEND_PUBLIC_URL`** correcto *antes* de que alguien suba la primera foto real — queda grabado en `animales.foto_url` en el momento de subir; cambiarlo después no corrige las fotos ya subidas.
-- [ ] **Backups** (sección 9) funcionando y **probados** — no basta con que el cron exista, hay que confirmar al menos una vez que un backup restaura de verdad. Sigue sin haberse probado a la fecha de esta revisión.
-- [ ] **Build de mobile para testers reales.** Todo lo hecho hasta ahora en `apps/mobile` fue `expo run:android`, que genera un build *debug* atado al dev-client + Metro corriendo en la PC de desarrollo — no instalable por un tercero. Si el testeo con usuarios reales incluye mobile (no sólo web), hace falta EAS Build (o un `gradle assembleRelease` local con un keystore propio) y cambiar el `package` de `app.json`, que sigue en el placeholder `com.anonymous.mobile`. Si el testeo inicial es sólo vía web, este punto puede esperar.
+- [x] **`BACKEND_PUBLIC_URL`** correcto (`https://api.huella.site`) desde el primer deploy (2026-09-13) — configurado antes de que nadie subiera ninguna foto real.
+- [x] **Backups** (sección 9) funcionando y **probados** (2026-09-13): cron diario + restore real contra un Postgres descartable, 48 tablas y conteos verificados. Sigue pendiente sumar una copia *fuera* de la VPS (hoy sólo protege contra "borré algo", no "se rompió el disco").
+- [ ] **Build de mobile para testers reales.** `app.json`/`eas.json` ya están listos (2026-09-13: package `com.huella.app` en vez del placeholder `com.anonymous.mobile`, perfil `preview` con `buildType: apk` para EAS Build) — falta crear la cuenta de Expo y correr el build en sí. Si el testeo inicial es sólo vía web, este punto puede esperar.
 
 ---
 
@@ -447,14 +448,16 @@ No hace falta nada elaborado al arrancar. Lo mínimo que vale la pena:
 
 ## 11. Checklist de deploy (primera vez, resumen ejecutable)
 
-1. [ ] Contratar la VPS (2vCPU/4GB/60-80GB como piso por proyecto, región cerca de Argentina si es posible).
-2. [ ] DNS: `app.tudominio.com` y `api.tudominio.com` apuntando a la IP de la VPS.
-3. [ ] Sección 3: usuario `deploy`, firewall, Docker instalado, red `edge` creada, stack de Caddy "edge" levantado.
-4. [ ] Sección 5: repo clonado, `.env` de raíz + `apps/backend/.env` armados, `docker compose build` + `up -d`, `db:migrate` + los 4 `db:seed*` corridos dentro del contenedor (especies es obligatorio; vacunas/diagnósticos/vademécum son catálogos de sugerencias — sin ellos no rompe nada, pero esas búsquedas quedan vacías en silencio).
-5. [ ] Sección 7: confirmar que Caddy detectó los labels y los dos dominios responden por HTTPS.
-6. [ ] Sección 8: checklist de endurecimiento completo — incluye los ítems nuevos de esta revisión (rate-limiting, dominio de Resend, health-check, backup probado, build de mobile si corresponde).
-7. [ ] Sección 9: cron de backup corriendo, un restore probado al menos una vez a mano.
-8. [ ] Entrar a `https://app.tudominio.com/admin` con el `SUPERADMIN_EMAILS` real y confirmar que el panel carga.
+Ejecutado el 2026-09-13 contra `huella.site` / `149.34.225.152`. Lo que sigue es el registro de qué se hizo — útil como plantilla si se repite este proceso para otro proyecto en la misma VPS.
+
+1. [x] Contratar la VPS (DonWeb, 4 vCPU/8GB/30GB, Ubuntu 24.04).
+2. [x] DNS: `app.huella.site` y `api.huella.site` apuntando a la IP de la VPS.
+3. [x] Sección 3: usuario `deploy`, firewall (`ufw` + firewall de red de DonWeb), Docker instalado, red `edge` creada, stack de Caddy "edge" levantado, `fail2ban` activo.
+4. [x] Sección 5: repo clonado desde `main`, `.env` de raíz + `apps/backend/.env` armados, `docker compose build` + `up -d`, `db:migrate` + los 4 `db:seed*` corridos dentro del contenedor.
+5. [x] Sección 7: Caddy detectó los labels, ambos dominios responden por HTTPS con certificado de Let's Encrypt.
+6. [ ] Sección 8: checklist de endurecimiento — la mayoría cerrado (JWT, SUPERADMIN_EMAILS, CORS, rate-limiting, health-check, BACKEND_PUBLIC_URL, backup probado); **falta Resend, error tracking y el build de mobile**.
+7. [x] Sección 9: cron de backup corriendo, restore probado a mano contra un Postgres descartable.
+8. [x] Entrar a `https://app.huella.site/admin` con `ridelernesto@gmail.com` y confirmar que el panel carga — hecho, cuenta creada vía `POST /auth/register` (no había ninguna todavía).
 9. [ ] Correr el `Protocolo_Pruebas.md` — o al menos los bloques 0/1/8 — contra el ambiente real antes de mandarle el link a la primera clínica.
 
 ---
