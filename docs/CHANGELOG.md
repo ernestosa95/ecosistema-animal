@@ -2,6 +2,14 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-09-12] — Plantillas de Instagram para el lanzamiento de Huella, armadas en Canva
+
+A pedido del usuario, generación de un primer set de plantillas editables para el lanzamiento de Huella en Instagram, con la sesión ya autenticada contra el MCP de Canva (sin brand kit propio en la cuenta todavía — la paleta/tipografía/tono se pasaron a mano en cada generación, tomados de `docs/Kit_Marca_Huella.html`).
+
+- Carpeta en Canva: [Huella — Lanzamiento IG](https://www.canva.com/folder/FAHU_beUW3M). Cinco plantillas editables: 1 post de feed ("Llegó Huella"), 3 historias (anuncio simple, variante con espacio para foto documental, variante con titular en pregunta + zona reservada para sticker de encuesta/pregunta de Instagram) y 1 portada de Reel (no existe un tipo de diseño "reel" generable por IA en este MCP — es video — así que se cubrió con el frame de apertura en formato historia 9:16).
+- Sin el logo real insertado (`apps/web/public/favicon.svg`): el MCP solo sube assets desde una URL pública, no desde archivo local, así que el sello-huella de las plantillas es una recreación por texto — pendiente arrastrar el SVG real adentro de Canva.
+- Complementa (no reemplaza) lo mencionado en `docs/Estrategia_Instagram.html` sobre plantillas de post/historia "en un canvas aparte" — este set es específicamente de lanzamiento, generado por fuera de ese documento.
+
 ## [2026-09-06] — Fix: la vacunación no tenía costo asociado, a diferencia de la consulta
 
 El usuario notó la asimetría: `consultas.costo` es obligatorio desde 2026-09-03 (aunque sea 0, cortesía), pero `vacunaciones` nunca sumó el mismo campo — no había forma de dejar registrado cuánto se cobró por aplicar una vacuna.

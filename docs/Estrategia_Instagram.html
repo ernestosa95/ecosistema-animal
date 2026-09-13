@@ -1,0 +1,254 @@
+<title>Estrategia de Instagram ER Soluciones</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+:root{
+  --verde:#0E7C6B; --verde-deep:#0A5C4F; --tierra:#8B5A2B; --tierra-deep:#6B4520; --ink:#1E2A23;
+  --paper:#F6F5F1; --paper-soft:#EDEBE4; --stamp:#A13D2B;
+  --border:#E2DFD6; --muted:#6C6650;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --verde:#43B79E; --verde-deep:#6BD2B9; --tierra:#C98A4E; --tierra-deep:#E3AC79; --ink:#EAE5D6;
+    --paper:#12201C; --paper-soft:#1A2B25; --stamp:#DD7259;
+    --border:#2B3B34; --muted:#93A099;
+  }
+}
+:root[data-theme="dark"]{
+  --verde:#43B79E; --verde-deep:#6BD2B9; --tierra:#C98A4E; --tierra-deep:#E3AC79; --ink:#EAE5D6;
+  --paper:#12201C; --paper-soft:#1A2B25; --stamp:#DD7259;
+  --border:#2B3B34; --muted:#93A099;
+}
+*{box-sizing:border-box;}
+body{background:var(--paper);color:var(--ink);font-family:'Work Sans',ui-sans-serif,system-ui,sans-serif;line-height:1.55;padding-inline:20px;padding-block:48px 80px;}
+h1,h2,h3{font-family:'Sora',system-ui,sans-serif;text-wrap:balance;margin:0;}
+.wrap{max-width:900px;margin-inline:auto;}
+.eyebrow{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:0.72rem;letter-spacing:0.11em;text-transform:uppercase;color:var(--verde);}
+p{margin:0 0 12px;max-width:66ch;}
+
+.portada{border:1.5px solid var(--border);border-radius:4px;padding:28px clamp(18px,4vw,40px);position:relative;}
+.portada::before{content:"";position:absolute;inset:6px;border:1px solid var(--border);border-radius:2px;pointer-events:none;}
+.portada h1{font-size:clamp(1.9rem,5.5vw,2.6rem);font-weight:700;margin-top:8px;}
+.portada .sub{max-width:60ch;color:var(--muted);margin-top:10px;}
+.meta{margin-top:22px;display:flex;gap:22px;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--muted);border-top:1px dashed var(--border);padding-top:14px;}
+.meta b{color:var(--ink);font-weight:600;}
+
+section{margin-top:52px;}
+.section-head{display:flex;align-items:baseline;gap:12px;margin-bottom:10px;}
+.section-head h2{font-size:1.4rem;font-weight:600;}
+.section-head .n{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--muted);}
+.dek{color:var(--muted);max-width:64ch;margin-bottom:22px;}
+
+/* leyenda */
+.leyenda{display:flex;gap:18px;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;font-size:0.78rem;margin-bottom:28px;}
+.leyenda span{display:inline-flex;align-items:center;gap:7px;}
+.dot{width:11px;height:11px;border-radius:50%;display:inline-block;}
+.dot.huella{background:var(--verde);}
+.dot.tropera{background:var(--tierra);}
+.dot.inst{background:var(--ink);}
+
+/* pilares */
+.pilares{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));}
+.pilar{border:1px solid var(--border);border-radius:8px;padding:18px 20px;background:var(--paper-soft);}
+.pilar .num{font-family:'IBM Plex Mono',monospace;font-size:0.7rem;color:var(--muted);}
+.pilar h3{font-size:1.05rem;font-weight:600;margin:6px 0 8px;}
+.pilar p{font-size:0.88rem;margin:0;color:var(--ink);max-width:none;}
+
+/* cadencia tabla */
+.tabla{width:100%;border-collapse:collapse;font-size:0.88rem;}
+.tabla th{text-align:left;font-family:'IBM Plex Mono',monospace;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--border);}
+.tabla td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top;}
+.tabla tr:last-child td{border-bottom:none;}
+.tabla .dia{font-family:'Sora',sans-serif;font-weight:600;white-space:nowrap;}
+
+/* calendario 4 semanas */
+.semana{margin-bottom:22px;}
+.semana-head{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--verde-deep);margin-bottom:10px;}
+.post-row{display:grid;grid-template-columns:90px 1fr;gap:14px;padding:10px 0;border-bottom:1px solid var(--border);font-size:0.9rem;align-items:baseline;}
+.post-row:last-child{border-bottom:none;}
+.post-row .dia{font-family:'Sora',sans-serif;font-weight:600;font-size:0.85rem;}
+.post-row .pill{display:inline-flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:0.68rem;text-transform:uppercase;margin-right:8px;}
+
+/* historias */
+.historia-card{border:1px solid var(--border);border-radius:8px;padding:16px 18px;margin-bottom:12px;}
+.historia-card .tipo{font-family:'Sora',sans-serif;font-weight:600;font-size:0.98rem;color:var(--verde-deep);}
+.historia-card p{margin:6px 0 0;font-size:0.9rem;}
+.historia-card .ejemplo{font-family:'IBM Plex Mono',monospace;font-size:0.8rem;background:var(--paper-soft);border-left:2px solid var(--verde);padding:8px 12px;border-radius:0 4px 4px 0;margin-top:8px;}
+
+/* prompts de imagen */
+.prompt-card{border:1px solid var(--border);border-radius:8px;padding:16px 18px;margin-bottom:12px;background:var(--paper-soft);}
+.prompt-card .cap{font-family:'IBM Plex Mono',monospace;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted);margin-bottom:8px;}
+.prompt-card .texto{font-family:'IBM Plex Mono',monospace;font-size:0.85rem;line-height:1.5;color:var(--ink);}
+
+.nota{border-left:2px solid var(--stamp);padding-left:14px;font-size:0.88rem;color:var(--muted);margin-top:8px;}
+
+footer{margin-top:64px;padding-top:18px;border-top:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+</style>
+
+<div class="wrap">
+
+  <div class="portada">
+    <span class="eyebrow">Estrategia de publicación</span>
+    <h1>Instagram @er.soluciones_</h1>
+    <p class="sub">Núcleo de comunicación de ER Soluciones — Huella (veterinarias) y Tropera (campo) en la misma cuenta. Pilares de contenido, cadencia semanal, un mes de calendario de ejemplo, tipos de historia y los prompts de imagen que faltan para producirlo.</p>
+    <div class="meta">
+      <span>Basado en: <b>Kit de Marca Huella</b></span>
+      <span>Fecha: <b>10.09.2026</b></span>
+      <span>Cuenta: <b>82 seguidores, en arranque</b></span>
+    </div>
+  </div>
+
+  <section>
+    <div class="section-head"><span class="n">·</span><h2>Objetivo de la cuenta</h2></div>
+    <p>Hoy la cuenta recién arranca (82 seguidores, 1 publicación). El objetivo de los primeros tres meses no es viralizar — es instalar dos cosas: que una veterinaria o un productor que llega a la cuenta entienda en 10 segundos qué resuelve cada solución, y que vea contenido útil con la frecuencia suficiente como para seguir en el radar hasta que le toque decidir.</p>
+    <div class="leyenda">
+      <span><span class="dot huella"></span>Huella</span>
+      <span><span class="dot tropera"></span>Tropera</span>
+      <span><span class="dot inst"></span>Institucional / ambas</span>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><span class="n">01</span><h2>Cinco pilares de contenido</h2></div>
+    <div class="pilares">
+      <div class="pilar">
+        <div class="num">PILAR 1</div>
+        <h3>Educación</h3>
+        <p>Tips clínicos (Huella) o de manejo de campo (Tropera). Contenido que se guarda y se comparte — construye autoridad antes de vender nada.</p>
+      </div>
+      <div class="pilar">
+        <div class="num">PILAR 2</div>
+        <h3>Producto en acción</h3>
+        <p>Antes/después, una función mostrada de verdad (screen recording, no mockup). Es el pilar que convierte a alguien que ya te sigue.</p>
+      </div>
+      <div class="pilar">
+        <div class="num">PILAR 3</div>
+        <h3>Casos reales</h3>
+        <p>Testimonios de clientes piloto — con su permiso, con su nombre real. La prueba social pesa más que cualquier feature.</p>
+      </div>
+      <div class="pilar">
+        <div class="num">PILAR 4</div>
+        <h3>Comunidad y detrás de escena</h3>
+        <p>El equipo, cómo se construye el producto, la vida real de una veterinaria o un campo. Refuerza "cercano" y "con oficio".</p>
+      </div>
+      <div class="pilar">
+        <div class="num">PILAR 5</div>
+        <h3>Novedades</h3>
+        <p>Lanzamientos de funciones, planes nuevos, hitos de la cuenta. El pilar que menos aparece — se gasta cuando hay algo real que anunciar.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><span class="n">02</span><h2>Cadencia semanal</h2></div>
+    <p class="dek">3 posts de feed por semana, historias todos los días, 1 reel semanal. Alternando Huella y Tropera para no dejarle ningún pilar sin atender a ninguno de los dos públicos.</p>
+    <table class="tabla">
+      <tr><th>Día</th><th>Feed</th><th>Historias</th></tr>
+      <tr><td class="dia">Lunes</td><td>Post educativo (Pilar 1)</td><td>Encuesta o pregunta a la audiencia</td></tr>
+      <tr><td class="dia">Martes</td><td>—</td><td>Detrás de escena / equipo</td></tr>
+      <tr><td class="dia">Miércoles</td><td>Post de producto (Pilar 2)</td><td>Recordatorio con link a la bio</td></tr>
+      <tr><td class="dia">Jueves</td><td>—</td><td>Repost de un cliente o caso real</td></tr>
+      <tr><td class="dia">Viernes</td><td>Reel o carrusel (Pilar 3 o 4)</td><td>Cierre de semana, contenido liviano</td></tr>
+      <tr><td class="dia">Sábado</td><td>—</td><td>Dato curioso o tip rápido</td></tr>
+      <tr><td class="dia">Domingo</td><td>Descanso</td><td>Opcional — cuenta regresiva a lo que viene</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <div class="section-head"><span class="n">03</span><h2>Calendario de ejemplo — primer mes</h2></div>
+    <p class="dek">Cuatro semanas concretas para arrancar. A partir de la segunda, el patrón se repite reemplazando el contenido puntual.</p>
+
+    <div class="semana">
+      <div class="semana-head">Semana 1</div>
+      <div class="post-row"><span class="dia">Lun</span><span><span class="pill"><span class="dot huella"></span>Huella</span>Post — "3 señales de que tu vacunatorio necesita un recordatorio automático" (plantilla de marca, Pilar 1).</span></div>
+      <div class="post-row"><span class="dia">Mié</span><span><span class="pill"><span class="dot inst"></span>Ambas</span>Carrusel de 2 slides — "de la carpeta de papel a la ficha digital" (antes/después, Pilar 2).</span></div>
+      <div class="post-row"><span class="dia">Vie</span><span><span class="pill"><span class="dot tropera"></span>Tropera</span>Reel — cómo registrar un movimiento de hacienda en 20 segundos, grabado de pantalla real.</span></div>
+    </div>
+
+    <div class="semana">
+      <div class="semana-head">Semana 2</div>
+      <div class="post-row"><span class="dia">Lun</span><span><span class="pill"><span class="dot tropera"></span>Tropera</span>Post — "cuándo registrar un movimiento y cuándo corregir una existencia" (Pilar 1).</span></div>
+      <div class="post-row"><span class="dia">Mié</span><span><span class="pill"><span class="dot huella"></span>Huella</span>Post — recordatorio de vacuna por WhatsApp, mostrado en pantalla real (Pilar 2).</span></div>
+      <div class="post-row"><span class="dia">Vie</span><span><span class="pill"><span class="dot inst"></span>Ambas</span>Carrusel con una cita textual de un cliente piloto (Pilar 3) — pedir el permiso antes de armarlo.</span></div>
+    </div>
+
+    <div class="semana">
+      <div class="semana-head">Semana 3</div>
+      <div class="post-row"><span class="dia">Lun</span><span><span class="pill"><span class="dot huella"></span>Huella</span>Post — cómo armar la agenda de un vacunatorio sin pisar turnos (Pilar 1).</span></div>
+      <div class="post-row"><span class="dia">Mié</span><span><span class="pill"><span class="dot tropera"></span>Tropera</span>Carrusel — planilla de Excel vs. panel consolidado de existencias (Pilar 2).</span></div>
+      <div class="post-row"><span class="dia">Vie</span><span><span class="pill"><span class="dot inst"></span>Ambas</span>Reel detrás de escena — el equipo mostrando en qué está trabajando (Pilar 4).</span></div>
+    </div>
+
+    <div class="semana">
+      <div class="semana-head">Semana 4</div>
+      <div class="post-row"><span class="dia">Lun</span><span><span class="pill"><span class="dot tropera"></span>Tropera</span>Post — 3 errores comunes al llevar el stock de hacienda a mano (Pilar 1).</span></div>
+      <div class="post-row"><span class="dia">Mié</span><span><span class="pill"><span class="dot huella"></span>Huella</span>Post de novedad — la función nueva que se haya lanzado ese mes (Pilar 5).</span></div>
+      <div class="post-row"><span class="dia">Vie</span><span><span class="pill"><span class="dot inst"></span>Ambas</span>Carrusel institucional — "un mes de Huella + Tropera en números" (Pilar 4/5).</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><span class="n">04</span><h2>Tipos de historia</h2></div>
+    <div class="historia-card">
+      <div class="tipo">Encuesta</div>
+      <p>Sticker de encuesta de Instagram, siempre atado a un problema real que resuelve el producto.</p>
+      <div class="ejemplo">"¿Cómo llevás hoy los turnos?" → Papel / WhatsApp — resultado + link a la bio.</div>
+    </div>
+    <div class="historia-card">
+      <div class="tipo">Detrás de escena</div>
+      <p>Foto o video corto y sin editar del equipo trabajando — nunca stock, nunca posado.</p>
+    </div>
+    <div class="historia-card">
+      <div class="tipo">Cuenta regresiva</div>
+      <p>Sticker de cuenta regresiva para el lanzamiento de una función nueva o la apertura de un plan.</p>
+    </div>
+    <div class="historia-card">
+      <div class="tipo">Repost de cliente</div>
+      <p>Captura de un mensaje real de agradecimiento o una reseña — siempre con permiso explícito antes de publicar.</p>
+    </div>
+    <div class="historia-card">
+      <div class="tipo">Preguntas y respuestas</div>
+      <p>Sticker de preguntas abierto una vez por semana — responder en historias siguientes, sin editar las preguntas.</p>
+    </div>
+    <div class="historia-card">
+      <div class="tipo">Recordatorio de bio</div>
+      <p>Historia corta que señala el link de la bio — turnero, planes o pedir una demo.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><span class="n">05</span><h2>Prompts de imagen</h2></div>
+    <p class="dek">Para los posts que necesitan fotografía (no la plantilla de marca) — misma dirección fotográfica del kit: documental, luz cálida, nunca posado, nunca stock genérico. Generalos y pasámelos si querés que arme el post alrededor.</p>
+
+    <div class="prompt-card">
+      <div class="cap">Huella · consultorio</div>
+      <div class="texto">Fotografía documental cuadrada. Manos de una veterinaria examinando a un perro mestizo marrón sobre una camilla de metal, estetoscopio apoyado en el lomo del animal. Luz natural cálida entrando de una ventana lateral, fondo de consultorio real desenfocado. Paleta cálida y terrosa, nadie mira a cámara, estilo fotoperiodístico, sin aspecto de stock.</div>
+    </div>
+    <div class="prompt-card">
+      <div class="cap">Tropera · campo</div>
+      <div class="texto">Primer plano de las manos de un productor rural anotando en una libreta de campo apoyada sobre una tranquera de madera vieja. Al fondo, desenfocado, vacas pastando en un campo verde. Luz de atardecer dorada y cálida. Estilo documental, textura real, sin filtros artificiales.</div>
+    </div>
+    <div class="prompt-card">
+      <div class="cap">Antes / después</div>
+      <div class="texto">Fotografía de la mesada de recepción de una veterinaria de barrio real: una carpeta de papel abierta, un celular con WhatsApp abierto al lado, y una laptop mostrando una ficha digital ordenada — como un antes y después dentro de la misma imagen. Luz natural, colores cálidos, composición documental.</div>
+    </div>
+    <div class="prompt-card">
+      <div class="cap">Huella · historia (vertical)</div>
+      <div class="texto">Foto vertical, formato historia de Instagram. Un veterinario sostiene a un gato atigrado en brazos, mirando hacia el animal, no a cámara. Fondo de consultorio desenfocado en tonos verdes y cálidos. Luz suave de ventana.</div>
+    </div>
+    <div class="prompt-card">
+      <div class="cap">Tropera · producto en mano</div>
+      <div class="texto">Fotografía de un celular en la mano de un productor de campo, mostrando en pantalla una app con un ícono de huella (pata) — de fondo, desenfocado, un corral con hacienda. Luz de mediodía, colores tierra.</div>
+    </div>
+    <div class="prompt-card">
+      <div class="cap">Institucional · equipo</div>
+      <div class="texto">Foto de 2-3 personas de un equipo real alrededor de una laptop en una oficina simple y cálida, señalando la pantalla sin poses forzadas de stock. Luz natural, paleta consistente con la marca: verde apagado y papel cálido.</div>
+    </div>
+    <p class="nota">Las plantillas de post e historia con el sello de Huella (sin necesidad de foto) ya están armadas y editables — quedaron en un canvas aparte para usar directo en los posts de tip/pilar educativo.</p>
+  </section>
+
+  <footer>
+    <span>ER Soluciones · Estrategia de Instagram</span>
+    <span>Documento vivo — construido con Ernesto, 10.09.2026</span>
+  </footer>
+
+</div>
