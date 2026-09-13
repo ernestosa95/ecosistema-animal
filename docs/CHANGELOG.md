@@ -2,6 +2,16 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-09-13] — Resend en producción + editar/eliminar/reenviar en Interesados
+
+`huella.site` verificado en Resend (DKIM + SPF + DMARC, propagó en ~12 minutos vía DonWeb) — `RESEND_API_KEY`/`MAIL_FROM` cargados en el `.env` de producción, `MAIL_FROM=Huella <no-reply@huella.site>`. A partir de ahora "olvidé mi contraseña" y los mails de `interesados/` (ver entrada anterior) salen de verdad, no sólo quedan logueados.
+
+Sumado al panel de "Interesados del lanzamiento" (`AdminPage.tsx`), a pedido del usuario tras el primer caso real: Renzo se anotó antes de que `email` fuera un campo del formulario, así que quedó sin ninguno cargado y sin forma de contactarlo por mail.
+
+- **Editar**: `PATCH /admin/interesados/:id` — corrige/completa email, celular, nombre o veterinaria a mano, sin borrar y recrear el registro.
+- **Eliminar**: `DELETE /admin/interesados/:id` — saca el registro y libera su lugar en el cupo de 10 (spam, duplicados, no-shows).
+- **Reenviar confirmación**: `POST /admin/interesados/:id/reenviar` — reenvía el mail de bienvenida; sólo disponible (el botón se oculta) si ya tiene email cargado.
+
 ## [2026-09-13] — Interesados: email obligatorio + confirmación y aviso automáticos
 
 Llegó el primer interesado real (post-deploy) con sólo un teléfono como "contacto" — no había forma de mandarle nada automático ni de contactarlo por mail. `plataforma.interesados` suma `email` (obligatorio a nivel de DTO, migración `0038`); la columna física sigue llamándose `contacto` pero pasa a representar sólo el celular (opcional, para WhatsApp) — sin romper el dato ya cargado. `InteresadosService.crear()` ahora dispara, sin bloquear el alta si falla, dos mails vía `MailService`: confirmación al interesado y un aviso a cada email de `SUPERADMIN_EMAILS` con nombre/veterinaria/contacto, para que el seguimiento no dependa de entrar al panel. Web: `ModalInteres.tsx` separa "Email" (obligatorio) de "Celular" (opcional); `AdminPage.tsx` muestra ambos. Las 19 `test:*-demo` pasan.

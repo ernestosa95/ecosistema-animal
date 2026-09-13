@@ -15,7 +15,10 @@ import {
   type Pregunta, type TipoPregunta, type RespuestasMensaje,
 } from '../api/admin';
 import { listarSolicitudes, aprobarSolicitud, rechazarSolicitud, type Solicitud } from '../api/solicitudes';
-import { listarInteresadosAdmin, type Interesado } from '../api/interesados';
+import {
+  listarInteresadosAdmin, editarInteresadoAdmin, eliminarInteresadoAdmin, reenviarConfirmacionInteresado,
+  type Interesado,
+} from '../api/interesados';
 import { InfoRoles } from '../components/InfoRoles';
 
 const ROLES: Array<{ v: string; label: string }> = [
@@ -1662,41 +1665,127 @@ function Interesados() {
   const [items, setItems] = useState<Interesado[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [emailForm, setEmailForm] = useState('');
+  const [celularForm, setCelularForm] = useState('');
+  const [ocupado, setOcupado] = useState<string | null>(null); // id con una acción en curso (guardar/eliminar/reenviar)
 
-  useEffect(() => {
+  function cargar() {
+    setCargando(true);
     listarInteresadosAdmin()
       .then(setItems)
       .catch((e) => setError(e.message ?? 'Error al cargar interesados'))
       .finally(() => setCargando(false));
-  }, []);
+  }
+
+  useEffect(cargar, []);
+
+  function abrirEdicion(i: Interesado) {
+    setEditandoId(i.id);
+    setEmailForm(i.email ?? '');
+    setCelularForm(i.celular ?? '');
+  }
+
+  async function guardarEdicion(id: string) {
+    setOcupado(id);
+    setError(null);
+    try {
+      await editarInteresadoAdmin(id, { email: emailForm.trim() || undefined, celular: celularForm.trim() || undefined });
+      setEditandoId(null);
+      cargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo guardar');
+    } finally {
+      setOcupado(null);
+    }
+  }
+
+  async function eliminar(id: string) {
+    if (!confirm('¿Sacar a este interesado de la lista? Libera su lugar en el cupo.')) return;
+    setOcupado(id);
+    setError(null);
+    try {
+      await eliminarInteresadoAdmin(id);
+      cargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo eliminar');
+    } finally {
+      setOcupado(null);
+    }
+  }
+
+  async function reenviar(id: string) {
+    setOcupado(id);
+    setError(null);
+    try {
+      await reenviarConfirmacionInteresado(id);
+      alert('Mail de confirmación reenviado.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo reenviar');
+    } finally {
+      setOcupado(null);
+    }
+  }
 
   if (cargando) return null;
-  if (error) return <div className="alerta" style={{ marginBottom: 12 }}>{error}</div>;
-  if (items.length === 0) return null;
+  if (items.length === 0 && !error) return null;
 
   return (
     <div style={{ marginBottom: '1.25rem' }}>
       <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
         Interesados del lanzamiento <EstadoChip texto={`${items.length}/10`} />
       </h3>
+      {error && <div className="alerta" style={{ marginBottom: 8 }}>{error}</div>}
       <div className="card">
         {items.map((i, idx) => (
           <div
             key={i.id}
             style={{
-              display: 'flex', justifyContent: 'space-between', gap: '0.5rem', padding: '0.5rem 0',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', padding: '0.5rem 0',
               borderTop: idx > 0 ? '1px solid var(--border)' : undefined,
             }}
           >
-            <div>
+            <div style={{ flex: 1 }}>
               <b>{i.nombre}</b> — {i.nombreVeterinaria}
-              <div className="muted" style={{ fontSize: '0.85rem' }}>
-                {i.email}{i.celular ? ` · ${i.celular}` : ''}
-              </div>
+              {editandoId === i.id ? (
+                <div className="form-grid" style={{ marginTop: '0.4rem', maxWidth: 420 }}>
+                  <label className="span-2">
+                    Email
+                    <input type="email" value={emailForm} onChange={(e) => setEmailForm(e.target.value)} />
+                  </label>
+                  <label className="span-2">
+                    Celular
+                    <input value={celularForm} onChange={(e) => setCelularForm(e.target.value)} />
+                  </label>
+                  <div className="span-2" style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button className="btn-ghost" disabled={ocupado === i.id} onClick={() => guardarEdicion(i.id)}>
+                      {ocupado === i.id ? 'Guardando…' : 'Guardar'}
+                    </button>
+                    <button className="link" onClick={() => setEditandoId(null)}>Cancelar</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="muted" style={{ fontSize: '0.85rem' }}>
+                  {i.email || <i>sin email cargado</i>}{i.celular ? ` · ${i.celular}` : ''}
+                </div>
+              )}
             </div>
-            <span className="muted" style={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
-              {new Date(i.createdAt).toLocaleDateString('es-AR')}
-            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3rem' }}>
+              <span className="muted" style={{ fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
+                {new Date(i.createdAt).toLocaleDateString('es-AR')}
+              </span>
+              {editandoId !== i.id && (
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  {i.email && (
+                    <button className="link" disabled={ocupado === i.id} onClick={() => reenviar(i.id)}>
+                      Reenviar
+                    </button>
+                  )}
+                  <button className="link" onClick={() => abrirEdicion(i)}>Editar</button>
+                  <button className="link" disabled={ocupado === i.id} onClick={() => eliminar(i.id)}>Eliminar</button>
+                </div>
+              )}
+            </div>
           </div>
         ))}
       </div>

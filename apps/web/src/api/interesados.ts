@@ -60,3 +60,38 @@ export async function listarInteresadosAdmin(): Promise<Interesado[]> {
   if (!res.ok) throw new Error((await res.text().catch(() => '')) || `Error ${res.status}`);
   return res.json();
 }
+
+/** Admin — corrige/completa datos a mano (ej. cargar el email de alguien que se anotó antes de que fuera obligatorio). */
+export async function editarInteresadoAdmin(
+  id: string,
+  dto: Partial<Pick<Interesado, 'nombre' | 'email' | 'celular' | 'nombreVeterinaria'>>,
+): Promise<Interesado> {
+  const res = await fetch(`${API}/admin/interesados/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+    body: JSON.stringify(dto),
+  });
+  if (!res.ok) throw new Error((await res.text().catch(() => '')) || `Error ${res.status}`);
+  return res.json();
+}
+
+/** Admin — saca el registro y libera su lugar en el cupo. */
+export async function eliminarInteresadoAdmin(id: string): Promise<void> {
+  const res = await fetch(`${API}/admin/interesados/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error((await res.text().catch(() => '')) || `Error ${res.status}`);
+}
+
+/** Admin — reenvía el mail de confirmación (sólo si ya tiene email cargado). */
+export async function reenviarConfirmacionInteresado(id: string): Promise<void> {
+  const res = await fetch(`${API}/admin/interesados/${id}/reenviar`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.message || `Error ${res.status}`);
+  }
+}
