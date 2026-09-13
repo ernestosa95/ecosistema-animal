@@ -184,7 +184,8 @@ export class AuthService {
       .where(eq(usuarios.id, user.id));
   }
 
-  private emitirTokens(sub: string, email: string) {
+  /** Público a propósito — reutilizado por `interesados/` para loguear directo tras la activación (ver InteresadosService.activar()). */
+  emitirTokens(sub: string, email: string) {
     return {
       accessToken: this.jwt.sign({ sub, email }),
       refreshToken: this.jwt.sign(

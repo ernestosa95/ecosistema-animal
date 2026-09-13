@@ -7,6 +7,7 @@
 // token del panel /admin (mismo patrón que `adminReq` en api/solicitudes.ts)
 // para que el super-admin vea la lista y haga el seguimiento manual.
 import { getToken } from './admin';
+import type { Sesion } from './types';
 
 const API = (import.meta.env.VITE_API_URL as string) || 'http://localhost:3000';
 
@@ -94,4 +95,59 @@ export async function reenviarConfirmacionInteresado(id: string): Promise<void> 
     const body = await res.json().catch(() => null);
     throw new Error(body?.message || `Error ${res.status}`);
   }
+}
+
+/** Admin — dispara el link de "terminá tu alta" a todos los interesados que tengan email cargado. */
+export async function invitarTodosInteresados(): Promise<{ enviados: number }> {
+  const res = await fetch(`${API}/admin/interesados/invitar-todos`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error((await res.text().catch(() => '')) || `Error ${res.status}`);
+  return res.json();
+}
+
+// ── Activación (link que abre ActivarInteresadoPage.tsx, ?activarToken=) ──
+
+export interface DatosActivacion {
+  nombre: string;
+  email: string;
+  nombreVeterinaria: string;
+}
+
+/** Público — precarga la página de activación con lo que el interesado ya había dejado. */
+export async function obtenerDatosActivacion(token: string): Promise<DatosActivacion> {
+  const res = await fetch(`${API}/interesados/activar/${token}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.message || 'Este link no es válido o venció.');
+  }
+  return res.json();
+}
+
+/** Público — crea la cuenta y devuelve una sesión lista para guardar (ver ActivarInteresadoPage.tsx). */
+export async function activarInteresado(dto: {
+  token: string;
+  apellido: string;
+  password: string;
+  nombreOrganizacion?: string;
+}): Promise<Sesion> {
+  const res = await fetch(`${API}/interesados/activar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(dto),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.message || `No se pudo activar la cuenta (Error ${res.status}).`);
+  }
+  const data = await res.json();
+  return {
+    token: data.accessToken,
+    refreshToken: data.refreshToken,
+    organizacionId: data.organizacionId,
+    roles: data.roles,
+    huellaActiva: data.huellaActiva,
+    troperaActiva: data.troperaActiva,
+  };
 }

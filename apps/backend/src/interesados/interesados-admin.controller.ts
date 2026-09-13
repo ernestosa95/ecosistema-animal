@@ -29,4 +29,10 @@ export class InteresadosAdminController {
   reenviar(@Param('id') id: string) {
     return this.interesados.reenviarConfirmacion(id);
   }
+
+  /** Dispara el link de "terminá tu alta" a todos los que tengan email cargado — ver InteresadosService.invitarTodos(). */
+  @Post('invitar-todos')
+  invitarTodos() {
+    return this.interesados.invitarTodos();
+  }
 }

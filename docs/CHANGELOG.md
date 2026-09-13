@@ -2,6 +2,14 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-09-13] — Plantilla de marca en mails + flujo de activación de interesados
+
+Dos pedidos del usuario tras probar el mail de confirmación real (ya con Resend andando): que tuviera la cara de Huella, y una forma de convertir a los 10 interesados en cuentas reales cuando la app esté lista, sin que cada uno pase por el circuito de aprobación manual de `solicitudes/` (ya los eligió a mano).
+
+- **Plantilla de marca** (`common/mail/plantilla.ts`, `envolverEmailHuella()`): envoltorio HTML con estilos 100% inline (ningún cliente de mail confía en un `<style>` de `<head>`) — header verde `#0e7c6b` con el wordmark, fuente web-safe (Sora/Work Sans no están garantizadas fuera de un navegador), CTA opcional como botón. Aplicado por ahora sólo al mail de confirmación de `interesados/` — reutilizable para cualquier otro mail transaccional más adelante.
+- **Flujo de activación**: `POST /admin/interesados/invitar-todos` (botón "🚀 Habilitar alta para todos" en el panel) manda, a cada interesado con email cargado, un link `app.huella.site/?activarToken=<jwt>` (30 días de validez, mismo patrón stateless que `reset_password`/`PortalTokenService`, `scope: 'activar_interesado'`). El link abre `ActivarInteresadoPage.tsx` (nueva, pública): precarga nombre/veterinaria vía `GET /interesados/activar/:token`, pide apellido + contraseña, y `POST /interesados/activar` crea organización + usuario `propietario` **sin pasar por aprobación** — a diferencia de `solicitudes/`, es una decisión deliberada porque el super-admin ya vetó a mano a estos 10. Reutiliza `AuthService.emitirTokens()` (ahora público) para devolver una sesión lista; el cliente la guarda con la misma clave que `useSesion.ts` (`ecosistema.sesion`) y recarga a `/`, quedando logueado directo. Un token ya usado (cuenta ya creada) rechaza con 409 en vez de duplicar nada.
+- 27 checks nuevos en `test:interesados-demo` (mini-schema de `core` sumada: organizaciones/usuarios/membresias) cubren cupo, alta, edición, invitación, activación de punta a punta, reintento con el mismo token, y token inválido.
+
 ## [2026-09-13] — Resend en producción + editar/eliminar/reenviar en Interesados
 
 `huella.site` verificado en Resend (DKIM + SPF + DMARC, propagó en ~12 minutos vía DonWeb) — `RESEND_API_KEY`/`MAIL_FROM` cargados en el `.env` de producción, `MAIL_FROM=Huella <no-reply@huella.site>`. A partir de ahora "olvidé mi contraseña" y los mails de `interesados/` (ver entrada anterior) salen de verdad, no sólo quedan logueados.
