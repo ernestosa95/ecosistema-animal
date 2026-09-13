@@ -106,7 +106,7 @@ export function TutorialGuiado({
       scrollToFirstStep
       onEvent={onEvent}
       locale={{ back: 'Atrás', close: 'Cerrar', last: 'Listo', next: 'Siguiente', skip: 'Saltar' }}
-      styles={{ options: { primaryColor: '#5c8a4e', zIndex: 10000 } }}
+      styles={{ options: { primaryColor: '#0e7c6b', zIndex: 10000 } }}
     />
   );
 }

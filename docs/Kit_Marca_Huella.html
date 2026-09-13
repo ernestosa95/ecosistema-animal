@@ -1,0 +1,1189 @@
+<title>Kit de Marca Huella</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+:root{
+  --verde:#0E7C6B; --verde-deep:#0A5C4F; --ink:#1E2A23;
+  --paper:#F6F5F1; --paper-soft:#EDEBE4; --stamp:#A13D2B;
+  --border:#E2DFD6; --muted:#6C6650;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --verde:#43B79E; --verde-deep:#6BD2B9; --ink:#EAE5D6;
+    --paper:#12201C; --paper-soft:#1A2B25; --stamp:#DD7259;
+    --border:#2B3B34; --muted:#93A099;
+  }
+}
+:root[data-theme="dark"]{
+  --verde:#43B79E; --verde-deep:#6BD2B9; --ink:#EAE5D6;
+  --paper:#12201C; --paper-soft:#1A2B25; --stamp:#DD7259;
+  --border:#2B3B34; --muted:#93A099;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--paper);color:var(--ink);font-family:'Work Sans',ui-sans-serif,system-ui,sans-serif;line-height:1.55;padding-inline:20px;padding-block:48px 80px;}
+h1,h2,h3{font-family:'Sora',system-ui,sans-serif;text-wrap:balance;margin:0;}
+.wrap{max-width:820px;margin-inline:auto;}
+.eyebrow{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:0.72rem;letter-spacing:0.11em;text-transform:uppercase;color:var(--verde);}
+p{margin:0 0 12px;max-width:64ch;}
+a{color:var(--verde-deep);}
+:focus-visible{outline:2px solid var(--verde);outline-offset:2px;}
+
+/* ---- portada general ---- */
+.carnet{border:1.5px solid var(--border);border-radius:4px;padding:28px clamp(18px,4vw,40px);position:relative;overflow:hidden;}
+.carnet::before{content:"";position:absolute;inset:6px;border:1px solid var(--border);border-radius:2px;pointer-events:none;}
+.carnet-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;}
+.wordmark{display:flex;align-items:center;gap:14px;}
+.wordmark svg{width:46px;height:46px;flex:none;color:var(--verde);}
+.wordmark h1{font-size:clamp(2.1rem,6vw,2.8rem);font-weight:700;letter-spacing:0.01em;}
+.tagline-sub{font-size:1rem;color:var(--muted);max-width:52ch;margin-top:6px;}
+.carnet-meta{margin-top:22px;display:flex;gap:22px;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--muted);border-top:1px dashed var(--border);padding-top:14px;}
+.carnet-meta b{color:var(--ink);font-weight:600;}
+
+/* ---- toc ---- */
+.toc{margin-top:32px;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+.toc-item{display:flex;gap:16px;padding:16px 20px;border-bottom:1px solid var(--border);text-decoration:none;color:var(--ink);align-items:baseline;}
+.toc-item:last-child{border-bottom:none;}
+.toc-item:hover{background:var(--paper-soft);}
+.toc-item .num{font-family:'IBM Plex Mono',monospace;color:var(--verde);font-size:0.85rem;flex:none;width:2.2em;}
+.toc-item .txt b{font-family:'Sora',system-ui,sans-serif;font-weight:600;font-size:1.05rem;display:block;}
+.toc-item .txt span{font-size:0.85rem;color:var(--muted);}
+
+/* ---- divisor de parte ---- */
+.parte-divider{margin-top:76px;padding-top:26px;padding-bottom:22px;border-top:2px solid var(--verde);border-bottom:1px dashed var(--border);scroll-margin-top:20px;}
+.parte-divider h2{font-size:clamp(1.6rem,4.5vw,2.2rem);font-weight:700;margin-top:6px;}
+.parte-divider .dek{margin:8px 0 16px;}
+.parte-index{display:flex;flex-wrap:wrap;gap:6px 16px;font-family:'IBM Plex Mono',monospace;font-size:0.75rem;}
+.parte-index a{color:var(--muted);text-decoration:none;}
+.parte-index a:hover{color:var(--verde-deep);}
+
+section{margin-top:52px;scroll-margin-top:20px;}
+.section-head{display:flex;align-items:baseline;gap:12px;margin-bottom:8px;}
+.section-head h2{font-size:1.4rem;font-weight:600;}
+.section-head .n{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--muted);}
+.dek{color:var(--muted);max-width:60ch;margin-bottom:20px;}
+.porque{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--verde-deep);margin-top:4px;}
+.porque::before{content:"→ refuerza: ";color:var(--muted);}
+
+/* ===== PARTE 1 — fundamentos ===== */
+.personas{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));}
+.persona{background:var(--paper-soft);border:1px solid var(--border);border-radius:6px;padding:16px 18px;}
+.persona .rol{font-family:'Sora',system-ui,sans-serif;font-weight:600;font-size:1.05rem;margin-bottom:6px;}
+.persona p{font-size:0.92rem;margin:0;color:var(--ink);max-width:none;}
+.nota-indirecta{margin-top:14px;font-size:0.88rem;color:var(--muted);border-left:2px solid var(--border);padding-left:12px;}
+
+.transform{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;align-items:stretch;}
+.transform .arrow{align-self:center;font-family:'IBM Plex Mono',monospace;color:var(--verde);font-size:1.3rem;}
+.transform-col{background:var(--paper-soft);border:1px solid var(--border);border-radius:6px;padding:16px 18px;}
+.transform-col h3{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;font-weight:600;margin-bottom:10px;color:var(--muted);}
+.transform-col.despues h3{color:var(--verde);}
+.transform-col ul{margin:0;padding-left:18px;font-size:0.92rem;}
+.transform-col li{margin-bottom:6px;}
+@media (max-width:560px){.transform{grid-template-columns:1fr;}.transform .arrow{transform:rotate(90deg);}}
+
+.marcas{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));}
+.marca{border:1px solid var(--border);border-radius:6px;padding:16px 18px;}
+.marca .nombre{font-family:'Sora',system-ui,sans-serif;font-weight:600;font-size:1.05rem;}
+.marca p{font-size:0.88rem;color:var(--muted);margin:6px 0 0;max-width:none;}
+
+.sensacion{font-family:'Sora',system-ui,sans-serif;font-size:clamp(1.3rem,3.4vw,1.7rem);font-weight:500;color:var(--verde-deep);max-width:34ch;}
+
+.sello{position:relative;border:2px solid var(--stamp);border-radius:6px;padding:clamp(22px,5vw,38px);color:var(--stamp);transform:rotate(-0.4deg);}
+.sello::before{content:"";position:absolute;inset:6px;border:1px dashed var(--stamp);border-radius:3px;opacity:0.55;}
+.sello .eyebrow{color:var(--stamp);opacity:0.8;}
+.sello blockquote{margin:10px 0 0;font-family:'Sora',system-ui,sans-serif;font-weight:600;font-size:clamp(1.15rem,3vw,1.45rem);line-height:1.35;color:var(--ink);max-width:56ch;}
+.tagline{margin-top:16px;font-family:'IBM Plex Mono',monospace;font-size:0.85rem;color:var(--stamp);}
+.tagline::before{content:"\201C ";}
+.tagline::after{content:" \201D";}
+
+.rasgos{border-top:1px solid var(--border);}
+.rasgo{display:grid;grid-template-columns:180px 1fr;gap:16px;padding:14px 0;border-bottom:1px solid var(--border);}
+.rasgo dt{font-family:'Sora',system-ui,sans-serif;font-weight:600;color:var(--verde-deep);}
+.rasgo dd{margin:0;font-size:0.92rem;color:var(--ink);max-width:52ch;}
+@media (max-width:560px){.rasgo{grid-template-columns:1fr;gap:4px;}}
+
+.palabras{display:grid;gap:24px;grid-template-columns:1fr 1fr;}
+.palabras h3{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px;}
+.palabras .propias h3{color:var(--verde);}
+.palabras .rechazadas h3{color:var(--stamp);}
+@media (max-width:560px){.palabras{grid-template-columns:1fr;}}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;}
+.chip{font-family:'IBM Plex Mono',monospace;font-size:0.82rem;padding:5px 11px;border-radius:999px;border:1px solid var(--border);}
+.propias .chip{border-color:var(--verde);color:var(--verde-deep);}
+.rechazadas .chip,.chip.rechazada{border-color:var(--stamp);color:var(--stamp);text-decoration:line-through;text-decoration-thickness:1px;}
+
+.libreta{background:var(--paper-soft);border:1px solid var(--border);border-radius:6px;padding:clamp(20px,4vw,32px);position:relative;}
+.libreta::before{content:"";position:absolute;top:0;left:24px;right:24px;height:0;border-top:1px dashed var(--border);}
+.libreta p{font-family:'Sora',system-ui,sans-serif;font-size:1.05rem;line-height:1.6;color:var(--ink);max-width:none;}
+.libreta mark{background:none;color:var(--stamp);font-style:italic;}
+.libreta .nota{margin-top:14px;font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--muted);max-width:none;}
+
+/* ===== PARTE 2 — identidad visual ===== */
+.lockups{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));margin-bottom:8px;}
+.lockup-card{border:1px solid var(--border);border-radius:6px;padding:26px 20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;}
+.lockup-card.on-dark{background:#12201C;color:#EAE5D6;border-color:#2B3B34;}
+.lockup-card.on-light{background:#F6F5F1;color:#1E2A23;border-color:#E2DFD6;}
+.lockup-card svg{width:38px;height:38px;}
+.lockup-card .wm{font-family:'Sora',system-ui,sans-serif;font-weight:700;font-size:1.6rem;}
+.lockup-row{display:flex;align-items:center;gap:12px;}
+.lockup-card .cap{font-family:'IBM Plex Mono',monospace;font-size:0.68rem;letter-spacing:0.06em;text-transform:uppercase;opacity:0.65;}
+.clearspace{border:1px dashed var(--border);border-radius:6px;padding:24px;display:flex;align-items:center;gap:18px;margin-top:18px;flex-wrap:wrap;}
+.clearspace svg{width:34px;height:34px;color:var(--verde);flex:none;}
+.clearspace p{margin:0;font-size:0.9rem;color:var(--muted);max-width:48ch;}
+.donts{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:18px;}
+.dont{border:1px solid var(--border);border-radius:6px;padding:12px 14px;font-size:0.85rem;color:var(--muted);}
+.dont b{color:var(--stamp);font-family:'IBM Plex Mono',monospace;font-size:0.72rem;display:block;margin-bottom:4px;}
+
+.tipo-row{border-top:1px solid var(--border);padding:22px 0;}
+.tipo-row .rol{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:10px;}
+.tipo-row .rol .nombre{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--verde);}
+.tipo-row .rol .uso{font-size:0.82rem;color:var(--muted);}
+.specimen-slab{font-family:'Sora',system-ui,sans-serif;font-weight:600;font-size:clamp(1.8rem,5vw,2.6rem);}
+.specimen-work{font-family:'Work Sans',sans-serif;font-size:1.05rem;max-width:58ch;}
+.specimen-mono{font-family:'IBM Plex Mono',monospace;font-size:0.95rem;background:var(--paper-soft);border:1px solid var(--border);border-radius:4px;padding:12px 16px;display:inline-block;}
+
+.swatches{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-bottom:20px;}
+.swatch{border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+.swatch .fill{height:64px;}
+.swatch .info{padding:10px 12px;background:var(--paper-soft);}
+.swatch .name{font-family:'Sora',system-ui,sans-serif;font-weight:600;font-size:0.95rem;}
+.swatch .role{font-size:0.8rem;color:var(--muted);margin-top:2px;}
+.swatch .hexes{font-family:'IBM Plex Mono',monospace;font-size:0.7rem;color:var(--muted);margin-top:6px;display:flex;justify-content:space-between;}
+
+.mood-row{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:20px 0;}
+.mood{border-radius:6px;height:110px;border:1px solid var(--border);position:relative;}
+.mood span{position:absolute;bottom:8px;left:10px;font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.5);}
+.mood.evitar::after{content:"\2715 evitar";position:absolute;top:8px;right:10px;font-family:'IBM Plex Mono',monospace;font-size:0.68rem;background:rgba(0,0,0,0.55);color:#fff;padding:2px 6px;border-radius:3px;}
+.crop-guide{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:18px;}
+.crop-box{width:120px;height:80px;border:1.5px dashed var(--verde);border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--verde-deep);text-align:center;padding:6px;}
+
+.usos{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));}
+.uso-card{border:1px solid var(--border);border-radius:6px;padding:18px;}
+.uso-card .cap{font-family:'IBM Plex Mono',monospace;font-size:0.68rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+.divider-demo{border-top:1px dashed var(--border);margin:14px 0;position:relative;}
+.divider-demo::after{content:"\00B7";position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:var(--paper-soft);padding:0 8px;color:var(--verde);}
+.badge-demo{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--verde);color:var(--verde-deep);border-radius:999px;padding:4px 12px;font-family:'IBM Plex Mono',monospace;font-size:0.78rem;}
+.badge-demo svg{width:14px;height:14px;}
+.field-demo{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--muted);}
+.field-demo b{color:var(--ink);font-weight:600;}
+
+.demo-split{display:grid;gap:16px;grid-template-columns:1fr 1fr;margin-top:8px;}
+@media (max-width:620px){.demo-split{grid-template-columns:1fr;}}
+.demo-panel{border-radius:8px;padding:26px 22px;border:1px solid;}
+.demo-panel.claro{background:#F6F5F1;color:#1E2A23;border-color:#E2DFD6;}
+.demo-panel.oscuro{background:#12201C;color:#EAE5D6;border-color:#2B3B34;}
+.demo-panel .cap{font-family:'IBM Plex Mono',monospace;font-size:0.68rem;letter-spacing:0.08em;text-transform:uppercase;opacity:0.6;margin-bottom:14px;}
+.demo-panel .lockup-row{margin-bottom:16px;}
+.demo-panel.claro svg{color:#0E7C6B;}
+.demo-panel.oscuro svg{color:#43B79E;}
+.demo-panel .wm{font-family:'Sora',system-ui,sans-serif;font-weight:700;font-size:1.5rem;}
+.demo-chips{display:flex;gap:6px;margin-bottom:14px;}
+.demo-chip{width:26px;height:26px;border-radius:5px;}
+.demo-panel p{font-size:0.85rem;max-width:none;opacity:0.85;}
+.demo-panel.claro .demo-stamp{color:#A13D2B;border-color:#A13D2B;}
+.demo-panel.oscuro .demo-stamp{color:#DD7259;border-color:#DD7259;}
+.demo-stamp{display:inline-block;border:1.5px solid;border-radius:4px;padding:4px 10px;font-family:'IBM Plex Mono',monospace;font-size:0.68rem;margin-top:10px;}
+
+/* ===== PARTE 3 — voz ===== */
+.voces{display:flex;flex-direction:column;gap:14px;}
+.voz-card{border:1px solid var(--border);border-radius:6px;padding:18px 20px;background:var(--paper-soft);}
+.voz-card .adj{font-family:'Sora',system-ui,sans-serif;font-weight:700;font-size:1.3rem;color:var(--verde-deep);}
+.voz-card .def{font-size:0.9rem;color:var(--muted);margin:4px 0 12px;}
+.voz-card .ej{font-family:'IBM Plex Mono',monospace;font-size:0.88rem;background:var(--paper);border-left:2px solid var(--verde);padding:8px 12px;border-radius:0 4px 4px 0;}
+
+.longitud-demo{display:flex;flex-direction:column;gap:10px;margin-top:10px;}
+.frase-bar{border:1px solid var(--border);border-radius:6px;padding:12px 14px;font-size:0.92rem;}
+.frase-bar.mal{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--stamp);text-decoration-thickness:1px;}
+.frase-bar.bien{border-color:var(--verde);}
+.frase-tag{font-family:'IBM Plex Mono',monospace;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);display:block;margin-bottom:6px;}
+
+.reglas{border-top:1px solid var(--border);}
+.regla{display:grid;grid-template-columns:150px 1fr;gap:14px;padding:12px 0;border-bottom:1px solid var(--border);font-size:0.92rem;}
+.regla .k{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--verde);text-transform:uppercase;letter-spacing:0.04em;}
+@media (max-width:560px){.regla{grid-template-columns:1fr;gap:4px;}}
+
+.par{border:1px solid var(--border);border-radius:6px;padding:16px 18px;margin-bottom:10px;}
+.par .tag{font-family:'IBM Plex Mono',monospace;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.06em;display:inline-block;margin-bottom:8px;padding:2px 9px;border-radius:999px;}
+.par.mal{background:var(--paper-soft);}
+.par.mal .tag{color:var(--stamp);border:1px solid var(--stamp);}
+.par.bien .tag{color:var(--verde-deep);border:1px solid var(--verde);}
+.par p{margin:0;font-size:0.92rem;max-width:none;}
+
+.rewrite{border-radius:6px;padding:20px 22px;margin-bottom:18px;position:relative;}
+.rewrite.fuera{background:var(--paper-soft);border:1px solid var(--border);}
+.rewrite.estilo{border:1.5px solid var(--verde);}
+.rewrite .badge{font-family:'IBM Plex Mono',monospace;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;display:inline-flex;align-items:center;gap:6px;margin-bottom:12px;}
+.rewrite.fuera .badge{color:var(--stamp);}
+.rewrite.estilo .badge{color:var(--verde-deep);}
+.rewrite p.texto{font-family:'Sora',system-ui,sans-serif;font-size:1.08rem;line-height:1.55;color:var(--ink);max-width:none;}
+.rewrite .nota{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--muted);margin-top:10px;margin-bottom:0;max-width:none;}
+
+/* ===== PARTE 4 — mapa de direccion del logotipo ===== */
+.direccion{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:28px;}
+.direccion-head{display:flex;justify-content:space-between;align-items:baseline;padding:14px 20px;background:var(--paper-soft);border-bottom:1px solid var(--border);}
+.direccion-head .letra{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--verde);}
+.direccion-head h3{font-size:1.15rem;font-weight:600;}
+.specimen-box{display:flex;align-items:center;justify-content:center;min-height:150px;padding:28px;background:var(--paper);border-bottom:1px solid var(--border);}
+.specimen-box svg{width:74px;height:74px;color:var(--verde-deep);}
+.specimen-box .wm-big{font-family:'Sora',system-ui,sans-serif;font-weight:700;font-size:clamp(2.2rem,7vw,3.2rem);color:var(--verde-deep);}
+.specimen-box .lockup-h{display:flex;align-items:center;gap:16px;}
+.specimen-box .lockup-h .wm-big{font-size:clamp(1.7rem,5.5vw,2.4rem);}
+.datos{padding:18px 20px 6px;}
+.dato-row{display:grid;grid-template-columns:150px 1fr;gap:14px;padding:11px 0;border-bottom:1px solid var(--border);font-size:0.9rem;}
+.dato-row:last-of-type{border-bottom:none;}
+.dato-row .k{font-family:'IBM Plex Mono',monospace;font-size:0.68rem;letter-spacing:0.04em;text-transform:uppercase;color:var(--muted);}
+.dato-row.riesgo .k{color:var(--stamp);}
+.dato-row.funciona .k{color:var(--verde);}
+@media (max-width:560px){.dato-row{grid-template-columns:1fr;gap:4px;}}
+.mini-test{display:flex;align-items:center;gap:12px;padding:16px 20px 20px;flex-wrap:wrap;}
+.mini-test .tag{font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;}
+.icon-40{width:40px;height:40px;border-radius:9px;background:var(--verde-deep);display:flex;align-items:center;justify-content:center;flex:none;}
+.icon-40 svg{width:24px;height:24px;color:#fff;}
+.icon-40.texto{font-family:'Sora',system-ui,sans-serif;font-weight:700;color:#fff;font-size:0.62rem;line-height:1;text-align:center;padding:2px;}
+.icon-40.monograma svg{width:22px;height:22px;}
+.recom{position:relative;border:2px solid var(--verde);border-radius:6px;padding:clamp(22px,5vw,38px);}
+.recom::before{content:"";position:absolute;inset:6px;border:1px dashed var(--verde);border-radius:3px;opacity:0.45;}
+.recom .eyebrow{opacity:0.85;}
+.recom h3{font-size:1.3rem;margin-top:6px;color:var(--verde-deep);}
+.recom p{margin-top:12px;max-width:none;}
+.plan{margin-top:16px;border-top:1px dashed var(--border);padding-top:14px;font-family:'IBM Plex Mono',monospace;font-size:0.82rem;color:var(--muted);}
+.plan b{color:var(--ink);}
+
+/* ===== PARTE 5 — plan inicial de plantillas ===== */
+.plantilla{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:28px;display:grid;grid-template-columns:220px 1fr;}
+.plantilla-head{grid-column:1 / -1;display:flex;justify-content:space-between;align-items:baseline;padding:14px 20px;background:var(--paper-soft);border-bottom:1px solid var(--border);}
+.plantilla-head .letra{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--verde);}
+.plantilla-head h3{font-size:1.1rem;font-weight:600;}
+.wireframe-col{padding:20px;display:flex;align-items:center;justify-content:center;border-right:1px solid var(--border);background:var(--paper);}
+@media (max-width:640px){.plantilla{grid-template-columns:1fr;}.wireframe-col{border-right:none;border-bottom:1px solid var(--border);}}
+.dato-row.fijo .k{color:var(--ink);}
+.dato-row.cambia .k{color:var(--verde);}
+
+.wireframe{position:relative;border:1px solid var(--border);border-radius:4px;background:var(--paper-soft);overflow:hidden;width:100%;}
+.wireframe.r-cuadrado{aspect-ratio:1/1;max-width:170px;}
+.wireframe.r-historia{aspect-ratio:9/16;max-width:110px;}
+.wireframe.r-slide{aspect-ratio:16/9;max-width:210px;}
+.wireframe.r-a4{aspect-ratio:210/297;max-width:150px;}
+.wireframe.r-email{aspect-ratio:600/180;max-width:210px;}
+.zona{position:absolute;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:0.52rem;line-height:1.15;color:var(--muted);text-align:center;padding:2px;}
+.zona.sello-z{border-style:solid;border-color:var(--verde-deep);color:var(--verde-deep);}
+.zona.cambia-z{border:1.5px solid var(--verde);color:var(--verde-deep);background:transparent;font-weight:600;}
+.zona.muerta{background:repeating-linear-gradient(135deg,transparent,transparent 4px,rgba(161,61,43,0.12) 4px,rgba(161,61,43,0.12) 7px);border-color:var(--stamp);color:var(--stamp);}
+
+.prioridad{border-top:1px solid var(--border);margin-top:8px;}
+.pr-row{display:grid;grid-template-columns:34px 1fr;gap:14px;padding:12px 0;border-bottom:1px solid var(--border);align-items:baseline;}
+.pr-row .num{font-family:'Sora',system-ui,sans-serif;font-weight:700;color:var(--verde-deep);font-size:1.1rem;}
+.pr-row .txt b{font-weight:600;}
+.pr-row .txt span{display:block;font-size:0.85rem;color:var(--muted);}
+.nota-fiscal{border-left:2px solid var(--stamp);padding-left:14px;font-size:0.88rem;color:var(--muted);margin-bottom:20px;}
+
+/* ===== PARTE 6 — prueba de resistencia ===== */
+.prueba{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:28px;}
+.prueba-head{display:flex;justify-content:space-between;align-items:baseline;padding:14px 20px;background:var(--paper-soft);border-bottom:1px solid var(--border);}
+.prueba-head h3{font-size:1.1rem;font-weight:600;}
+.prueba-head .letra{font-family:'IBM Plex Mono',monospace;font-size:0.72rem;color:var(--verde);}
+.vista{padding:26px 20px;display:flex;gap:26px;align-items:center;justify-content:center;flex-wrap:wrap;background:var(--paper);border-bottom:1px solid var(--border);}
+.vista .cap{font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);text-align:center;margin-top:8px;max-width:120px;}
+.vista-item{display:flex;flex-direction:column;align-items:center;}
+
+.mono-icon{border-radius:16px;background:#12201C;display:flex;align-items:center;justify-content:center;}
+.mono-icon svg{color:#fff;}
+.mono-icon.grande{width:64px;height:64px;}
+.mono-icon.grande svg{width:44px;height:44px;}
+.mono-icon.chico{width:28px;height:28px;border-radius:8px;}
+.mono-icon.chico svg{width:18px;height:18px;}
+
+.tab-demo{background:var(--paper-soft);border:1px solid var(--border);border-radius:7px 7px 0 0;padding:7px 14px 7px 9px;display:flex;align-items:center;gap:7px;font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);}
+.tab-demo .fav{width:16px;height:16px;flex:none;color:var(--verde-deep);}
+.tab-demo .fav svg{width:100%;height:100%;}
+
+.gap-wrap{position:relative;width:120px;height:120px;}
+.gap-wrap svg{width:100%;height:100%;color:var(--verde-deep);}
+.gap-mark{position:absolute;border:1.5px dashed var(--stamp);border-radius:50%;pointer-events:none;}
+.gap-label{position:absolute;font-family:'IBM Plex Mono',monospace;font-size:0.58rem;color:var(--stamp);}
+
+.swatch-pair{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;}
+.swatch-mini{width:96px;}
+.swatch-mini .fill{height:54px;border-radius:5px;border:1px solid var(--border);}
+.swatch-mini .lbl{font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:var(--muted);margin-top:6px;text-align:center;}
+
+.franja-demo{display:flex;align-items:stretch;width:96px;height:54px;border-radius:5px;overflow:hidden;border:1px solid var(--border);}
+.franja-demo .barra{width:20%;}
+.franja-demo .resto{flex:1;background:var(--paper-soft);display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:0.5rem;color:var(--muted);text-align:center;padding:2px;}
+
+.sintesis{border:2px solid var(--verde);border-radius:6px;padding:clamp(20px,4vw,32px);position:relative;}
+.sintesis::before{content:"";position:absolute;inset:6px;border:1px dashed var(--verde);border-radius:3px;opacity:0.4;}
+.sintesis ol{margin:12px 0 0;padding-left:20px;}
+.sintesis li{margin-bottom:10px;font-size:0.94rem;}
+.sintesis li b{color:var(--verde-deep);}
+
+/* ===== PARTE 7 — manual de marca ===== */
+.errores{border:2px solid var(--stamp);border-radius:8px;padding:18px 20px;background:var(--paper-soft);}
+.errores h2{color:var(--stamp);font-size:1.15rem;}
+.errores ol{margin:10px 0 0;padding-left:20px;}
+.errores li{margin-bottom:8px;font-size:0.92rem;}
+.errores li b{color:var(--ink);}
+
+.logo-row{display:flex;gap:18px;flex-wrap:wrap;align-items:center;}
+.logo-mini{border:1px solid var(--border);border-radius:6px;padding:16px;display:flex;align-items:center;justify-content:center;background:var(--paper-soft);min-width:90px;height:90px;}
+.logo-mini svg{width:40px;height:40px;color:var(--verde-deep);}
+.clearspace-mini{border:1px dashed var(--border);border-radius:6px;padding:14px 16px;display:flex;align-items:center;gap:12px;flex:1;min-width:220px;font-size:0.85rem;color:var(--muted);}
+.clearspace-mini svg{width:28px;height:28px;color:var(--verde);flex:none;}
+.reglas-min{margin-top:12px;font-size:0.88rem;}
+.reglas-min li{margin-bottom:4px;}
+
+.paleta-tabla{width:100%;border-collapse:collapse;font-size:0.85rem;}
+.paleta-tabla th{text-align:left;font-family:'IBM Plex Mono',monospace;font-size:0.65rem;text-transform:uppercase;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--border);}
+.paleta-tabla td{padding:8px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.chip-color{width:20px;height:20px;border-radius:4px;display:inline-block;vertical-align:middle;border:1px solid var(--border);}
+.paleta-tabla .hex{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--muted);}
+
+.escala-row{display:flex;align-items:baseline;gap:16px;padding:10px 0;border-bottom:1px solid var(--border);}
+.escala-row:last-child{border-bottom:none;}
+.escala-row .muestra{flex:1;}
+.escala-meta{font-family:'IBM Plex Mono',monospace;font-size:0.68rem;color:var(--muted);white-space:nowrap;}
+.h1-esc{font-family:'Sora',system-ui,sans-serif;font-weight:700;font-size:2rem;}
+.h2-esc{font-family:'Sora',system-ui,sans-serif;font-weight:600;font-size:1.5rem;}
+.h3-esc{font-family:'Sora',system-ui,sans-serif;font-weight:600;font-size:1.125rem;}
+.body-esc{font-family:'Work Sans',sans-serif;font-size:1rem;}
+.ui-esc{font-family:'Work Sans',sans-serif;font-weight:500;font-size:0.875rem;}
+.mono-esc{font-family:'IBM Plex Mono',monospace;font-size:0.8125rem;}
+
+.voz-mini{display:flex;flex-direction:column;gap:8px;}
+.voz-mini .item{display:flex;gap:10px;align-items:baseline;font-size:0.9rem;}
+.voz-mini .item b{font-family:'IBM Plex Mono',monospace;font-size:0.68rem;text-transform:uppercase;color:var(--verde);flex:none;width:90px;}
+
+.dono-grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));}
+.dono-pair{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.dono-card{border-radius:6px;padding:16px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;min-height:100px;background:var(--paper-soft);}
+.dono-card.si{border:1.5px solid var(--verde);}
+.dono-card.no{border:1.5px solid var(--stamp);}
+.dono-tag{font-family:'IBM Plex Mono',monospace;font-size:0.62rem;text-transform:uppercase;}
+.dono-card.si .dono-tag{color:var(--verde-deep);}
+.dono-card.no .dono-tag{color:var(--stamp);}
+.dono-card svg{width:34px;height:34px;color:var(--verde-deep);}
+.dono-card.no svg{color:var(--stamp);filter:drop-shadow(1px 2px 2px rgba(0,0,0,0.35));}
+.btn-demo{font-family:'Work Sans',sans-serif;font-size:0.82rem;border-radius:6px;padding:6px 14px;background:var(--verde);color:#fff;}
+.btn-demo.mal{background:var(--stamp);text-transform:uppercase;}
+.wm-si{font-family:'Sora',system-ui,sans-serif;font-weight:700;font-size:1.3rem;color:var(--verde-deep);}
+.wm-no{font-family:Arial,sans-serif;font-weight:700;font-size:1.3rem;color:var(--verde-deep);}
+.franja-mini{display:flex;width:100%;height:34px;border-radius:4px;overflow:hidden;border:1px solid var(--border);}
+.franja-mini .b{width:22%;background:var(--verde);}
+.franja-mini .r{flex:1;background:var(--paper);display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-size:0.6rem;color:var(--muted);}
+.dono-caption{font-size:0.72rem;color:var(--muted);}
+
+footer{margin-top:70px;padding-top:18px;border-top:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+</style>
+
+<div class="wrap">
+
+  <div class="carnet">
+    <div class="carnet-top">
+      <div class="wordmark">
+        <svg viewBox="0 0 64 64" fill="currentColor" aria-hidden="true"><ellipse cx="32" cy="42" rx="15" ry="12"/><ellipse cx="14" cy="24" rx="7" ry="9" transform="rotate(-18 14 24)"/><ellipse cx="30" cy="14" rx="7.5" ry="9.5"/><ellipse cx="47" cy="16" rx="7" ry="9" transform="rotate(14 47 16)"/><ellipse cx="55" cy="32" rx="6" ry="8" transform="rotate(30 55 32)"/></svg>
+        <h1>Huella</h1>
+      </div>
+    </div>
+    <p class="tagline-sub">Kit de marca completo — fundamentos, identidad visual y guía de voz de la primera solución del ecosistema en salir al mercado.</p>
+    <div class="carnet-meta">
+      <span>Estado: <b>borrador para validar</b></span>
+      <span>Fecha: <b>10.09.2026</b></span>
+      <span>Alcance: <b>Huella (HCE Animal)</b></span>
+    </div>
+  </div>
+
+  <nav class="toc" aria-label="Índice">
+    <a class="toc-item" href="#parte-1"><span class="num">01</span><span class="txt"><b>Fundamentos de marca</b><span>A quién ayuda, posicionamiento, personalidad, palabras e historia</span></span></a>
+    <a class="toc-item" href="#parte-2"><span class="num">02</span><span class="txt"><b>Identidad visual</b><span>Logotipo, tipografía, paleta, fotografía y recurso gráfico</span></span></a>
+    <a class="toc-item" href="#parte-3"><span class="num">03</span><span class="txt"><b>Guía de voz</b><span>Adjetivos en acción, puntuación, palabras prohibidas y malas noticias</span></span></a>
+    <a class="toc-item" href="#parte-4"><span class="num">04</span><span class="txt"><b>Mapa de dirección del logotipo</b><span>Cuatro direcciones de logo, sus riesgos y la recomendación final</span></span></a>
+    <a class="toc-item" href="#parte-5"><span class="num">05</span><span class="txt"><b>Plan inicial de plantillas</b><span>Lo que hace falta diseñar en el primer mes, con tamaño y reglas fijas</span></span></a>
+    <a class="toc-item" href="#parte-6"><span class="num">06</span><span class="txt"><b>Prueba de resistencia de marca</b><span>Qué falla en cinco contextos reales y el cambio mínimo para cada uno</span></span></a>
+    <a class="toc-item" href="#parte-7"><span class="num">07</span><span class="txt"><b>Manual de marca</b><span>La versión breve para un diseñador freelance — errores comunes primero</span></span></a>
+  </nav>
+
+  <!-- ============ PARTE 1 ============ -->
+  <div class="parte-divider" id="parte-1">
+    <span class="eyebrow">Parte 01</span>
+    <h2>Fundamentos de marca</h2>
+    <p class="dek">Quién es Huella antes de escribir una sola palabra o dibujar un solo píxel.</p>
+    <div class="parte-index">
+      <a href="#s-1-1">1.1 A quién ayuda</a>
+      <a href="#s-1-2">1.2 La transformación</a>
+      <a href="#s-1-3">1.3 Marcas de confianza</a>
+      <a href="#s-1-4">1.4 La sensación</a>
+      <a href="#s-1-5">1.5 Posicionamiento</a>
+      <a href="#s-1-6">1.6 Personalidad</a>
+      <a href="#s-1-7">1.7 Palabras</a>
+      <a href="#s-1-8">1.8 Historia de 30s</a>
+    </div>
+  </div>
+
+  <section id="s-1-1">
+    <div class="section-head"><span class="n">1.1</span><h2>A quién ayuda</h2></div>
+    <div class="personas">
+      <div class="persona"><div class="rol">Dueño/a de la veterinaria</div><p>Hoy sostiene la clínica con papel, Excel y WhatsApp. Es quien decide comprar y quien más carga administrativa siente.</p></div>
+      <div class="persona"><div class="rol">Veterinario/a</div><p>Atiende y necesita dejar la consulta registrada rápido, sin que la ficha sea un obstáculo entre paciente y paciente.</p></div>
+      <div class="persona"><div class="rol">Recepción / staff</div><p>Maneja la agenda del día, la caja y los turnos — necesita ver todo de un vistazo, sin llamar a nadie para confirmar nada.</p></div>
+    </div>
+    <p class="nota-indirecta">Beneficio indirecto: el dueño de la mascota, que hoy accede a la libreta sanitaria de su animal vía portal — no es el comprador, pero es quien nota la diferencia cuando la veterinaria pasó a usar Huella.</p>
+  </section>
+
+  <section id="s-1-2">
+    <div class="section-head"><span class="n">1.2</span><h2>La transformación</h2></div>
+    <div class="transform">
+      <div class="transform-col antes"><h3>Antes</h3><ul><li>La ficha del paciente en una carpeta de papel</li><li>Turnos coordinados a mano por WhatsApp</li><li>Stock y caja en una planilla aparte</li><li>Todo depende de que alguien se acuerde</li></ul></div>
+      <div class="arrow">→</div>
+      <div class="transform-col despues"><h3>Con Huella</h3><ul><li>Historia clínica completa en un lugar, accesible al toque</li><li>Turnos, caja y stock en el mismo sistema</li><li>Nada se pierde si cambia quien atiende el mostrador</li><li>El orden ya no depende de una sola persona</li></ul></div>
+    </div>
+  </section>
+
+  <section id="s-1-3">
+    <div class="section-head"><span class="n">1.3</span><h2>Marcas en las que ya confían</h2></div>
+    <div class="marcas">
+      <div class="marca"><div class="nombre">Mercado Pago</div><p>Presta confianza operativa: "esto funciona, no me va a hacer perder plata."</p></div>
+      <div class="marca"><div class="nombre">WhatsApp Business</div><p>Presta familiaridad: es la herramienta que ya usan a diario con sus clientes.</p></div>
+      <div class="marca"><div class="nombre">Su droguería veterinaria de referencia</div><p>Presta autoridad de oficio: confían en quien entiende cómo se trabaja de verdad.</p></div>
+    </div>
+  </section>
+
+  <section id="s-1-4">
+    <div class="section-head"><span class="n">1.4</span><h2>La sensación al entrar en contacto</h2></div>
+    <p class="sensacion">Alivio y orden — por fin algo que entiende cómo trabajo.</p>
+  </section>
+
+  <section id="s-1-5">
+    <div class="section-head"><span class="n">1.5</span><h2>Posicionamiento</h2></div>
+    <div class="sello">
+      <span class="eyebrow">Frase de posicionamiento</span>
+      <blockquote>Para las veterinarias que hoy manejan su día a día entre papeles, Excel y WhatsApp, Huella es el sistema que junta la historia clínica, los turnos, la caja y el stock en un solo lugar — pensado para cómo se trabaja de verdad en una veterinaria argentina, no adaptado de un sistema genérico de afuera.</blockquote>
+      <div class="tagline">Cada paciente deja huella. Nosotros la ordenamos.</div>
+    </div>
+  </section>
+
+  <section id="s-1-6">
+    <div class="section-head"><span class="n">1.6</span><h2>Rasgos de personalidad</h2></div>
+    <dl class="rasgos">
+      <div class="rasgo"><dt>Confiable</dt><dd>Como el colega al que le confiás la caja sin auditar.</dd></div>
+      <div class="rasgo"><dt>Cercano</dt><dd>Habla como se habla en una veterinaria, no como un manual corporativo.</dd></div>
+      <div class="rasgo"><dt>Práctico</dt><dd>Resuelve sin vueltas — no exhibe funciones, saca trabajo de encima.</dd></div>
+      <div class="rasgo"><dt>Profesional</dt><dd>Serio con los datos del paciente, informal en el trato con quien lo usa.</dd></div>
+      <div class="rasgo"><dt>Terrenal</dt><dd>Entiende la veterinaria de barrio argentina, no un caso de estudio de Silicon Valley.</dd></div>
+    </dl>
+  </section>
+
+  <section id="s-1-7">
+    <div class="section-head"><span class="n">1.7</span><h2>Palabras</h2></div>
+    <div class="palabras">
+      <div class="propias"><h3>Nos apropiamos</h3><div class="chips"><span class="chip">orden</span><span class="chip">huella</span><span class="chip">a mano</span><span class="chip">acompaña</span><span class="chip">confianza</span><span class="chip">simple</span><span class="chip">historia</span></div></div>
+      <div class="rechazadas"><h3>Rechazamos</h3><div class="chips"><span class="chip">disruptivo</span><span class="chip">revolucionario</span><span class="chip">innovador</span><span class="chip">solución integral</span><span class="chip">digitalización</span><span class="chip">plataforma</span><span class="chip">corporativo</span></div></div>
+    </div>
+  </section>
+
+  <section id="s-1-8">
+    <div class="section-head"><span class="n">1.8</span><h2>Historia de 30 segundos</h2></div>
+    <div class="libreta">
+      <p><mark>[Reemplazar por una anécdota real tuya — un veterinario, un cliente, un momento fundacional]</mark>. Ese día entendí que el problema no era falta de ganas, era falta de un lugar donde todo viviera junto. Por eso armamos Huella: la historia clínica, los turnos, la caja y el stock en un solo sistema, pensado para cómo se trabaja de verdad en una veterinaria argentina — no una planilla más, sino el orden que le faltaba a un oficio que se hace con las manos.</p>
+      <p class="nota">Plantilla de guion (~85 palabras / 30 seg hablado) — completar el corchete con un hecho real antes de usarla en público.</p>
+    </div>
+  </section>
+
+  <!-- ============ PARTE 2 ============ -->
+  <div class="parte-divider" id="parte-2">
+    <span class="eyebrow">Parte 02</span>
+    <h2>Identidad visual</h2>
+    <p class="dek">Cómo se ve Huella — y por qué cada elección encaja con lo definido en la Parte 01.</p>
+    <div class="parte-index">
+      <a href="#s-2-1">2.1 Logotipo</a>
+      <a href="#s-2-2">2.2 Tipografía</a>
+      <a href="#s-2-3">2.3 Paleta</a>
+      <a href="#s-2-4">2.4 Fotografía</a>
+      <a href="#s-2-5">2.5 Recurso gráfico</a>
+      <a href="#s-2-6">2.6 Claro / oscuro</a>
+    </div>
+  </div>
+
+  <section id="s-2-1">
+    <div class="section-head"><span class="n">2.1</span><h2>Logotipo</h2></div>
+    <p class="dek">Wordmark + sello. Nunca un ícono de pata ilustrado y tierno, ni el típico cruz/corazón veterinario genérico — la marca de Huella es un <b>sello</b>: una huella estampada, geométrica, como quedaría marcada en una ficha de verdad.</p>
+    <div class="lockups">
+      <div class="lockup-card on-light"><svg viewBox="0 0 64 64" fill="currentColor"><ellipse cx="32" cy="42" rx="15" ry="12"/><ellipse cx="14" cy="24" rx="7" ry="9" transform="rotate(-18 14 24)"/><ellipse cx="30" cy="14" rx="7.5" ry="9.5"/><ellipse cx="47" cy="16" rx="7" ry="9" transform="rotate(14 47 16)"/><ellipse cx="55" cy="32" rx="6" ry="8" transform="rotate(30 55 32)"/></svg><span class="cap">Sello solo — ícono de app / favicon</span></div>
+      <div class="lockup-card on-light"><div class="lockup-row"><svg viewBox="0 0 64 64" fill="currentColor"><ellipse cx="32" cy="42" rx="15" ry="12"/><ellipse cx="14" cy="24" rx="7" ry="9" transform="rotate(-18 14 24)"/><ellipse cx="30" cy="14" rx="7.5" ry="9.5"/><ellipse cx="47" cy="16" rx="7" ry="9" transform="rotate(14 47 16)"/><ellipse cx="55" cy="32" rx="6" ry="8" transform="rotate(30 55 32)"/></svg><span class="wm">Huella</span></div><span class="cap">Lockup horizontal — encabezados, nav</span></div>
+      <div class="lockup-card on-dark"><div class="lockup-row"><svg viewBox="0 0 64 64" fill="currentColor"><ellipse cx="32" cy="42" rx="15" ry="12"/><ellipse cx="14" cy="24" rx="7" ry="9" transform="rotate(-18 14 24)"/><ellipse cx="30" cy="14" rx="7.5" ry="9.5"/><ellipse cx="47" cy="16" rx="7" ry="9" transform="rotate(14 47 16)"/><ellipse cx="55" cy="32" rx="6" ry="8" transform="rotate(30 55 32)"/></svg><span class="wm">Huella</span></div><span class="cap">Sobre fondo oscuro — sin cambios de forma, solo de tono</span></div>
+    </div>
+    <p class="porque">confiable, terrenal — un sello no promete, registra.</p>
+    <div class="clearspace">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="8" width="48" height="48" rx="4"/><ellipse cx="32" cy="42" rx="9" ry="7"/><ellipse cx="22" cy="30" rx="4" ry="5"/><ellipse cx="32" cy="24" rx="4.5" ry="5.5"/><ellipse cx="42" cy="30" rx="4" ry="5"/></svg>
+      <p><b>Espacio de resguardo:</b> dejar alrededor del sello un margen igual a la altura de una "pata" del propio mark. Nunca pegarlo a un borde, una regla o texto.</p>
+    </div>
+    <div class="donts">
+      <div class="dont"><b>NO</b>degradés ni sombras 3D — el sello es plano, como tinta real.</div>
+      <div class="dont"><b>NO</b>ilustrar la huella con detalle realista — se queda geométrica.</div>
+      <div class="dont"><b>NO</b>rotarlo, inclinarlo (salvo el guiño puntual del sello de posicionamiento).</div>
+      <div class="dont"><b>NO</b>recolorearlo fuera de la paleta de esta ficha.</div>
+    </div>
+  </section>
+
+  <section id="s-2-2">
+    <div class="section-head"><span class="n">2.2</span><h2>Combinación tipográfica</h2></div>
+    <p class="dek">Tres familias, tres trabajos distintos — ninguna se pisa con otra.</p>
+    <div class="tipo-row">
+      <div class="rol"><span class="nombre">Sora</span><span class="uso">Títulos, wordmark, cifras grandes</span></div>
+      <div class="specimen-slab">Historia clínica<br>al toque.</div>
+      <p class="porque">confiable, terrenal — geométrica y de trazo parejo, con las mismas terminaciones redondeadas que el sello, pero moderna: la slab serif original leía "carnet viejo" en pantalla.</p>
+    </div>
+    <div class="tipo-row">
+      <div class="rol"><span class="nombre">Work Sans</span><span class="uso">Cuerpo de texto, interfaz, formularios</span></div>
+      <p class="specimen-work">Recepción carga el turno, el veterinario cierra la consulta, el dueño mira la libreta desde el celular — todo con la misma letra clara, sin esfuerzo de lectura.</p>
+      <p class="porque">práctico, cercano — humanista y legible a tamaños chicos, para pantallas de mostrador.</p>
+    </div>
+    <div class="tipo-row">
+      <div class="rol"><span class="nombre">IBM Plex Mono</span><span class="uso">Datos, etiquetas, campos de ficha</span></div>
+      <div class="specimen-mono">PACIENTE: Nala · ESPECIE: canina · PRÓXIMA DOSIS: 14.10</div>
+      <p class="porque">profesional sin acartonado — cada dato alineado como en una ficha real, y sirve igual en el marketing que dentro del producto.</p>
+    </div>
+  </section>
+
+  <section id="s-2-3">
+    <div class="section-head"><span class="n">2.3</span><h2>Paleta de colores</h2></div>
+    <p class="dek">Un solo verde hace de marca <em>y</em> de "todo está bien" — no hay semáforo inventado. El acento tierra es "prestá atención", no "error": nunca grita.</p>
+    <div class="swatches">
+      <div class="swatch"><div class="fill" style="background:#0E7C6B;"></div><div class="info"><div class="name">Verde Huella</div><div class="role">Marca, acciones primarias, estado positivo</div><div class="hexes"><span>claro #0E7C6B</span><span>oscuro #43B79E</span></div></div></div>
+      <div class="swatch"><div class="fill" style="background:#0A5C4F;"></div><div class="info"><div class="name">Verde Profundo</div><div class="role">Hover / presionado, títulos fuertes</div><div class="hexes"><span>claro #0A5C4F</span><span>oscuro #6BD2B9</span></div></div></div>
+      <div class="swatch"><div class="fill" style="background:#A13D2B;"></div><div class="info"><div class="name">Sello</div><div class="role">Atención — vencido, stock bajo, pendiente</div><div class="hexes"><span>claro #A13D2B</span><span>oscuro #DD7259</span></div></div></div>
+      <div class="swatch"><div class="fill" style="background:#F6F5F1;border-bottom:1px solid #E2DFD6;"></div><div class="info"><div class="name">Papel</div><div class="role">Fondo — nunca blanco clínico puro</div><div class="hexes"><span>claro #F6F5F1</span><span>oscuro #12201C</span></div></div></div>
+      <div class="swatch"><div class="fill" style="background:#EDEBE4;border-bottom:1px solid #E2DFD6;"></div><div class="info"><div class="name">Papel Suave</div><div class="role">Tarjetas y superficies</div><div class="hexes"><span>claro #EDEBE4</span><span>oscuro #1A2B25</span></div></div></div>
+      <div class="swatch"><div class="fill" style="background:#1E2A23;"></div><div class="info"><div class="name">Tinta</div><div class="role">Texto principal — negro con subtono verde, nunca #000</div><div class="hexes"><span>claro #1E2A23</span><span>oscuro #EAE5D6</span></div></div></div>
+    </div>
+    <p class="porque">cercano — bordes y grises siempre con matiz cálido, nunca el gris neutro de sistema operativo.</p>
+  </section>
+
+  <section id="s-2-4">
+    <div class="section-head"><span class="n">2.4</span><h2>Estilo fotográfico</h2></div>
+    <p class="dek">Documental, no publicitario: manos trabajando, luz de ventana real, animales que miran para cualquier lado menos a cámara. Grillado cálido — nunca el blanco-azulado frío del stock veterinario genérico.</p>
+    <div class="mood-row">
+      <div class="mood" style="background:linear-gradient(160deg,#e7cba3,#a8763f);"><span>luz cálida</span></div>
+      <div class="mood" style="background:linear-gradient(160deg,#d7cdb0,#7d7256);"><span>documental</span></div>
+      <div class="mood" style="background:linear-gradient(160deg,#8f9c7c,#41513a);"><span>texturas / manos</span></div>
+      <div class="mood evitar" style="background:linear-gradient(160deg,#d7e6ec,#8fa9b5);"><span>clínico frío</span></div>
+    </div>
+    <div class="crop-guide">
+      <div class="crop-box">Primer plano de manos revisando, no la clínica entera</div>
+      <div class="crop-box">Paciente mirando afuera de cámara, nunca posado</div>
+      <div class="crop-box">Objetos reales: carnet, collar, libreta — no íconos de stock</div>
+    </div>
+    <p class="porque" style="margin-top:16px;">terrenal, cercano — se ve una veterinaria de barrio real, no un catálogo de marketing.</p>
+  </section>
+
+  <section id="s-2-5">
+    <div class="section-head"><span class="n">2.5</span><h2>Recurso gráfico que se repite</h2></div>
+    <p class="dek">El sello, la línea punteada de "ficha perforada" y la etiqueta mono <code>CAMPO: VALOR</code> aparecen en marketing y adentro del producto — para que se sientan la misma casa.</p>
+    <div class="usos">
+      <div class="uso-card"><div class="cap">Como divisor</div><p style="margin:0;font-size:0.85rem;">Separa secciones largas sin una línea sólida fría.</p><div class="divider-demo"></div></div>
+      <div class="uso-card"><div class="cap">Como confirmación</div><p style="margin:0 0 10px;font-size:0.85rem;">Reemplaza el ✓ genérico de cualquier SaaS.</p><span class="badge-demo"><svg viewBox="0 0 64 64" fill="currentColor"><ellipse cx="32" cy="42" rx="15" ry="12"/><ellipse cx="14" cy="24" rx="7" ry="9" transform="rotate(-18 14 24)"/><ellipse cx="30" cy="14" rx="7.5" ry="9.5"/><ellipse cx="47" cy="16" rx="7" ry="9" transform="rotate(14 47 16)"/><ellipse cx="55" cy="32" rx="6" ry="8" transform="rotate(30 55 32)"/></svg> guardado</span></div>
+      <div class="uso-card"><div class="cap">Como etiqueta de campo</div><p style="margin:0 0 8px;font-size:0.85rem;">Mismo lenguaje en un form real:</p><div class="field-demo">TURNO: <b>10:30</b> · ESTADO: <b>confirmado</b></div></div>
+    </div>
+  </section>
+
+  <section id="s-2-6">
+    <div class="section-head"><span class="n">2.6</span><h2>El sistema sobre fondo claro y oscuro</h2></div>
+    <p class="dek">Ningún color literal cambia de rol al cambiar de fondo — solo se aclara u oscurece para mantener el contraste. El sello siempre queda "tierra", el verde siempre queda "Huella".</p>
+    <div class="demo-split">
+      <div class="demo-panel claro">
+        <div class="cap">Fondo claro</div>
+        <div class="lockup-row"><svg viewBox="0 0 64 64" fill="currentColor"><ellipse cx="32" cy="42" rx="15" ry="12"/><ellipse cx="14" cy="24" rx="7" ry="9" transform="rotate(-18 14 24)"/><ellipse cx="30" cy="14" rx="7.5" ry="9.5"/><ellipse cx="47" cy="16" rx="7" ry="9" transform="rotate(14 47 16)"/><ellipse cx="55" cy="32" rx="6" ry="8" transform="rotate(30 55 32)"/></svg><span class="wm">Huella</span></div>
+        <div class="demo-chips"><div class="demo-chip" style="background:#0E7C6B;"></div><div class="demo-chip" style="background:#0A5C4F;"></div><div class="demo-chip" style="background:#A13D2B;"></div><div class="demo-chip" style="background:#EDEBE4;border:1px solid #E2DFD6;"></div></div>
+        <p>Historia clínica, turnos y caja en un solo lugar.</p>
+        <span class="demo-stamp">próxima dosis: vencida</span>
+      </div>
+      <div class="demo-panel oscuro">
+        <div class="cap">Fondo oscuro</div>
+        <div class="lockup-row"><svg viewBox="0 0 64 64" fill="currentColor"><ellipse cx="32" cy="42" rx="15" ry="12"/><ellipse cx="14" cy="24" rx="7" ry="9" transform="rotate(-18 14 24)"/><ellipse cx="30" cy="14" rx="7.5" ry="9.5"/><ellipse cx="47" cy="16" rx="7" ry="9" transform="rotate(14 47 16)"/><ellipse cx="55" cy="32" rx="6" ry="8" transform="rotate(30 55 32)"/></svg><span class="wm">Huella</span></div>
+        <div class="demo-chips"><div class="demo-chip" style="background:#43B79E;"></div><div class="demo-chip" style="background:#6BD2B9;"></div><div class="demo-chip" style="background:#DD7259;"></div><div class="demo-chip" style="background:#1A2B25;border:1px solid #2B3B34;"></div></div>
+        <p>Historia clínica, turnos y caja en un solo lugar.</p>
+        <span class="demo-stamp">próxima dosis: vencida</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PARTE 3 ============ -->
+  <div class="parte-divider" id="parte-3">
+    <span class="eyebrow">Parte 03</span>
+    <h2>Guía de voz</h2>
+    <p class="dek">Cómo escribe Huella, palabra por palabra.</p>
+    <div class="parte-index">
+      <a href="#s-3-1">3.1 Adjetivos en acción</a>
+      <a href="#s-3-2">3.2 Extensión de frase</a>
+      <a href="#s-3-3">3.3 Puntuación</a>
+      <a href="#s-3-4">3.4 Palabras prohibidas</a>
+      <a href="#s-3-5">3.5 Malas noticias</a>
+      <a href="#s-3-6">3.6 El párrafo x3</a>
+    </div>
+  </div>
+
+  <section id="s-3-1">
+    <div class="section-head"><span class="n">3.1</span><h2>Tres adjetivos, en acción</h2></div>
+    <div class="voces">
+      <div class="voz-card"><div class="adj">Cercano</div><div class="def">Habla como un colega de mostrador, no como un manual.</div><div class="ej">"Ya quedó cargada la consulta de Nala. Cualquier cosa, la editás desde la ficha."</div></div>
+      <div class="voz-card"><div class="adj">Directo</div><div class="def">Dice qué pasó y qué hacer, sin vueltas ni relleno.</div><div class="ej">"No hay caja abierta todavía. Abrimos una para que puedas cobrar."</div></div>
+      <div class="voz-card"><div class="adj">Con oficio</div><div class="def">Usa las palabras de la veterinaria y del campo — no las traduce a jerga de sistema.</div><div class="ej">"Guardamos la dosis en el carnet: la próxima le va a aparecer al dueño en el portal."</div></div>
+    </div>
+  </section>
+
+  <section id="s-3-2">
+    <div class="section-head"><span class="n">3.2</span><h2>Extensión de frase</h2></div>
+    <p class="dek">Entre 8 y 16 palabras, una idea por frase. Si se alarga, la cortamos en dos — nunca le sumamos comas para no cortarla.</p>
+    <div class="longitud-demo">
+      <div class="frase-bar mal"><span class="frase-tag">Evitamos (29 palabras, una sola idea estirada)</span>Una vez que hayas completado la carga de los datos del paciente, el sistema procederá automáticamente a generar la ficha correspondiente, la cual podrá ser consultada por el personal autorizado.</div>
+      <div class="frase-bar bien"><span class="frase-tag">Preferimos (dos frases cortas)</span>Cargá los datos del paciente. La ficha queda lista al toque, y la puede ver cualquiera del equipo.</div>
+    </div>
+  </section>
+
+  <section id="s-3-3">
+    <div class="section-head"><span class="n">3.3</span><h2>Hábitos de puntuación</h2></div>
+    <div class="reglas">
+      <div class="regla"><span class="k">Exclamación</span><span>Punto, no "¡!". El entusiasmo se nota en lo que decimos, no en cómo lo gritamos.</span></div>
+      <div class="regla"><span class="k">Puntos suspensivos</span><span>No los usamos para generar intriga ("estamos preparando algo…").</span></div>
+      <div class="regla"><span class="k">Dos puntos</span><span>Anuncian algo concreto que sigue — un dato, un paso. Nunca decoran.</span></div>
+      <div class="regla"><span class="k">Punto y coma</span><span>No aparece. Es de texto formal, no de mostrador.</span></div>
+      <div class="regla"><span class="k">Mayúsculas</span><span>Minúscula en botones y títulos ("Guardar cambios", no "Guardar Cambios") — el Title Case es una convención en inglés que no hablamos.</span></div>
+      <div class="regla"><span class="k">Números</span><span>Siempre en cifra ("3 turnos", no "tres turnos") — es un dato de ficha, no un relato.</span></div>
+      <div class="regla"><span class="k">Emoji</span><span>Como mucho uno, y solo en un recordatorio de WhatsApp. Nunca dentro del producto.</span></div>
+    </div>
+  </section>
+
+  <section id="s-3-4">
+    <div class="section-head"><span class="n">3.4</span><h2>Palabras que nunca usamos</h2></div>
+    <div class="chips">
+      <span class="chip rechazada">disruptivo</span><span class="chip rechazada">revolucionario</span><span class="chip rechazada">innovador</span><span class="chip rechazada">solución integral</span><span class="chip rechazada">digitalización</span><span class="chip rechazada">plataforma</span><span class="chip rechazada">empoderar</span><span class="chip rechazada">sinergia</span><span class="chip rechazada">experiencia de excelencia</span><span class="chip rechazada">no dude en contactarnos</span><span class="chip rechazada">en tan solo unos clics</span>
+    </div>
+  </section>
+
+  <section id="s-3-5">
+    <div class="section-head"><span class="n">3.5</span><h2>Cómo damos las malas noticias</h2></div>
+    <p class="dek">Decimos qué pasó, en una frase, sin buscar culpables ni esconderlo detrás de un eufemismo. Después decimos qué sigue. No nos disculpamos de más — reconocemos y resolvemos.</p>
+    <div class="par mal"><span class="tag">evitamos</span><p>"Lamentamos informarle que hemos experimentado un inconveniente técnico en el procesamiento de su solicitud. Pedimos disculpas por las molestias ocasionadas y agradecemos su paciencia."</p></div>
+    <div class="par bien"><span class="tag">decimos</span><p>"No se pudo guardar la consulta. Probá de nuevo — si vuelve a fallar, escribinos y lo vemos."</p></div>
+    <div class="par mal" style="margin-top:18px;"><span class="tag">evitamos</span><p>"Ha alcanzado el límite de usuarios permitido por su plan actual. Para continuar, deberá actualizar su suscripción."</p></div>
+    <div class="par bien"><span class="tag">decimos</span><p>"Ya usaste los cupos de veterinario que tiene tu plan. Podés liberar uno o pasar a un plan con más lugares."</p></div>
+  </section>
+
+  <section id="s-3-6">
+    <div class="section-head"><span class="n">3.6</span><h2>El mismo párrafo, tres veces</h2></div>
+    <p class="dek">Presentamos Huella a un dueño de veterinaria. Mismo mensaje, tres formas de decirlo.</p>
+    <div class="rewrite fuera">
+      <span class="badge">✕ fuera de estilo</span>
+      <p class="texto">¡Descubrí la revolucionaria solución integral que transformará la gestión de tu clínica veterinaria! Con nuestra innovadora plataforma vas a poder digitalizar todos tus procesos administrativos de manera ágil y eficiente, empoderando a tu equipo para brindar una experiencia de excelencia. ¡Sumate hoy mismo y sé parte del cambio!</p>
+      <p class="nota">Exclamaciones, "revolucionario", "solución integral", "empoderar" — podría ser cualquier SaaS de cualquier rubro.</p>
+    </div>
+    <div class="rewrite estilo">
+      <span class="badge">✓ en estilo — versión 1</span>
+      <p class="texto">Hoy la ficha del paciente vive en una carpeta, los turnos en el WhatsApp y la caja en una planilla aparte. Huella los junta en un solo lugar. Cargás la consulta, cerrás el turno y la caja queda al día, sin buscar en tres lugares distintos.</p>
+      <p class="nota">Cercano y directo: nombra objetos reales (carpeta, WhatsApp, planilla), frases cortas, sin exclamaciones.</p>
+    </div>
+    <div class="rewrite estilo">
+      <span class="badge">✓ en estilo — versión 2</span>
+      <p class="texto">Ficha, turnos, caja y stock: hoy andan sueltos, cada uno por su lado. Con Huella quedan juntos, donde los vas a buscar. Menos tiempo repitiendo datos. Más tiempo con el paciente.</p>
+      <p class="nota">Con oficio: usa los dos puntos para anunciar la lista, frases más cortas todavía, cierre en dos golpes.</p>
+    </div>
+  </section>
+
+  <!-- ============ PARTE 4 ============ -->
+  <div class="parte-divider" id="parte-4">
+    <span class="eyebrow">Parte 04</span>
+    <h2>Mapa de dirección del logotipo</h2>
+    <p class="dek">Cuatro caminos posibles para el sello de Huella, comparados, antes de comprometernos con el que ya se desarrolló en la Parte 02.</p>
+    <div class="parte-index">
+      <a href="#s-4-1">4.1 Logotipo tipográfico</a>
+      <a href="#s-4-2">4.2 Monograma</a>
+      <a href="#s-4-3">4.3 Símbolo</a>
+      <a href="#s-4-4">4.4 Combinación</a>
+      <a href="#s-4-5">4.5 Recomendación</a>
+    </div>
+  </div>
+
+  <section id="s-4-1">
+    <div class="section-head"><span class="n">4.1</span><h2>Logotipo tipográfico</h2></div>
+    <div class="direccion">
+      <div class="direccion-head"><h3>Solo la palabra</h3><span class="letra">DIRECCIÓN A</span></div>
+      <div class="specimen-box"><div class="wm-big">Huella</div></div>
+      <div class="datos">
+        <div class="dato-row"><span class="k">Lenguaje de formas</span><span>Slab serif robusta, x-height generosa, terminales redondeados — sin símbolo aparte, el peso y la calidez quedan en la letra misma. Las dos "l" pueden tratarse con un puente sutil a la altura del asta, como si fueran un sendero.</span></div>
+        <div class="dato-row"><span class="k">Referencias</span><span>Rotulado pintado a mano de un local de barrio, etiquetas de frasco de producto veterinario, la tapa de un carnet de identidad.</span></div>
+        <div class="dato-row funciona"><span class="k">Funciona en</span><span>Encabezados con espacio horizontal, membrete, portada de documentos, el lomo de un carnet impreso — donde el nombre ya se puede leer con calma.</span></div>
+        <div class="dato-row riesgo"><span class="k">Riesgo en</span><span>Cualquier espacio chico y cuadrado (ícono de app, favicon, avatar) — una palabra no entra legible en 32×32px. Sin símbolo, tampoco hay nada que reconocer a la distancia sin poder leer.</span></div>
+      </div>
+      <div class="mini-test">
+        <span class="tag">prueba, ícono de 40px:</span>
+        <div class="icon-40 texto">Hu<br>ella</div>
+        <span class="tag" style="color:var(--stamp);">→ ilegible</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="s-4-2">
+    <div class="section-head"><span class="n">4.2</span><h2>Monograma</h2></div>
+    <div class="direccion">
+      <div class="direccion-head"><h3>Una H con almohadillas</h3><span class="letra">DIRECCIÓN B</span></div>
+      <div class="specimen-box">
+        <svg viewBox="0 0 64 64" fill="currentColor"><rect x="12" y="9" width="13" height="46" rx="6.5"/><rect x="39" y="9" width="13" height="46" rx="6.5"/><rect x="12" y="26" width="40" height="11" rx="5.5"/></svg>
+      </div>
+      <div class="datos">
+        <div class="dato-row"><span class="k">Lenguaje de formas</span><span>Geometría de cápsulas — no una H de manual, sino una H cuyos extremos son óvalos, tomando prestado el mismo lenguaje redondeado de las almohadillas del sello. Trazo grueso, sólido, un solo color.</span></div>
+        <div class="dato-row"><span class="k">Referencias</span><span>Marcas de hierro de establecimientos de campo (la "marca" grabada a fuego), sellos notariales de iniciales, herrajes de talabartería.</span></div>
+        <div class="dato-row funciona"><span class="k">Funciona en</span><span>Ícono de app, favicon, marca de agua, avatar — cualquier espacio chico y cuadrado que la palabra completa no puede ocupar.</span></div>
+        <div class="dato-row riesgo"><span class="k">Riesgo en</span><span>Como primer contacto no comunica nada por sí sola — una H sola solo funciona una vez que el público ya conoce el nombre. Usada de entrada, es un ícono huérfano de significado.</span></div>
+      </div>
+      <div class="mini-test">
+        <span class="tag">prueba, ícono de 40px:</span>
+        <div class="icon-40 monograma"><svg viewBox="0 0 64 64" fill="currentColor"><rect x="12" y="9" width="13" height="46" rx="6.5"/><rect x="39" y="9" width="13" height="46" rx="6.5"/><rect x="12" y="26" width="40" height="11" rx="5.5"/></svg></div>
+        <span class="tag" style="color:var(--verde);">→ legible, pero sin contexto</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="s-4-3">
+    <div class="section-head"><span class="n">4.3</span><h2>Símbolo</h2></div>
+    <div class="direccion">
+      <div class="direccion-head"><h3>El sello, solo</h3><span class="letra">DIRECCIÓN C</span></div>
+      <div class="specimen-box">
+        <svg viewBox="0 0 64 64" fill="currentColor"><ellipse cx="32" cy="42" rx="15" ry="12"/><ellipse cx="14" cy="24" rx="7" ry="9" transform="rotate(-18 14 24)"/><ellipse cx="30" cy="14" rx="7.5" ry="9.5"/><ellipse cx="47" cy="16" rx="7" ry="9" transform="rotate(14 47 16)"/><ellipse cx="55" cy="32" rx="6" ry="8" transform="rotate(30 55 32)"/></svg>
+      </div>
+      <div class="datos">
+        <div class="dato-row"><span class="k">Lenguaje de formas</span><span>Óvalos superpuestos, silueta plana y sólida, sin contorno — el gesto mínimo de una huella real, reducido a su forma, nunca ilustrado con detalle realista.</span></div>
+        <div class="dato-row"><span class="k">Referencias</span><span>El sello de goma en una libreta sanitaria, señalética de refugio/veterinaria, un escudo de colegio profesional simplificado a su gesto esencial.</span></div>
+        <div class="dato-row funciona"><span class="k">Funciona en</span><span>Elemento repetido (marca de agua en la ficha impresa, textura de fondo), o una vez instalada la marca — ícono de notificación, sello de "guardado" dentro del producto.</span></div>
+        <div class="dato-row riesgo"><span class="k">Riesgo en</span><span>Como primera impresión, sin la palabra al lado, corre el riesgo de leerse como "el ícono de pata" genérico que ya usan decenas de marcas de mascotas — pierde justo lo diferenciador, que es la combinación con la tipografía de sello.</span></div>
+      </div>
+      <div class="mini-test">
+        <span class="tag">prueba, ícono de 40px:</span>
+        <div class="icon-40"><svg viewBox="0 0 64 64" fill="currentColor"><ellipse cx="32" cy="42" rx="15" ry="12"/><ellipse cx="14" cy="24" rx="7" ry="9" transform="rotate(-18 14 24)"/><ellipse cx="30" cy="14" rx="7.5" ry="9.5"/><ellipse cx="47" cy="16" rx="7" ry="9" transform="rotate(14 47 16)"/><ellipse cx="55" cy="32" rx="6" ry="8" transform="rotate(30 55 32)"/></svg></div>
+        <span class="tag" style="color:var(--verde);">→ legible y distintivo</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="s-4-4">
+    <div class="section-head"><span class="n">4.4</span><h2>Combinación</h2></div>
+    <div class="direccion">
+      <div class="direccion-head"><h3>Sello + palabra</h3><span class="letra">DIRECCIÓN D</span></div>
+      <div class="specimen-box">
+        <div class="lockup-h">
+          <svg viewBox="0 0 64 64" fill="currentColor"><ellipse cx="32" cy="42" rx="15" ry="12"/><ellipse cx="14" cy="24" rx="7" ry="9" transform="rotate(-18 14 24)"/><ellipse cx="30" cy="14" rx="7.5" ry="9.5"/><ellipse cx="47" cy="16" rx="7" ry="9" transform="rotate(14 47 16)"/><ellipse cx="55" cy="32" rx="6" ry="8" transform="rotate(30 55 32)"/></svg>
+          <span class="wm-big">Huella</span>
+        </div>
+      </div>
+      <div class="datos">
+        <div class="dato-row"><span class="k">Lenguaje de formas</span><span>La unión de C y A: el símbolo funciona solo en chico, la palabra ancla el nombre en grande, y ambos comparten la misma geometría de óvalos y terminales redondeados — se sienten dibujados por la misma mano.</span></div>
+        <div class="dato-row"><span class="k">Referencias</span><span>Una etiqueta de producto real: nombre + sello de garantía en el mismo empaque, no dos elementos sueltos.</span></div>
+        <div class="dato-row funciona"><span class="k">Funciona en</span><span>La aplicación principal — sitio, redes, papelería, el encabezado del producto — cualquier lugar con espacio para ambos.</span></div>
+        <div class="dato-row riesgo"><span class="k">Riesgo en</span><span>En espacios muy chicos obliga a partir el lockup y usar solo el símbolo (Dirección C) — necesita, desde el vamos, una regla clara de cuándo separarlo.</span></div>
+      </div>
+      <div class="mini-test">
+        <span class="tag">prueba, ícono de 40px:</span>
+        <div class="icon-40"><svg viewBox="0 0 64 64" fill="currentColor"><ellipse cx="32" cy="42" rx="15" ry="12"/><ellipse cx="14" cy="24" rx="7" ry="9" transform="rotate(-18 14 24)"/><ellipse cx="30" cy="14" rx="7.5" ry="9.5"/><ellipse cx="47" cy="16" rx="7" ry="9" transform="rotate(14 47 16)"/><ellipse cx="55" cy="32" rx="6" ry="8" transform="rotate(30 55 32)"/></svg></div>
+        <span class="tag">→ se reduce al símbolo solo (Dirección C)</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="s-4-5">
+    <div class="section-head"><span class="n">4.5</span><h2>Recomendación</h2></div>
+    <div class="recom">
+      <span class="eyebrow">A desarrollar</span>
+      <h3>Dirección D — Combinación</h3>
+      <p>Huella todavía no tiene reconocimiento de marca instalado: el símbolo y el nombre necesitan aprenderse juntos desde el primer contacto. Un símbolo solo (C) arriesga confundirse con la "patita" genérica que ya usan decenas de marcas veterinarias; un monograma (B) o un wordmark solo (A) no resuelven, cada uno por su lado, el problema de funcionar tanto en grande como en un ícono de 40px. La combinación es la única dirección que hace las dos cosas a la vez — y es la que ya se desarrolló en la Parte 02.</p>
+      <div class="plan">
+        <b>En la práctica, esto es un sistema de tres piezas</b>, no un solo archivo:<br>
+        · Lockup completo (Dirección D) → aplicación principal<br>
+        · Sello solo (Dirección C) → ícono de app, favicon, espacios chicos<br>
+        · Monograma (B) y wordmark solo (A) quedan como estudios de referencia, no como logotipos a implementar
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PARTE 5 ============ -->
+  <div class="parte-divider" id="parte-5">
+    <span class="eyebrow">Parte 05</span>
+    <h2>Plan inicial de plantillas</h2>
+    <p class="dek">Lo que Huella necesita diseñar en el primer mes — ni más ni menos — con tamaño, reglas de composición, lo que nunca se mueve y lo único que cambia en cada una.</p>
+    <div class="parte-index">
+      <a href="#s-5-1">5.1 Post cuadrado</a>
+      <a href="#s-5-2">5.2 Historia</a>
+      <a href="#s-5-3">5.3 Presentación</a>
+      <a href="#s-5-4">5.4 Documento de una página</a>
+      <a href="#s-5-5">5.5 Encabezado de email</a>
+      <a href="#s-5-6">5.6 Comprobante de pago</a>
+    </div>
+  </div>
+
+  <section id="s-5-1">
+    <div class="section-head"><span class="n">5.1</span><h2>Redes sociales — post cuadrado</h2></div>
+    <div class="plantilla">
+      <div class="plantilla-head"><h3>Feed — Instagram / Facebook / LinkedIn</h3><span class="letra">PLANTILLA 1</span></div>
+      <div class="wireframe-col">
+        <div class="wireframe r-cuadrado">
+          <div class="zona sello-z" style="top:8%;left:8%;width:16%;height:16%;">sello</div>
+          <div class="zona cambia-z" style="top:32%;left:8%;width:60%;height:36%;">mensaje<br>(cambia)</div>
+          <div class="zona" style="bottom:8%;right:8%;width:34%;height:9%;">huella.app</div>
+        </div>
+      </div>
+      <div class="datos">
+        <div class="dato-row"><span class="k">Tamaño</span><span>1080 × 1080 px</span></div>
+        <div class="dato-row"><span class="k">Composición</span><span>Margen de seguridad de 64px en los cuatro bordes. Mensaje alineado a la izquierda, máximo 3 líneas, Sora.</span></div>
+        <div class="dato-row fijo"><span class="k">Nunca se mueve</span><span>El sello (96px, esquina superior izquierda), la etiqueta "huella.app" (esquina inferior derecha), el margen de 64px, la tipografía del mensaje.</span></div>
+        <div class="dato-row cambia"><span class="k">Único cambiable</span><span>El mensaje central — nada más se reacomoda para que entre un texto más largo, se acorta el texto.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="s-5-2">
+    <div class="section-head"><span class="n">5.2</span><h2>Redes sociales — historia</h2></div>
+    <div class="plantilla">
+      <div class="plantilla-head"><h3>Instagram / WhatsApp Status</h3><span class="letra">PLANTILLA 2</span></div>
+      <div class="wireframe-col">
+        <div class="wireframe r-historia">
+          <div class="zona muerta" style="top:0;left:0;width:100%;height:14%;">zona muerta</div>
+          <div class="zona sello-z" style="top:18%;left:15%;width:24%;height:10%;">sello</div>
+          <div class="zona cambia-z" style="top:42%;left:10%;width:80%;height:26%;">mensaje<br>(cambia)</div>
+          <div class="zona muerta" style="bottom:0;left:0;width:100%;height:14%;">zona muerta</div>
+        </div>
+      </div>
+      <div class="datos">
+        <div class="dato-row"><span class="k">Tamaño</span><span>1080 × 1920 px</span></div>
+        <div class="dato-row"><span class="k">Composición</span><span>270px de zona muerta arriba y abajo (ahí la interfaz de Instagram pone su propia UI) — nada importante va ahí. El mensaje vive en el tercio medio.</span></div>
+        <div class="dato-row fijo"><span class="k">Nunca se mueve</span><span>Las dos zonas muertas de seguridad, la posición del sello debajo de la zona muerta superior, la tipografía.</span></div>
+        <div class="dato-row cambia"><span class="k">Único cambiable</span><span>El mensaje central.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="s-5-3">
+    <div class="section-head"><span class="n">5.3</span><h2>Presentación</h2></div>
+    <div class="plantilla">
+      <div class="plantilla-head"><h3>Diapositiva de contenido (16:9)</h3><span class="letra">PLANTILLA 3</span></div>
+      <div class="wireframe-col">
+        <div class="wireframe r-slide">
+          <div class="zona sello-z" style="top:0;left:0;width:100%;height:12%;">sello + paginación</div>
+          <div class="zona cambia-z" style="top:16%;left:8%;width:84%;height:70%;">contenido (cambia)</div>
+          <div class="zona" style="bottom:0;left:0;width:100%;height:8%;">Huella</div>
+        </div>
+      </div>
+      <div class="datos">
+        <div class="dato-row"><span class="k">Tamaño</span><span>1920 × 1080 px (16:9). La portada es un caso aparte y fijo: fondo verde profundo, sello grande y título — no se rediseña por presentación.</span></div>
+        <div class="dato-row"><span class="k">Composición</span><span>Header de 12% con sello chico a la izquierda y número de página a la derecha. Footer de 8% con "Huella" en mono. Una idea por diapositiva.</span></div>
+        <div class="dato-row fijo"><span class="k">Nunca se mueve</span><span>El header, el footer, la numeración, la regla de una idea por diapositiva.</span></div>
+        <div class="dato-row cambia"><span class="k">Único cambiable</span><span>El contenido central de cada diapositiva — texto, gráfico o imagen.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="s-5-4">
+    <div class="section-head"><span class="n">5.4</span><h2>Documento de una página</h2></div>
+    <div class="plantilla">
+      <div class="plantilla-head"><h3>One-pager comercial</h3><span class="letra">PLANTILLA 4</span></div>
+      <div class="wireframe-col">
+        <div class="wireframe r-a4">
+          <div class="zona sello-z" style="top:0;left:0;width:100%;height:11%;">sello + título</div>
+          <div class="zona cambia-z" style="top:14%;left:9%;width:82%;height:76%;">cuerpo (cambia)</div>
+          <div class="zona" style="bottom:0;left:0;width:100%;height:6%;">contacto</div>
+        </div>
+      </div>
+      <div class="datos">
+        <div class="dato-row"><span class="k">Tamaño</span><span>A4 — 210 × 297 mm</span></div>
+        <div class="dato-row"><span class="k">Composición</span><span>Header con sello + wordmark + una franja de color. Título en Sora. Cuerpo en Work Sans, una columna de máximo 65 caracteres de ancho.</span></div>
+        <div class="dato-row fijo"><span class="k">Nunca se mueve</span><span>El header, el footer de contacto, el ancho de columna del cuerpo.</span></div>
+        <div class="dato-row cambia"><span class="k">Único cambiable</span><span>El contenido del cuerpo — texto, tabla o imagen según lo que necesite ese documento puntual.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="s-5-5">
+    <div class="section-head"><span class="n">5.5</span><h2>Encabezado de email</h2></div>
+    <div class="plantilla">
+      <div class="plantilla-head"><h3>Header de correos transaccionales</h3><span class="letra">PLANTILLA 5</span></div>
+      <div class="wireframe-col">
+        <div class="wireframe r-email">
+          <div class="zona sello-z" style="top:15%;left:30%;width:40%;height:38%;">sello + Huella</div>
+          <div class="zona cambia-z" style="top:60%;left:20%;width:60%;height:24%;">línea de contexto (cambia)</div>
+        </div>
+      </div>
+      <div class="datos">
+        <div class="dato-row"><span class="k">Tamaño</span><span>600 × 180 px — 600px es el ancho seguro que respetan todos los clientes de correo.</span></div>
+        <div class="dato-row"><span class="k">Composición</span><span>Sello + wordmark centrados. Una sola línea de contexto en mono debajo, identifica el tipo de correo.</span></div>
+        <div class="dato-row fijo"><span class="k">Nunca se mueve</span><span>El sello, el wordmark, el color de fondo.</span></div>
+        <div class="dato-row cambia"><span class="k">Único cambiable</span><span>La línea de contexto ("Recordatorio de turno", "Bienvenido a Huella", "Restablecer contraseña").</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="s-5-6">
+    <div class="section-head"><span class="n">5.6</span><h2>Comprobante de pago</h2></div>
+    <p class="nota-fiscal">Huella todavía no emite factura fiscal (AFIP/ARCA es la Fase 5 del roadmap, deliberadamente diferida). Esto es el comprobante de pago interno del plan — no un documento fiscal.</p>
+    <div class="plantilla">
+      <div class="plantilla-head"><h3>Comprobante interno de plan</h3><span class="letra">PLANTILLA 6</span></div>
+      <div class="wireframe-col">
+        <div class="wireframe r-a4">
+          <div class="zona" style="top:0;left:4%;width:96%;height:13%;">sello + datos org</div>
+          <div class="zona" style="top:16%;left:4%;width:96%;height:56%;">tabla de conceptos</div>
+          <div class="zona cambia-z" style="top:0;left:0;width:4%;height:100%;">franja<br>estado<br>(cambia)</div>
+          <div class="zona" style="bottom:0;left:4%;width:96%;height:9%;">condiciones</div>
+        </div>
+      </div>
+      <div class="datos">
+        <div class="dato-row"><span class="k">Tamaño</span><span>A4 — 210 × 297 mm</span></div>
+        <div class="dato-row"><span class="k">Composición</span><span>Header con sello + datos de la organización. Tabla de conceptos en IBM Plex Mono con números tabulares. Footer con condiciones.</span></div>
+        <div class="dato-row fijo"><span class="k">Nunca se mueve</span><span>El header, la estructura de la tabla, el footer de condiciones.</span></div>
+        <div class="dato-row cambia"><span class="k">Único cambiable</span><span>El color de la franja lateral de estado — verde si está pagado, tierra/sello si está pendiente. Los montos y datos son contenido, no diseño.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><span class="n">·</span><h2>Orden para el primer mes</h2></div>
+    <p class="dek">No las seis a la vez — en el orden en que realmente hacen falta.</p>
+    <div class="prioridad">
+      <div class="pr-row"><span class="num">1</span><span class="txt"><b>Post cuadrado + historia</b><span>Hacen falta desde el día 1, para anunciar el lanzamiento.</span></span></div>
+      <div class="pr-row"><span class="num">2</span><span class="txt"><b>Encabezado de email</b><span>Ya está en producción — bienvenida, recordatorios, recuperación de contraseña la usan de entrada.</span></span></div>
+      <div class="pr-row"><span class="num">3</span><span class="txt"><b>Documento de una página</b><span>Para la primera reunión comercial con una veterinaria.</span></span></div>
+      <div class="pr-row"><span class="num">4</span><span class="txt"><b>Presentación</b><span>Recién hace falta cuando aparece la primera reunión con espacio para una charla más larga.</span></span></div>
+      <div class="pr-row"><span class="num">5</span><span class="txt"><b>Comprobante de pago</b><span>Recién hace falta cuando el primer cliente paga — no antes.</span></span></div>
+    </div>
+  </section>
+
+  <!-- ============ PARTE 6 ============ -->
+  <div class="parte-divider" id="parte-6">
+    <span class="eyebrow">Parte 06</span>
+    <h2>Prueba de resistencia de marca</h2>
+    <p class="dek">Cinco situaciones reales que ponen a prueba lo construido en las partes 02, 04 y 05 — qué falla, por qué, y el cambio más chico que lo arregla.</p>
+    <div class="parte-index">
+      <a href="#s-6-1">6.1 Teléfono</a>
+      <a href="#s-6-2">6.2 Tarjeta impresa</a>
+      <a href="#s-6-3">6.3 Camiseta bordada</a>
+      <a href="#s-6-4">6.4 Favicon</a>
+      <a href="#s-6-5">6.5 Blanco y negro</a>
+    </div>
+  </div>
+
+  <section id="s-6-1">
+    <div class="section-head"><span class="n">6.1</span><h2>Pantalla de teléfono</h2></div>
+    <div class="prueba">
+      <div class="prueba-head"><h3>Ícono de notificación / barra de estado</h3><span class="letra">PRUEBA 1</span></div>
+      <div class="vista">
+        <div class="vista-item">
+          <div class="mono-icon grande"><svg viewBox="0 0 64 64" fill="currentColor"><ellipse cx="32" cy="42" rx="15" ry="12"/><ellipse cx="14" cy="24" rx="7" ry="9" transform="rotate(-18 14 24)"/><ellipse cx="30" cy="14" rx="7.5" ry="9.5"/><ellipse cx="47" cy="16" rx="7" ry="9" transform="rotate(14 47 16)"/><ellipse cx="55" cy="32" rx="6" ry="8" transform="rotate(30 55 32)"/></svg></div>
+          <div class="cap">como se diseñó (64px)</div>
+        </div>
+        <div class="vista-item">
+          <div class="mono-icon chico"><svg viewBox="0 0 64 64" fill="currentColor"><ellipse cx="32" cy="42" rx="15" ry="12"/><ellipse cx="14" cy="24" rx="7" ry="9" transform="rotate(-18 14 24)"/><ellipse cx="30" cy="14" rx="7.5" ry="9.5"/><ellipse cx="47" cy="16" rx="7" ry="9" transform="rotate(14 47 16)"/><ellipse cx="55" cy="32" rx="6" ry="8" transform="rotate(30 55 32)"/></svg></div>
+          <div class="cap">forzado a blanco, ~18px real (Android)</div>
+        </div>
+      </div>
+      <div class="datos">
+        <div class="dato-row riesgo"><span class="k">Qué falla</span><span>Android y otros sistemas fuerzan el ícono de notificación a un solo color plano. Los huecos finos entre los cinco óvalos se cierran a ~18px: el sello deja de leerse como huella y se ve como una mancha.</span></div>
+        <div class="dato-row"><span class="k">Por qué</span><span>El lenguaje de formas depende de la separación entre almohadillas — separación pensada para tamaños normales, no para un ícono de sistema forzado a un solo color.</span></div>
+        <div class="dato-row funciona"><span class="k">Cambio mínimo</span><span>Agrandar ~15–20% la separación entre cada dedo y la almohadilla central en el archivo maestro del sello. No cambia la silueta ni el carácter — solo le da aire a las uniones.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="s-6-2">
+    <div class="section-head"><span class="n">6.2</span><h2>Tarjeta impresa</h2></div>
+    <div class="prueba">
+      <div class="prueba-head"><h3>Tarjeta personal, tirada corta</h3><span class="letra">PRUEBA 2</span></div>
+      <div class="vista">
+        <div class="swatch-pair">
+          <div class="swatch-mini"><div class="fill" style="background:#0E7C6B;"></div><div class="lbl">Verde Huella (pantalla)</div></div>
+          <div class="swatch-mini"><div class="fill" style="background:#4E7A72;"></div><div class="lbl">aproximación en offset barato (ilustrativo)</div></div>
+        </div>
+      </div>
+      <div class="datos">
+        <div class="dato-row riesgo"><span class="k">Qué falla</span><span>El verde de Huella es un teal — justo la familia de color que más se corre al convertir a CMYK en una imprenta de oficina o una tirada corta: puede salir más apagado o azulado que en pantalla.</span></div>
+        <div class="dato-row"><span class="k">Por qué</span><span>El sistema hoy solo tiene el valor hex de pantalla — no hay un valor de imprenta definido de antemano.</span></div>
+        <div class="dato-row funciona"><span class="k">Cambio mínimo</span><span>Fijar un valor CMYK/Pantone específico para "Verde Huella" antes de la primera tirada — una entrada nueva en la ficha de paleta, no una paleta nueva.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="s-6-3">
+    <div class="section-head"><span class="n">6.3</span><h2>Camiseta bordada</h2></div>
+    <div class="prueba">
+      <div class="prueba-head"><h3>Logo de pecho, 3–4cm</h3><span class="letra">PRUEBA 3</span></div>
+      <div class="vista">
+        <div class="gap-wrap">
+          <svg viewBox="0 0 64 64" fill="currentColor"><ellipse cx="32" cy="42" rx="15" ry="12"/><ellipse cx="14" cy="24" rx="7" ry="9" transform="rotate(-18 14 24)"/><ellipse cx="30" cy="14" rx="7.5" ry="9.5"/><ellipse cx="47" cy="16" rx="7" ry="9" transform="rotate(14 47 16)"/><ellipse cx="55" cy="32" rx="6" ry="8" transform="rotate(30 55 32)"/></svg>
+          <div class="gap-mark" style="width:26px;height:20px;top:38%;left:30%;"></div>
+          <div class="gap-label" style="top:33%;left:5%;">hueco &lt; puntada mín.</div>
+        </div>
+      </div>
+      <div class="datos">
+        <div class="dato-row riesgo"><span class="k">Qué falla</span><span>El mismo problema de la Prueba 1 vuelve acá por otra puerta: a la escala de un logo de pecho (3–4cm), los huecos entre los dedos y la almohadilla del sello quedan por debajo del ancho de puntada mínimo — el hilo los puentea y el bordado sale como una mancha, igual que el ícono forzado a blanco.</span></div>
+        <div class="dato-row"><span class="k">Por qué</span><span>Bordado y silueta forzada a un solo color son, en el fondo, la misma prueba: cuánto hueco necesita el sello para seguir leyéndose sin la ayuda del color.</span></div>
+        <div class="dato-row funciona"><span class="k">Cambio mínimo</span><span>El mismo cambio de la Prueba 1 — agrandar ~15–20% la separación entre dedos y almohadilla en el archivo maestro — resuelve las dos pruebas con una sola edición.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="s-6-4">
+    <div class="section-head"><span class="n">6.4</span><h2>Favicon diminuto</h2></div>
+    <div class="prueba">
+      <div class="prueba-head"><h3>Pestaña del navegador, 16px reales</h3><span class="letra">PRUEBA 4</span></div>
+      <div class="vista">
+        <div class="vista-item">
+          <div class="tab-demo"><span class="fav"><svg viewBox="0 0 64 64" fill="currentColor"><ellipse cx="32" cy="42" rx="15" ry="12"/><ellipse cx="14" cy="24" rx="7" ry="9" transform="rotate(-18 14 24)"/><ellipse cx="30" cy="14" rx="7.5" ry="9.5"/><ellipse cx="47" cy="16" rx="7" ry="9" transform="rotate(14 47 16)"/><ellipse cx="55" cy="32" rx="6" ry="8" transform="rotate(30 55 32)"/></svg></span>Huella</div>
+          <div class="cap">sello completo, 16px</div>
+        </div>
+        <div class="vista-item">
+          <div class="tab-demo"><span class="fav"><svg viewBox="0 0 64 64" fill="currentColor"><ellipse cx="32" cy="44" rx="14" ry="11"/><ellipse cx="20" cy="23" rx="8" ry="10"/><ellipse cx="44" cy="23" rx="8" ry="10"/></svg></span>Huella</div>
+          <div class="cap">versión favicon (3 formas), 16px</div>
+        </div>
+      </div>
+      <div class="datos">
+        <div class="dato-row riesgo"><span class="k">Qué falla</span><span>A 16px reales (no los 40px que probamos en la Parte 04) el sello completo de cinco óvalos deja de leerse — es más chico que el problema del teléfono, así que esa solución tampoco alcanza acá.</span></div>
+        <div class="dato-row"><span class="k">Por qué</span><span>Cinco formas distintas necesitan más píxeles de los que un favicon real tiene para diferenciarse entre sí.</span></div>
+        <div class="dato-row funciona"><span class="k">Cambio mínimo</span><span>Una versión "mínima" del sello con solo tres formas (la almohadilla + los dos dedos más grandes), reservada exclusivamente para 20px o menos — un tercer nivel de reducción que hoy no existe en el sistema, no un reemplazo del sello de cinco.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="s-6-5">
+    <div class="section-head"><span class="n">6.5</span><h2>Copia en blanco y negro</h2></div>
+    <div class="prueba">
+      <div class="prueba-head"><h3>Comprobante de pago fotocopiado</h3><span class="letra">PRUEBA 5</span></div>
+      <div class="vista">
+        <div class="vista-item">
+          <div class="franja-demo"><div class="barra" style="background:#0E7C6B;"></div><div class="resto">pagado</div></div>
+          <div class="cap">a color</div>
+        </div>
+        <div class="vista-item">
+          <div class="franja-demo"><div class="barra" style="background:#0E7C6B;filter:grayscale(100%);"></div><div class="resto" style="filter:grayscale(100%);">¿pagado?</div></div>
+          <div class="cap">en blanco y negro</div>
+        </div>
+        <div class="vista-item">
+          <div class="franja-demo"><div class="barra" style="background:#A13D2B;filter:grayscale(100%);"></div><div class="resto" style="filter:grayscale(100%);">¿pendiente?</div></div>
+          <div class="cap">estado opuesto, casi el mismo gris</div>
+        </div>
+      </div>
+      <div class="datos">
+        <div class="dato-row riesgo"><span class="k">Qué falla</span><span>Todo el sistema de "color con significado" definido en la Parte 05 — verde = al día, tierra = atención, en la franja de estado del comprobante — se pierde en blanco y negro. Un comprobante fotocopiado no le dice a nadie si algo está pagado o pendiente.</span></div>
+        <div class="dato-row"><span class="k">Por qué</span><span>Es el único lugar del sistema donde el color no es decoración: es la única información. Por eso es el más frágil frente a esta prueba.</span></div>
+        <div class="dato-row funciona"><span class="k">Cambio mínimo</span><span>Agregar la palabra ("PAGADO" / "PENDIENTE") junto a la franja de color, solo en esa pieza — no hace falta rehacer la paleta para que funcione en blanco y negro en todos lados, alcanza con no depender del color donde el color es la única señal.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><span class="n">·</span><h2>Qué arreglar primero</h2></div>
+    <div class="sintesis">
+      <span class="eyebrow">Orden de gravedad</span>
+      <ol>
+        <li><b>Blanco y negro (6.5)</b> es la más grave de las cinco: no es un problema estético, es pérdida real de información en un documento de pago.</li>
+        <li><b>El hueco del sello (6.1)</b> es el cambio de mayor apalancamiento: una sola edición geométrica en el archivo maestro resuelve de una vez la prueba del teléfono y la de la camiseta (6.3) — son la misma fragilidad vista desde dos medios distintos.</li>
+        <li><b>El favicon (6.4)</b> es el único que no se arregla con ese mismo cambio — necesita su propia reducción a tres formas, más chica todavía que la del ícono de app.</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ============ PARTE 7 ============ -->
+  <div class="parte-divider" id="parte-7">
+    <span class="eyebrow">Parte 07</span>
+    <h2>Manual de marca</h2>
+    <p class="dek">La versión breve de todo lo anterior — lo que un diseñador freelance necesita para trabajar sin preguntar nada más. Los errores más comunes van primero, a propósito.</p>
+  </div>
+
+  <section>
+    <div class="errores">
+      <h2>⚠ Los 6 errores más comunes</h2>
+      <ol>
+        <li><b>Usar una pata ilustrada y tierna</b> en vez del sello geométrico plano — Huella no es una marca de peluche.</li>
+        <li><b>Cambiar la tipografía del logotipo</b> por otra geométrica "parecida" — el wordmark es siempre Sora.</li>
+        <li><b>Pegar el sello a un borde o a texto</b> sin el espacio de resguardo mínimo.</li>
+        <li><b>Usar el color tierra (sello) como alarma o error</b> — significa "atención/pendiente", no "algo se rompió".</li>
+        <li><b>Exclamaciones y Mayúscula De Título</b> en botones o titulares — siempre punto y minúscula ("Guardar cambios.").</li>
+        <li><b>Degradés, sombras 3D o recolorear el sello</b> fuera de los tonos de esta guía.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="s-7-1">
+    <div class="section-head"><span class="n">7.1</span><h2>Posicionamiento</h2></div>
+    <p>Para las veterinarias que hoy manejan su día a día entre papeles, Excel y WhatsApp, <b>Huella</b> es el sistema que junta la historia clínica, los turnos, la caja y el stock en un solo lugar. La marca es <b>confiable, cercana, directa, profesional sin acartonarse y terrenal</b> — habla como un colega de mostrador, no como un manual corporativo.</p>
+  </section>
+
+  <section id="s-7-2">
+    <div class="section-head"><span class="n">7.2</span><h2>Logotipo y área de seguridad</h2></div>
+    <div class="logo-row">
+      <div class="logo-mini"><svg viewBox="0 0 64 64" fill="currentColor"><ellipse cx="32" cy="42" rx="15" ry="12"/><ellipse cx="14" cy="24" rx="7" ry="9" transform="rotate(-18 14 24)"/><ellipse cx="30" cy="14" rx="7.5" ry="9.5"/><ellipse cx="47" cy="16" rx="7" ry="9" transform="rotate(14 47 16)"/><ellipse cx="55" cy="32" rx="6" ry="8" transform="rotate(30 55 32)"/></svg></div>
+      <div class="clearspace-mini">
+        <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="8" width="48" height="48" rx="4"/><ellipse cx="32" cy="42" rx="9" ry="7"/><ellipse cx="22" cy="30" rx="4" ry="5"/><ellipse cx="32" cy="24" rx="4.5" ry="5.5"/><ellipse cx="42" cy="30" rx="4" ry="5"/></svg>
+        <span>Resguardo mínimo: el alto de una "pata" del propio sello, en los cuatro lados. Nunca pegado a un borde o a texto.</span>
+      </div>
+    </div>
+    <ul class="reglas-min">
+      <li>Lockup completo (sello + "Huella") para cualquier espacio con lugar de sobra.</li>
+      <li>Sello solo, sin la palabra, para ícono de app y espacios chicos (≥ 24px).</li>
+      <li>Por debajo de 24px, usar la versión de 3 formas — pedirla al responsable de marca, no improvisarla.</li>
+      <li>Un solo color por vez, siempre de la paleta de abajo — nunca degradé ni sombra.</li>
+    </ul>
+  </section>
+
+  <section id="s-7-3">
+    <div class="section-head"><span class="n">7.3</span><h2>Paleta</h2></div>
+    <table class="paleta-tabla">
+      <tr><th>Color</th><th>Uso</th><th>Claro</th><th>Oscuro</th></tr>
+      <tr><td><span class="chip-color" style="background:#0E7C6B;"></span> Verde Huella</td><td>Marca, acciones, positivo</td><td class="hex">#0E7C6B</td><td class="hex">#43B79E</td></tr>
+      <tr><td><span class="chip-color" style="background:#0A5C4F;"></span> Verde Profundo</td><td>Hover, títulos fuertes</td><td class="hex">#0A5C4F</td><td class="hex">#6BD2B9</td></tr>
+      <tr><td><span class="chip-color" style="background:#A13D2B;"></span> Sello</td><td>Atención — nunca error</td><td class="hex">#A13D2B</td><td class="hex">#DD7259</td></tr>
+      <tr><td><span class="chip-color" style="background:#F6F5F1;"></span> Papel</td><td>Fondo</td><td class="hex">#F6F5F1</td><td class="hex">#12201C</td></tr>
+      <tr><td><span class="chip-color" style="background:#EDEBE4;"></span> Papel Suave</td><td>Tarjetas</td><td class="hex">#EDEBE4</td><td class="hex">#1A2B25</td></tr>
+      <tr><td><span class="chip-color" style="background:#1E2A23;"></span> Tinta</td><td>Texto</td><td class="hex">#1E2A23</td><td class="hex">#EAE5D6</td></tr>
+    </table>
+  </section>
+
+  <section id="s-7-4">
+    <div class="section-head"><span class="n">7.4</span><h2>Escala tipográfica</h2></div>
+    <div class="escala-row"><div class="muestra h1-esc">Título H1</div><span class="escala-meta">Sora 700 · 32/40</span></div>
+    <div class="escala-row"><div class="muestra h2-esc">Título H2</div><span class="escala-meta">Sora 600 · 24/32</span></div>
+    <div class="escala-row"><div class="muestra h3-esc">Título H3</div><span class="escala-meta">Sora 600 · 18/26</span></div>
+    <div class="escala-row"><div class="muestra body-esc">Cuerpo de texto</div><span class="escala-meta">Work Sans 400 · 16/24</span></div>
+    <div class="escala-row"><div class="muestra ui-esc">Botones y campos</div><span class="escala-meta">Work Sans 500 · 14/20</span></div>
+    <div class="escala-row"><div class="muestra mono-esc">DATO: 13/18</div><span class="escala-meta">IBM Plex Mono 500 · 13/18</span></div>
+  </section>
+
+  <section id="s-7-5">
+    <div class="section-head"><span class="n">7.5</span><h2>Voz en tres líneas</h2></div>
+    <div class="voz-mini">
+      <div class="item"><b>Cercano</b> "Ya quedó cargada la consulta de Nala."</div>
+      <div class="item"><b>Directo</b> "No hay caja abierta. Abrimos una para que puedas cobrar."</div>
+      <div class="item"><b>Con oficio</b> "Guardamos la dosis en el carnet."</div>
+    </div>
+  </section>
+
+  <section id="s-7-6">
+    <div class="section-head"><span class="n">7.6</span><h2>Hacer / no hacer</h2></div>
+    <div class="dono-grid">
+      <div class="dono-pair">
+        <div class="dono-card si"><span class="dono-tag">✓ sí</span><svg viewBox="0 0 64 64" fill="currentColor"><ellipse cx="32" cy="42" rx="15" ry="12"/><ellipse cx="14" cy="24" rx="7" ry="9" transform="rotate(-18 14 24)"/><ellipse cx="30" cy="14" rx="7.5" ry="9.5"/><ellipse cx="47" cy="16" rx="7" ry="9" transform="rotate(14 47 16)"/><ellipse cx="55" cy="32" rx="6" ry="8" transform="rotate(30 55 32)"/></svg><span class="dono-caption">plano, un color</span></div>
+        <div class="dono-card no"><span class="dono-tag">✗ no</span><svg viewBox="0 0 64 64"><defs><linearGradient id="g7" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#43B79E"/><stop offset="1" stop-color="#0A5C4F"/></linearGradient></defs><g fill="url(#g7)"><ellipse cx="32" cy="42" rx="15" ry="12"/><ellipse cx="14" cy="24" rx="7" ry="9" transform="rotate(-18 14 24)"/><ellipse cx="30" cy="14" rx="7.5" ry="9.5"/><ellipse cx="47" cy="16" rx="7" ry="9" transform="rotate(14 47 16)"/><ellipse cx="55" cy="32" rx="6" ry="8" transform="rotate(30 55 32)"/></g></svg><span class="dono-caption">degradé + sombra</span></div>
+      </div>
+      <div class="dono-pair">
+        <div class="dono-card si"><span class="dono-tag">✓ sí</span><span class="btn-demo">Guardar cambios</span><span class="dono-caption">punto, minúscula</span></div>
+        <div class="dono-card no"><span class="dono-tag">✗ no</span><span class="btn-demo mal">¡Guardar Cambios!</span><span class="dono-caption">exclamación, Title Case</span></div>
+      </div>
+      <div class="dono-pair">
+        <div class="dono-card si"><span class="dono-tag">✓ sí</span><div class="franja-mini"><div class="b"></div><div class="r">Pagado</div></div><span class="dono-caption">color + palabra</span></div>
+        <div class="dono-card no"><span class="dono-tag">✗ no</span><div class="franja-mini"><div class="b"></div><div class="r">&nbsp;</div></div><span class="dono-caption">color solo, sin texto</span></div>
+      </div>
+      <div class="dono-pair">
+        <div class="dono-card si"><span class="dono-tag">✓ sí</span><span class="wm-si">Huella</span><span class="dono-caption">Sora</span></div>
+        <div class="dono-card no"><span class="dono-tag">✗ no</span><span class="wm-no">Huella</span><span class="dono-caption">sans genérica</span></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Huella · Kit de marca completo</span>
+    <span>Documento vivo — construido con Ernesto, 10.09.2026</span>
+  </footer>
+
+</div>

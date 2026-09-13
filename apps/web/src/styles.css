@@ -1,32 +1,36 @@
 :root {
-  /* Identidad de marca (Tropera/Identidad_Visual_Tropera.pdf): Verde Monte y
-     Marrón Tierra son los colores de las dos soluciones; Azul Río/Cielo es
-     de apoyo (gráficos, alertas informativas, estado de conexión), nunca de
-     acción. */
-  --verde: #5c8a4e;
-  --verde-dark: #4a7340;
+  /* Identidad de marca — kit de marca Huella (docs/Kit_Marca_Huella.html,
+     2026-09-10): Verde Huella reemplaza al Verde Monte anterior (#5c8a4e).
+     Tierra y Azul Río/Cielo siguen siendo los de Tropera/Identidad_Visual_Tropera.pdf,
+     sin tocar — este rediseño es solo de la solución Huella. */
+  --verde: #0e7c6b;
+  --verde-dark: #0a5c4f;
   --tierra: #8b5a2b;
   --celeste: #4f8fc0;
   --tropera-bg: #fdf4eb;
-  --huella-bg: #ecfdf5;
-  /* Paleta neutra unificada con la del nav rail (slate) — antes el rail usaba
-     grises fríos (#e2e8f0/#64748b) y el resto de la app grises más cálidos
-     (#e5e7eb/#6b7280); quedaban ligeramente descoordinados uno al lado del otro. */
-  --text: #1e293b;
-  --muted: #64748b;
-  --border: #e2e8f0;
-  --bg: #f4f7f9;
+  --huella-bg: #e5f2ef;
+  /* Paleta neutra cálida (antes slate frío #1e293b/#64748b/#e2e8f0/#f4f7f9) —
+     "papel", nunca blanco clínico ni gris de sistema operativo, por
+     coherencia con el resto del kit de marca. Corregida dos veces el
+     2026-09-10: la primera pasada (#f1eee1/#ece7d6/#d9d2b9) subía la
+     luminosidad pero mantenía la saturación — seguía leyendo "marrón viejo"
+     junto a las tarjetas blancas. Esta baja la saturación en vez de solo
+     aclarar: casi gris cálido, no crema/manila. */
+  --text: #1e2a23;
+  --muted: #6c6650;
+  --border: #e2dfd6;
+  --bg: #f6f5f1;
   --card: #ffffff;
-  --hover-bg: #f1f5f9;
+  --hover-bg: #edebe4;
   --danger: #b91c1c;
   --danger-bg: #fef2f2;
-  /* Advertencia (ej. vacuna próxima a vencer, todavía no vencida) — no había
-     un tercer estado semántico además de éxito/verde y peligro/rojo hasta
-     que Recordatorios lo necesitó. */
-  --advertencia: #b45309;
-  --advertencia-bg: #fef3c7;
-  --sombra-suave: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
-  --sombra-flotante: 0 10px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.08);
+  /* Advertencia (ej. vacuna próxima a vencer, todavía no vencida) — ahora es
+     el "Sello" del kit de marca: significa atención/pendiente, nunca error
+     (ver Prueba de Resistencia de Marca, docs/Kit_Marca_Huella.html Parte 06). */
+  --advertencia: #a13d2b;
+  --advertencia-bg: #f5e6df;
+  --sombra-suave: 0 1px 2px rgba(30, 42, 35, 0.05), 0 1px 3px rgba(30, 42, 35, 0.07);
+  --sombra-flotante: 0 10px 25px -5px rgba(30, 42, 35, 0.14), 0 8px 10px -6px rgba(30, 42, 35, 0.09);
 }
 
 * {
@@ -45,19 +49,26 @@ body,
 }
 body {
   margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Work Sans', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
   color: var(--text);
   background: var(--bg);
   line-height: 1.5;
 }
 
+/* Sora para todo título — kit de marca Huella, actualizado 2026-09-10: la
+   slab serif (Zilla Slab) resultaba demasiado antigua/vintage en pantalla
+   ("Home" en HuellaHomeSection se veía a máquina de escribir); Sora
+   mantiene el mismo lenguaje redondeado de terminales que el sello, pero
+   con un trazo geométrico moderno. */
 h1 {
+  font-family: 'Sora', system-ui, sans-serif;
   font-size: 1.5rem;
   font-weight: 700;
   letter-spacing: -0.01em;
   margin: 0;
 }
 h2 {
+  font-family: 'Sora', system-ui, sans-serif;
   font-size: 1.15rem;
   font-weight: 600;
   margin: 0;
@@ -79,7 +90,7 @@ h2 {
   height: 12px;
   border-radius: 50%;
   background: var(--verde);
-  box-shadow: 0 0 0 3px rgba(92, 138, 78, 0.2);
+  box-shadow: 0 0 0 3px rgba(14, 124, 107, 0.2);
 }
 
 /* --- Layout app ---
@@ -244,8 +255,19 @@ h2 {
    y navegar a ciegas. Se resuelve pasando el riel a una barra arriba,
    angosta, con el label siempre visible debajo del ícono (mismo
    `data-title` que ya usa el tooltip de desktop, sin tocar el JSX) y
-   scrolleable horizontalmente si no entran todos los ítems. */
-@media (max-width: 720px) {
+   scrolleable horizontalmente si no entran todos los ítems.
+
+   El `max-width: 720px` sólo cubre el celular en vertical — girado a
+   horizontal, la mayoría de los celulares reales (iPhone 12/13/14 ~844px,
+   Pixel 6/7 ~915px, iPhone Pro Max ~932px) supera ese ancho y quedaba
+   mostrando el riel de escritorio completo (80px, columna entera), rompiendo
+   la app en ese momento (confirmado con capturas a esos anchos). Se agrega
+   una segunda condición por alto+orientación en vez de sólo correr el ancho
+   más arriba: un celular en horizontal siempre es bajo (~375-430px de alto)
+   sin importar cuán ancho sea, mientras que una ventana de escritorio rara
+   vez baja de eso — así se detecta "es un celular acostado" sin tocar el
+   comportamiento en tablet/desktop vertical, que no es lo que se pidió acá. */
+@media (max-width: 720px), (max-height: 500px) and (orientation: landscape) {
   .app-rail {
     flex-direction: column;
   }
@@ -260,6 +282,11 @@ h2 {
     border-bottom: 1px solid var(--border);
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    /* Sin esto, el scroll puede quedar a mitad de un ítem (el borde del
+       viewport corta el ícono/label a la mitad) — con snap, siempre se
+       asienta mostrando un ítem completo, nunca "cortado". Confirmado con
+       capturas a 390px: sin snap el último ítem visible quedaba a medias. */
+    scroll-snap-type: x proximity;
   }
   .solutions-group {
     flex-direction: row;
@@ -273,6 +300,8 @@ h2 {
   .solution-btn {
     width: 38px;
     height: 38px;
+    flex-shrink: 0;
+    scroll-snap-align: start;
   }
   .options-group {
     flex: 1;
@@ -288,6 +317,7 @@ h2 {
     gap: 0.15rem;
     padding: 0.35rem 0.5rem;
     border-radius: 10px;
+    scroll-snap-align: start;
   }
   /* El label deja de ser un tooltip flotante (posicionado, oculto salvo
      :hover) y pasa a ser una leyenda chica siempre visible debajo del
@@ -312,6 +342,7 @@ h2 {
     margin: 0;
     border-top: none;
     border-left: 2px solid var(--border);
+    scroll-snap-align: end;
   }
   .user-dropdown {
     left: auto;
@@ -667,7 +698,7 @@ input:focus,
 select:focus,
 textarea:focus {
   border-color: var(--verde);
-  box-shadow: 0 0 0 3px rgba(92, 138, 78, 0.15);
+  box-shadow: 0 0 0 3px rgba(14, 124, 107, 0.15);
 }
 
 .form-grid {
@@ -878,7 +909,7 @@ textarea:focus {
   text-transform: capitalize;
 }
 .mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.88rem;
 }
 .muted {
@@ -1690,7 +1721,7 @@ textarea:focus {
 
 /* ══════════════════════════════════════════════════════════════════════
    Landing pública (campañas de marketing) — LandingPage.tsx
-   Estilo editorial (serif Playfair Display + itálica de acento) sobre la
+   Estilo editorial (Sora + color de acento) sobre la
    paleta real de marca (--verde/--huella-bg), no una paleta nueva — la
    landing tiene que sentirse como la misma marca que el resto de la app,
    sólo con más aire y tipografía más grande. Scopeado bajo `.landing` para
@@ -1704,10 +1735,10 @@ textarea:focus {
   overflow-x: hidden;
 }
 .landing-serif {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: 'Sora', system-ui, sans-serif;
 }
 .landing-serif em {
-  font-style: italic;
+  font-style: normal;
   color: var(--verde-dark);
 }
 
@@ -1724,7 +1755,7 @@ textarea:focus {
   border-bottom: 1px solid var(--border);
 }
 .landing-logo {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: 'Sora', system-ui, sans-serif;
   font-weight: 700;
   font-size: 1.25rem;
   color: var(--text);
@@ -1806,7 +1837,7 @@ textarea:focus {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(92, 138, 78, 0.12), transparent 70%);
+  background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(14, 124, 107, 0.12), transparent 70%);
   pointer-events: none;
 }
 .landing-eyebrow {
@@ -1997,7 +2028,7 @@ textarea:focus {
   box-shadow: var(--sombra-suave);
 }
 .landing-paso-numero {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: 'Sora', system-ui, sans-serif;
   font-size: 1.4rem;
   color: var(--verde-dark);
   font-weight: 700;
@@ -2138,7 +2169,7 @@ textarea:focus {
   min-height: 2.5em;
 }
 .landing-plan-precio {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: 'Sora', system-ui, sans-serif;
   font-size: 2.1rem;
   font-weight: 700;
   color: var(--text);
@@ -2177,7 +2208,7 @@ textarea:focus {
   text-align: center;
 }
 .landing-footer-logo {
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: 'Sora', system-ui, sans-serif;
   font-weight: 700;
   font-size: 1.1rem;
   margin-bottom: 0.4rem;

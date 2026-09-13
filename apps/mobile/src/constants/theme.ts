@@ -3,30 +3,31 @@ import { Platform, type ViewStyle } from 'react-native';
 /**
  * Paleta compartida con la web (apps/web/src/styles.css `:root`) — mismos
  * valores hex, para que el mobile no introduzca una identidad visual propia.
- * Actualizado 2026-09-02 para seguir la paleta slate + tokens de sombra que
- * la web ya tiene desde el rediseño del shell (antes el mobile tenía una
- * paleta de grises cálidos vieja, `#1f2933`/`#6b7280`/`#e5e7eb`/`#f6f7f4`,
- * sin `advertencia` ni `celeste` ni sombras).
+ * Actualizado 2026-09-10 con el kit de marca Huella (docs/Kit_Marca_Huella.html):
+ * el verde salvia (`#5c8a4e`) y los grises slate quedan reemplazados por el
+ * Verde Huella y una paleta neutra cálida ("papel", nunca gris de sistema
+ * operativo). `tierra`/`troperaBg`/`celeste` son de Tropera
+ * (Identidad_Visual_Tropera.pdf) y no se tocan — este rediseño es solo Huella.
  */
 export const Colors = {
-  verde: '#5c8a4e',
-  verdeDark: '#4a7340',
-  // Antes `verdeClaro` — renombrado para calzar 1:1 con el token de la web
-  // (`--huella-bg`), que es el fondo suave de la solución Huella.
-  huellaBg: '#ecfdf5',
+  verde: '#0e7c6b',
+  verdeDark: '#0a5c4f',
+  huellaBg: '#e5f2ef',
   tierra: '#8b5a2b',
   troperaBg: '#fdf4eb',
   celeste: '#4f8fc0',
-  text: '#1e293b',
-  muted: '#64748b',
-  border: '#e2e8f0',
-  bg: '#f4f7f9',
+  text: '#1e2a23',
+  muted: '#6c6650',
+  border: '#e2dfd6',
+  bg: '#f6f5f1',
   card: '#ffffff',
-  hoverBg: '#f1f5f9',
+  hoverBg: '#edebe4',
   danger: '#b91c1c',
   dangerBg: '#fef2f2',
-  advertencia: '#b45309',
-  advertenciaBg: '#fef3c7',
+  // "Sello" del kit de marca: atención/pendiente, nunca error (Prueba de
+  // Resistencia de Marca, Parte 06) — antes un ámbar (`#b45309`) genérico.
+  advertencia: '#a13d2b',
+  advertenciaBg: '#f5e6df',
 };
 
 /** Radios de borde, calcados de los mismos valores en px que usa styles.css. */
@@ -43,14 +44,14 @@ export const Radii = {
  */
 export const Shadows: Record<'suave' | 'flotante', ViewStyle> = {
   suave: {
-    shadowColor: '#0f172a',
+    shadowColor: '#1e2a23',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 3,
     ...Platform.select({ android: { elevation: 2 }, default: {} }),
   },
   flotante: {
-    shadowColor: '#0f172a',
+    shadowColor: '#1e2a23',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.18,
     shadowRadius: 20,

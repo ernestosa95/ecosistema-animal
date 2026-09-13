@@ -737,9 +737,9 @@ function ModalNuevo({ fechaDefault, onClose, onOk }: {
 
 // ── Estilos (CSS propio, autocontenido) ───────────────────────────────────────
 const CSS = `
-.hu-agenda { /* Paleta de la solución Huella (verde), no la del teal genérico de antes. */
-  --hu-teal:#5c8a4e; --hu-teal-d:#4a7340; --hu-bg:#f4f7f9; --hu-card:#fff;
-  --hu-border:#e2e8f0; --hu-text:#1e293b; --hu-muted:#64748b;
+.hu-agenda { /* Paleta de la solución Huella — kit de marca 2026-09-10 (docs/Kit_Marca_Huella.html). */
+  --hu-teal:#0e7c6b; --hu-teal-d:#0a5c4f; --hu-bg:#f6f5f1; --hu-card:#fff;
+  --hu-border:#e2dfd6; --hu-text:#1e2a23; --hu-muted:#6c6650;
   width: 100%; color: var(--hu-text);
   flex: 1; min-height: 0; display: flex; flex-direction: column; }
 

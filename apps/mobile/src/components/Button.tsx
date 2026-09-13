@@ -1,5 +1,6 @@
 import { Pressable, Text, StyleSheet, type PressableProps } from 'react-native';
 import { Colors, Radii } from '@/constants/theme';
+import { Fonts } from '@/constants/fonts';
 
 /** Equivalente RN de `.btn`/`.btn-ghost` en styles.css. */
 export function Button({
@@ -43,12 +44,12 @@ const styles = StyleSheet.create({
   },
   textoPrimary: {
     color: '#fff',
-    fontWeight: '600',
+    fontFamily: Fonts.bodySemiBold,
     fontSize: 16,
   },
   textoGhost: {
     color: Colors.text,
-    fontWeight: '600',
+    fontFamily: Fonts.bodySemiBold,
     fontSize: 15,
   },
 });

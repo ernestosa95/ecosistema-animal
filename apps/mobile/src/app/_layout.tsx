@@ -1,14 +1,28 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter, useSegments } from 'expo-router';
+import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { useColorScheme } from 'react-native';
+import { Text, TextInput, useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { SesionProvider, useSesionContext } from '@/auth/SesionContext';
 import { SyncProvider } from '@/db/SyncContext';
 import { api } from '@/api/client';
+import { Fonts, FontsToLoad } from '@/constants/fonts';
 
 SplashScreen.preventAutoHideAsync();
+
+// Work Sans como fuente por defecto de todo `Text`/`TextInput` de la app —
+// kit de marca Huella — en vez de reescribir el `fontFamily` pantalla por
+// pantalla. Un componente puede seguir pisándolo (ej. títulos con
+// `Fonts.heading`, Zilla Slab).
+(Text as any).defaultProps = (Text as any).defaultProps || {};
+(Text as any).defaultProps.style = [{ fontFamily: Fonts.body }, (Text as any).defaultProps.style];
+(TextInput as any).defaultProps = (TextInput as any).defaultProps || {};
+(TextInput as any).defaultProps.style = [
+  { fontFamily: Fonts.body },
+  (TextInput as any).defaultProps.style,
+];
 
 function RootNavigator() {
   const { sesion, cargando } = useSesionContext();
@@ -59,6 +73,14 @@ function RootNavigator() {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const [fontsLoaded] = useFonts(FontsToLoad);
+
+  // El splash nativo (expo-splash-screen, ver app.json) sigue visible hasta
+  // que las tipografías del kit de marca terminan de cargar — sin esto, la
+  // primera pantalla parpadearía con la fuente de sistema y después
+  // "saltaría" a Zilla Slab/Work Sans una vez montadas.
+  if (!fontsLoaded) return null;
+
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <SesionProvider>
