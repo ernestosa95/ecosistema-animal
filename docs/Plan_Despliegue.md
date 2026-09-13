@@ -1,10 +1,39 @@
 # 🚀 Plan de despliegue — Ecosistema de Salud Animal
 
-**Fecha:** 2026-09-03, revisado 2026-09-05 (arquitectura pasada a Docker — ver nota abajo). Estado: **plan escrito, todavía no ejecutado** (F0.1 del Roadmap sigue ⏳ — nada de esto corrió contra una VPS real todavía).
+**Fecha:** 2026-09-03, revisado 2026-09-05 (arquitectura pasada a Docker — ver nota abajo) y 2026-09-10 (compra de la VPS confirmada para el **sábado 12/09** — ver la sección 0, cronograma). Estado: **VPS a comprarse el 12/09** (F0.1 del Roadmap pasa de ⏳ a en curso esta semana — nada de esto corrió contra una VPS real todavía).
 
 > Este documento asume una **VPS paga** contratada por el usuario (self-hosted, no un PaaS tipo Railway/Render). Se descartó la idea original del Roadmap de una VM de Oracle Cloud Always Free — ver la sección de recursos más abajo para por qué.
 
 > **Revisión 2026-09-05**: la primera versión de este plan asumía Node/Postgres/Caddy/PM2 instalados directo en el sistema operativo ("bare-metal"). Se pasó a **Docker** porque esta VPS probablemente conviva con otros proyectos/ecosistemas del usuario a futuro — con procesos bare-metal, dos proyectos compitiendo por el mismo puerto, la misma instancia de Postgres o versiones de Node distintas es un problema real; con contenedores, cada proyecto queda aislado y un problema en uno no afecta a los demás. Todo el resto de las decisiones del plan original (Caddy para HTTPS automático, DonWeb como proveedor, los recursos recomendados, el checklist de endurecimiento, los backups) sigue en pie — sólo cambia el "cómo" se corre cada pieza.
+
+> **Revisión 2026-09-10**: la VPS elegida (DonWeb Cloud Server, 4 vCPU / 8GB RAM / 30GB SSD, 12 meses, dominio gratis incluido) es exactamente la recomendada en la sección 2 — se compra el sábado 12/09. Se agregó la sección 0 con el cronograma concreto de esa compra y se re-verificaron las migraciones (ahora 35, `0000`–`0034`) contra un Postgres 16 limpio.
+
+---
+
+## 0. Cronograma para este despliegue (semana del 10/09)
+
+### Hoy → viernes 11/09, antes de comprar
+
+- [ ] **Decidir qué se despliega, commitear y pushear.** A la fecha de esta revisión el trabajo vive en la rama `feat/turnero-web-y-datos-especie`, sin commitear — ni el rediseño de marca (paleta, tipografía, logo/favicon) ni la columna `costo` nueva en vacunaciones llegan al servidor el sábado si esto sigue así: `git clone`/`git pull` sólo trae lo que está pusheado a la rama que se vaya a desplegar. Cerrar lo que se quiera llevar, mergear a `main` (o decidir que el deploy apunta a esta rama) y `git push` antes del sábado.
+- [x] **Migraciones re-verificadas** (10/09/2026): las 35 actuales (`0000`–`0034`, incluida la nueva `costo` de `hce.vacunaciones`) corren de punta a punta contra un Postgres 16 recién creado + el seed de especies, sin ningún error. Ver el detalle actualizado en la sección 5.
+- [ ] **Elegir el dominio real** — leer la nota de abajo antes de aceptar el dominio gratis de DonWeb como el dominio principal que va a ver una clínica.
+- [ ] Crear la cuenta de Resend (gratis) si todavía no existe, para tener el panel a mano en cuanto haya un dominio para verificar — no se puede verificar nada sin el dominio, pero la cuenta se crea antes.
+- [ ] Opcional, 10 minutos: crear una cuenta de Sentry gratuita — no hace falta cablearla todavía, pero tenerla creada agiliza el ítem de "error tracking" de la sección 8 cuando llegue el momento.
+
+### Sábado 12/09 — compra y primer deploy
+
+1. Comprar el Cloud Server (4 vCPU / 8GB RAM / 30GB SSD, 12 meses) y activar el dominio gratis incluido.
+2. **DNS primero, en cuanto se tenga la IP**: apuntar `app.<dominio>` y `api.<dominio>` a la IP de la VPS (sección 2). La propagación tarda de minutos a un par de horas — conviene lanzar este paso y seguir con el resto del deploy mientras propaga, no esperarlo con los brazos cruzados.
+3. Secciones 3 a 7, en orden: usuario `deploy` + firewall + Docker + red `edge` + Caddy (sección 3) → clonar el repo, `.env` de raíz y de `apps/backend/.env`, `docker compose build && up -d`, migraciones + los 4 seeds (sección 5) → confirmar que Caddy levantó HTTPS en los dos subdominios (sección 7).
+4. No seguir al endurecimiento (sección 8) hasta confirmar que `https://app.<dominio>` y `https://api.<dominio>/health` responden.
+
+### Después del sábado, antes de mandarle el link a una clínica real
+
+- [ ] Verificar el dominio en Resend — recién es posible una vez que el DNS del dominio nuevo está armado (no antes). Sigue siendo el ítem más importante de la sección 8.
+- [ ] El resto del checklist de la sección 8: `JWT_SECRET` random, `SUPERADMIN_EMAILS` real, `BACKEND_PUBLIC_URL` correcto, backups corriendo y **probados** con un restore real.
+- [ ] Bloques 0/1/8 de `Protocolo_Pruebas.md` contra el ambiente real.
+
+**Nota sobre el dominio gratis**: DonWeb ofrece `.ONLINE`, `.SITE`, `.WEBSITE` o `.UNO` gratis al comprar 12 meses. Ninguno transmite la misma confianza que un `.com`/`.com.ar` frente a una veterinaria evaluando pagar por un software — encaja raro con que "confiable" sea uno de los cinco rasgos de personalidad de la marca (Ficha de Marca, `docs/Kit_Marca_Huella.html`). Alternativas: usar el dominio gratis para algo secundario (una landing de prueba, un link corto) y registrar aparte un `.com.ar` (por NIC.ar, no hace falta que sea DonWeb) para `app.`/`api.` — es lo que ve el cliente y cuesta poco. Si el sábado no da el tiempo para eso, arrancar con el gratis no bloquea nada técnico — es una decisión de marca a revisar después, no de infraestructura.
 
 ---
 
@@ -320,9 +349,10 @@ docker compose exec backend pnpm --filter backend db:seed:vademecum    # vademé
 Los tres últimos son opcionales en el sentido de que nada rompe si no corren — son sólo
 catálogos de referencia para autocompletar (ver `hce/catalogo-vacunas/`,
 `hce/catalogo-diagnosticos/`, `farmacia/vademecum-senasa/`) — pero sin ellos esas búsquedas con
-sugerencias quedan vacías en silencio, sin ningún error visible. Verificado el 2026-09-05
-corriendo las 34 migraciones + los 4 seeds contra un Postgres 16 real desde cero (mismo
-escenario que un primer deploy).
+sugerencias quedan vacías en silencio, sin ningún error visible. Re-verificado el 2026-09-10
+corriendo las 35 migraciones (`0000`–`0034`) + el seed de especies contra un Postgres 16 real
+desde cero (mismo escenario que un primer deploy) — 45 tablas resultantes en los 9 schemas del
+proyecto, especies sembradas sin error.
 
 ---
 
@@ -444,10 +474,10 @@ docker compose exec backend pnpm --filter backend db:migrate
 ```
 `docker compose up -d` reemplaza sólo los contenedores cuya imagen cambió — no hace falta bajar todo el stack para un deploy normal. No hace falta tocar el stack "edge" salvo que cambien los dominios/labels.
 
-Verificado el 2026-09-05: las 34 migraciones actuales (`0000`–`0033`) corren de punta a punta
+Re-verificado el 2026-09-10: las 35 migraciones actuales (`0000`–`0034`) corren de punta a punta
 contra un Postgres 16 limpio sin ningún error — incluida la extensión `pgcrypto` (best-effort,
-no hace falta en PG13+) y las columnas más recientes (`plataforma.pagos.estado`/
-`comprobante_url`, `core.organizaciones.logo_url`).
+no hace falta en PG13+), las columnas de la revisión anterior (`plataforma.pagos.estado`/
+`comprobante_url`, `core.organizaciones.logo_url`) y la más nueva (`hce.vacunaciones.costo`).
 
 ---
 
