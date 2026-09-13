@@ -78,6 +78,7 @@ export default function PacienteDetalleScreen() {
   const [producto, setProducto] = useState('');
   const [loteProducto, setLoteProducto] = useState('');
   const [proximaDosis, setProximaDosis] = useState('');
+  const [costoVacuna, setCostoVacuna] = useState('0');
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -143,12 +144,14 @@ export default function PacienteDetalleScreen() {
           v.fecha = new Date().toISOString().slice(0, 10);
           v.proximaDosis = proximaDosis.trim() || null;
           v.loteProducto = loteProducto.trim() || null;
+          v.costo = costoVacuna.trim() ? Number(costoVacuna) : 0;
         });
       });
       api.registrarEvento(sesion, 'accion', 'vacunacion-crear');
       setProducto('');
       setLoteProducto('');
       setProximaDosis('');
+      setCostoVacuna('0');
       setOk(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al guardar');
@@ -277,6 +280,7 @@ export default function PacienteDetalleScreen() {
                       {item.fecha}
                       {item.proximaDosis ? ` · próxima dosis: ${item.proximaDosis}` : ''}
                     </Text>
+                    <Text style={styles.rowSub}>${item.costo ?? 0}</Text>
                   </View>
                 )}
                 ListEmptyComponent={<EmptyState mensaje="Sin vacunaciones cargadas todavía." />}
@@ -305,6 +309,7 @@ export default function PacienteDetalleScreen() {
                 />
                 <Field label="Lote (opcional)" value={loteProducto} onChangeText={setLoteProducto} />
                 <CampoFecha label="Próxima dosis (opcional)" value={proximaDosis} onCambiar={setProximaDosis} />
+                <Field label="Costo" value={costoVacuna} onChangeText={setCostoVacuna} keyboardType="numeric" />
                 <View style={styles.boton}>
                   <Button
                     title={guardando ? 'Guardando…' : 'Guardar vacunación'}

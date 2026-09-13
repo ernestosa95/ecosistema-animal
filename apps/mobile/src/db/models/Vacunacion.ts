@@ -1,5 +1,5 @@
 import { Model } from '@nozbe/watermelondb';
-import { date, readonly, text } from '@nozbe/watermelondb/decorators';
+import { date, field, readonly, text } from '@nozbe/watermelondb/decorators';
 
 export class Vacunacion extends Model {
   static table = 'vacunaciones';
@@ -12,6 +12,7 @@ export class Vacunacion extends Model {
   @text('fecha') fecha: string;
   @text('proxima_dosis') proximaDosis: string | null;
   @text('lote_producto') loteProducto: string | null;
+  @field('costo') costo: number | null;
   @readonly @date('created_at') createdAt: Date;
   @readonly @date('updated_at') updatedAt: Date;
 }

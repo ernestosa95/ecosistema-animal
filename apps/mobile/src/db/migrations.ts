@@ -9,10 +9,20 @@ import { schemaMigrations, createTable, addColumns } from '@nozbe/watermelondb/S
  * v4 → v5: Farmacia (productos/stock/movimientos_stock), para Venta rápida offline.
  * v5 → v6: `consultas.costo`.
  * v6 → v7: `turnos.agenda_id` + tabla `agendas` (ver nota en schema.ts).
+ * v7 → v8: `vacunaciones.costo`.
  * Sólo creación de tablas nuevas — nada de lo existente (tropera.*) cambia.
  */
 export const migrations = schemaMigrations({
   migrations: [
+    {
+      toVersion: 8,
+      steps: [
+        addColumns({
+          table: 'vacunaciones',
+          columns: [{ name: 'costo', type: 'number', isOptional: true }],
+        }),
+      ],
+    },
     {
       toVersion: 7,
       steps: [

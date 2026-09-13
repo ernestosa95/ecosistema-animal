@@ -135,6 +135,7 @@ export interface Vacunacion {
   proximaDosis?: string | null; // 'YYYY-MM-DD'
   loteProducto?: string | null;
   veterinarioId?: string | null;
+  costo?: string | null;
 }
 
 /** Fila del catálogo de referencia por especie (vacunas/antiparasitarios comunes) — sólo asiste el alta. */
@@ -404,6 +405,13 @@ export interface Plan {
 
 export type DestinatarioTipo = 'todas' | 'organizacion' | 'grupo';
 
+export interface PreguntaMensaje {
+  id: string;
+  tipo: 'si_no' | 'opcion_multiple' | 'texto_breve';
+  texto: string;
+  opciones?: string[];
+}
+
 export interface MensajePlataforma {
   id: string;
   titulo: string;
@@ -411,6 +419,7 @@ export interface MensajePlataforma {
   destinatarioTipo: DestinatarioTipo;
   organizacionId?: string | null;
   grupoId?: string | null;
+  preguntas: PreguntaMensaje[];
   publicadoEn: string;
 }
 

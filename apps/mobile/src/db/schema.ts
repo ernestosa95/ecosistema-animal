@@ -30,11 +30,13 @@ import { appSchema, tableSchema } from '@nozbe/watermelondb';
 // "Nueva consulta" para agendas médicas, no para una "no médica" como
 // peluquería). No se suman `agenda_bloques`/`agenda_excepciones`: mobile no
 // necesita horarios/slots, sólo saber si HAY un profesional.
+// v7→v8: `vacunaciones.costo` — mismo criterio que `consultas.costo` en v6,
+// le faltaba a la vacunación (backend + alta web + alta offline).
 // Nombres de columna en snake_case porque así los serializa
 // `serializeRow`/`valoresParaEscribir` (contrato = objeto WatermelonDB, no
 // el camelCase de Drizzle).
 export const schema = appSchema({
-  version: 7,
+  version: 8,
   tables: [
     tableSchema({
       name: 'personas',
@@ -103,6 +105,7 @@ export const schema = appSchema({
         { name: 'fecha', type: 'string' },
         { name: 'proxima_dosis', type: 'string', isOptional: true },
         { name: 'lote_producto', type: 'string', isOptional: true },
+        { name: 'costo', type: 'number', isOptional: true },
         { name: 'created_at', type: 'number' },
         { name: 'updated_at', type: 'number' },
       ],

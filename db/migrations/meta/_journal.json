@@ -239,6 +239,13 @@
       "when": 1788632469860,
       "tag": "0033_useful_agent_brand",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1788732119382,
+      "tag": "0034_regular_dreaming_celestial",
+      "breakpoints": true
     }
   ]
 }

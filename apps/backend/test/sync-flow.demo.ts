@@ -71,7 +71,7 @@ async function main() {
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
       organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
       animal_id uuid NOT NULL REFERENCES core.animales(id), veterinario_id uuid REFERENCES core.usuarios(id),
-      producto text, vademecum_id uuid, fecha date NOT NULL DEFAULT current_date, proxima_dosis date, lote_producto text, recordatorio_descartado_en timestamptz,
+      producto text, vademecum_id uuid, fecha date NOT NULL DEFAULT current_date, proxima_dosis date, lote_producto text, costo numeric(12,2), recordatorio_descartado_en timestamptz,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
     CREATE TABLE hce.agendas (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

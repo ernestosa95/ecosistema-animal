@@ -47,7 +47,7 @@ async function main() {
       organizacion_id uuid NOT NULL REFERENCES core.organizaciones(id) ON DELETE CASCADE,
       animal_id uuid NOT NULL REFERENCES core.animales(id),
       veterinario_id uuid REFERENCES core.usuarios(id),
-      producto text, vademecum_id uuid, fecha date NOT NULL DEFAULT current_date, proxima_dosis date, lote_producto text, recordatorio_descartado_en timestamptz,
+      producto text, vademecum_id uuid, fecha date NOT NULL DEFAULT current_date, proxima_dosis date, lote_producto text, costo numeric(12,2), recordatorio_descartado_en timestamptz,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
   `);
 
@@ -69,6 +69,7 @@ async function main() {
     const [v] = await db.insert(vacunaciones).values({
       organizacionId: orgId, animalId: dto.animalId, veterinarioId: vetId,
       producto: dto.producto, fecha: dto.fecha, proximaDosis: dto.proximaDosis, loteProducto: dto.loteProducto,
+      costo: dto.costo != null ? String(dto.costo) : undefined,
     }).returning();
     return v;
   }
@@ -85,12 +86,17 @@ async function main() {
   // ============================== Pruebas ==============================
   console.log('1) Registrar vacunación');
   const v1 = await registrar(orgA.id, vet.id, {
-    animalId: firu.id, producto: 'Séxtuple', fecha: iso(-2), proximaDosis: iso(10), loteProducto: 'L-2024-A',
+    animalId: firu.id, producto: 'Séxtuple', fecha: iso(-2), proximaDosis: iso(10), loteProducto: 'L-2024-A', costo: 5000,
   });
   check('se registró la vacunación', !!v1.id);
   check('quedó en la organización correcta', v1.organizacionId === orgA.id);
   check('registró al veterinario', v1.veterinarioId === vet.id);
   check('guardó la próxima dosis', v1.proximaDosis === iso(10));
+  check('guardó el costo', Number(v1.costo) === 5000);
+
+  console.log('1b) Costo 0 (cortesía) se guarda igual que cualquier otro valor, no como "sin costo"');
+  const cortesia = await registrar(orgA.id, vet.id, { animalId: firu.id, producto: 'Antiparasitario', fecha: iso(0), costo: 0 });
+  check('costo 0 se persiste como 0, no null', cortesia.costo !== null && Number(cortesia.costo) === 0);
 
   // una vacuna con próxima dosis lejana (no debe entrar en recordatorios de 30 días)
   await registrar(orgA.id, vet.id, { animalId: firu.id, producto: 'Antirrábica', fecha: iso(-1), proximaDosis: iso(200) });

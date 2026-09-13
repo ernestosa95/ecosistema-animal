@@ -35,6 +35,7 @@ export class VacunacionesService {
         fecha: dto.fecha,
         proximaDosis: dto.proximaDosis,
         loteProducto: dto.loteProducto,
+        costo: dto.costo.toString(),
       })
       .returning();
     return vacunacion;

@@ -1325,6 +1325,7 @@ function NuevaVacunacionForm({
   const [fecha, setFecha] = useState('');
   const [proximaDosis, setProximaDosis] = useState('');
   const [loteProducto, setLoteProducto] = useState('');
+  const [costo, setCosto] = useState('0');
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -1337,6 +1338,7 @@ function NuevaVacunacionForm({
       if (fecha) data.fecha = fecha;
       if (proximaDosis) data.proximaDosis = proximaDosis;
       if (loteProducto) data.loteProducto = loteProducto;
+      if (costo !== '') data.costo = Number(costo);
       await api.registrarVacunacion(sesion, data);
       api.registrarEvento(sesion, 'accion', 'vacunacion-crear');
       onCreada();
@@ -1370,6 +1372,16 @@ function NuevaVacunacionForm({
       <label className="span-2">
         Lote
         <input value={loteProducto} onChange={(e) => setLoteProducto(e.target.value)} />
+      </label>
+      <label>
+        Costo
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          value={costo}
+          onChange={(e) => setCosto(e.target.value)}
+        />
       </label>
       {error && <div className="alerta span-2">{error}</div>}
       <div className="span-2">

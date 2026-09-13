@@ -2,6 +2,17 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-09-06] — Fix: la vacunación no tenía costo asociado, a diferencia de la consulta
+
+El usuario notó la asimetría: `consultas.costo` es obligatorio desde 2026-09-03 (aunque sea 0, cortesía), pero `vacunaciones` nunca sumó el mismo campo — no había forma de dejar registrado cuánto se cobró por aplicar una vacuna.
+
+- Backend: `hce.vacunaciones` suma `costo` (numeric, nullable — migración `0034_regular_dreaming_celestial.sql`, aplicada contra el `pgdata` real con el procedimiento de siempre, conteos iguales antes/después). `CreateVacunacionDto.costo` es obligatorio, mismo criterio que `CreateConsultaDto` (acepta 0). No genera un cobro automático en Caja — mismo acoplamiento flojo que la consulta.
+- Web: `NuevaVacunacionForm` (`PacienteDetallePage.tsx`) suma el campo "Costo" (default '0', igual que el de consulta).
+- Mobile: `db/schema.ts`/`migrations.ts` (v7→v8) + modelo `Vacunacion.ts` suman la columna; el formulario de vacunación en `paciente/[id].tsx` suma el campo y ahora también muestra el costo en el listado de vacunaciones (ya lo hacía para consultas).
+- `test:vacunas-demo` suma 2 casos (costo se guarda, costo 0 se persiste como 0 y no como "sin costo") — mismo patrón que ya cubría `hce-flow.demo.ts` para consultas.
+
+**Verificado**: `tsc --noEmit` limpio en backend y mobile, `vite build` limpio en web. Las 18 `test:*-demo` pasan (12/12 en `vacunas-demo`, 2 nuevos). Migración aplicada y backend reintegrado.
+
 ## [2026-09-06] — Auditoría de roles pre-despliegue: Tropera no dejaba entrar a `veterinario` aunque el backend se lo permitía
 
 Pedido del usuario la noche antes del primer despliegue: revisar consistencia de roles en toda la app antes de "el gran día". Repasé sistemáticamente los ~35 controllers con `@Roles` contra lo que expone cada pantalla — todo cerraba bien (caja, animales, personas, usuarios, agendas, farmacia, consultas/vacunaciones ya corregido el día anterior) salvo un hallazgo real en Tropera.

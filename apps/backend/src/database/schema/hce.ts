@@ -65,6 +65,11 @@ export const vacunaciones = hce.table('vacunaciones', {
   fecha: date('fecha').notNull().default(sql`current_date`),
   proximaDosis: date('proxima_dosis'),
   loteProducto: text('lote_producto'),
+  // Mismo criterio que `consultas.costo`: obligatorio a nivel de DTO desde
+  // que se agregó, nullable acá para no romper las filas ya cargadas. Dato
+  // de referencia de la ficha — no genera un cobro automático en caja, el
+  // cobro real se sigue cargando a mano desde Caja.
+  costo: numeric('costo', { precision: 12, scale: 2 }),
   // No nulo = el staff descartó el recordatorio de esta dosis (ej. ya se
   // contactó al dueño y no quiere seguir viéndolo en la lista, o decidió
   // que no aplica). No borra la vacunación ni la próxima dosis — sólo la
