@@ -326,7 +326,7 @@ export class AdminService {
     return { porPeriodo: filas, totalAcumulado };
   }
 
-  /** Crea una organización vacía. */
+  /** Crea una organización vacía. Fecha de activación = ahora, igual criterio que aprobar() en solicitudes/. */
   async crearOrganizacion(dto: CrearOrganizacionDto) {
     const [org] = await this.db
       .insert(organizaciones)
@@ -335,6 +335,7 @@ export class AdminService {
         huellaActiva: dto.huellaActiva ?? true,
         troperaActiva: dto.troperaActiva ?? false,
         cuit: dto.cuit,
+        fechaActivacion: new Date(),
       })
       .returning();
     return org;

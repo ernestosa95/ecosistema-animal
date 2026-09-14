@@ -2,6 +2,10 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-09-14] — Alta manual de organización también fija la fecha de activación
+
+`AdminService.crearOrganizacion()` (el form "Nueva organización" del panel, alta directa por el super-admin) dejaba `fechaActivacion` en null — a diferencia de `SolicitudesService.aprobar()`, que desde el 2026-09-03 la fija en `now()` al aprobar una solicitud. En la práctica ambos caminos ya facturaban igual (`proximoVencimiento`/`resumenPagos` caen a `createdAt` cuando `fechaActivacion` es null), pero el campo quedaba vacío en el detalle de la organización sin motivo — el criterio que pidió el usuario es que la fecha de activación por defecto sea el momento en que se aprueba/crea la cuenta, sin importar el camino (solicitud pública o alta manual). Ahora `crearOrganizacion()` también la fija en `new Date()` al insertar. Las 19 `test:*-demo` pasan.
+
 ## [2026-09-14] — Planes con "meses bonificados" + se retira "Estoy interesado"
 
 Pedido del usuario: los planes de suscripción pueden ahora nacer con meses de demo gratis (ej. "3 meses bonificados"), una decisión comercial del super-admin al armar el plan — y esto reemplaza a la campaña temporal de "Estoy interesado" (cupo fijo de 10, con "3 meses gratis" hardcodeado) armada más temprano en esta misma sesión de trabajo. El alta de cuenta vuelve a ser autoservicio directo, como era antes de esa campaña.
