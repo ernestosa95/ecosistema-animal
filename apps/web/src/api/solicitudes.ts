@@ -8,6 +8,8 @@ export interface PlanPublico {
   precioMensual?: string | null; precioAnual?: string | null;
   limitesRoles: Record<string, number>;
   descripcion?: string | null;
+  /** Meses gratis al arrancar (ej. 3 = "3 meses bonificados"). 0 = sin bonificación. */
+  mesesBonificados: number;
 }
 
 export interface Solicitud {

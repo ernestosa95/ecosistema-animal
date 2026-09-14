@@ -2,6 +2,15 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-09-14] — Planes con "meses bonificados" + se retira "Estoy interesado"
+
+Pedido del usuario: los planes de suscripción pueden ahora nacer con meses de demo gratis (ej. "3 meses bonificados"), una decisión comercial del super-admin al armar el plan — y esto reemplaza a la campaña temporal de "Estoy interesado" (cupo fijo de 10, con "3 meses gratis" hardcodeado) armada más temprano en esta misma sesión de trabajo. El alta de cuenta vuelve a ser autoservicio directo, como era antes de esa campaña.
+
+- **Backend**: `plataforma.planes` suma `mesesBonificados` (integer, `NOT NULL DEFAULT 0`, migración `0039`) — 0 = sin bonificación, se muestra igual en la tarjeta del plan. `CrearPlanDto`/`ActualizarPlanDto` lo aceptan opcional (`@IsInt() @Min(0)`); `PlanesService.crear()`/`actualizar()` y `SolicitudesService.planesDisponibles()` lo devuelven.
+- **Web**: `AdminPage.tsx` (Planes) — input "Meses bonificados" en alta y edición, chip "🎁 N meses bonificados" en la tarjeta del plan.
+- **`LandingPage.tsx`/`LoginPage.tsx`**: se saca el `ModalInteres`/cupo de 10 del todo — el CTA "Estoy interesado" vuelve a ser "Crear cuenta", que lleva directo al alta (`LoginPage` en modo registro, con el plan preseleccionado si vino de una tarjeta de la landing). Cada plan con `mesesBonificados > 0` muestra su propio cartel ("🎁 N meses bonificados al arrancar") en vez del texto fijo de "los primeros 10". El código de `interesados/` (backend, `ModalInteres.tsx`, `ActivarInteresadoPage.tsx`) queda en el repo sin usarse — no se borró, por si hace falta reactivar una campaña de cupo limitado más adelante.
+- Las 19 `test:*-demo` pasan — hubo que sumar `meses_bonificados` a los mini-schemas de `plataforma.planes` hand-armados en `plataforma-flow.demo.ts`, `solicitudes-flow.demo.ts` y `usuarios-flow.demo.ts` (cada `*-flow.demo.ts` arma su propio DDL contra PGlite, no corre las migraciones reales — quedaron desincronizados hasta este ajuste).
+
 ## [2026-09-14] — Los egresos también abren la caja del día solos (apertura rápida)
 
 Decisión anterior revertida: `EgresosService.crear()` exigía una caja ya abierta y rechazaba con "abrí la caja primero" si no había ninguna — a diferencia de `CobrosService.crear()`, que desde 2026-09-03 abre una sola si hace falta. El usuario señaló el caso real que rompía esto: el flujo "+ Ingresos" de Farmacia genera un egreso automático por la compra a proveedor (`IngresoStockForm.tsx`), y eso puede ser la primera plata del día — antes de cualquier venta o cobro — con lo cual el egreso fallaba silenciosamente (el ingreso de stock ya se había guardado, sólo fallaba el gasto en Caja).

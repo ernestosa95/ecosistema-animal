@@ -1,4 +1,4 @@
-import { IsNumber, IsObject, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { IsInt, IsNumber, IsObject, IsOptional, IsString, Min, MinLength } from 'class-validator';
 
 export class CrearPlanDto {
   @IsString()
@@ -23,4 +23,10 @@ export class CrearPlanDto {
   @IsOptional()
   @IsString()
   descripcion?: string;
+
+  /** Meses gratis al arrancar (ej. "3 meses bonificados") — 0 = sin bonificación. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  mesesBonificados?: number;
 }

@@ -26,6 +26,7 @@ export class PlanesService {
         precioAnual: dto.precioAnual?.toString(),
         limitesRoles: dto.limitesRoles ?? {},
         descripcion: dto.descripcion,
+        mesesBonificados: dto.mesesBonificados ?? 0,
       })
       .returning();
     return plan;
@@ -42,6 +43,7 @@ export class PlanesService {
         ...(dto.limitesRoles !== undefined && { limitesRoles: dto.limitesRoles }),
         ...(dto.descripcion !== undefined && { descripcion: dto.descripcion }),
         ...(dto.activo !== undefined && { activo: dto.activo }),
+        ...(dto.mesesBonificados !== undefined && { mesesBonificados: dto.mesesBonificados }),
         updatedAt: new Date(),
       })
       .where(eq(planes.id, id))

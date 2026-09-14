@@ -79,6 +79,8 @@ export interface Plan {
   /** Cupo máximo de miembros por rol en las organizaciones de este plan. Un rol ausente = sin límite. */
   limitesRoles: Record<string, number>;
   descripcion?: string | null; activo: boolean;
+  /** Meses gratis al arrancar (ej. 3 = "3 meses bonificados"). 0 = sin bonificación. */
+  mesesBonificados: number;
 }
 export type DestinatarioTipo = 'todas' | 'organizacion' | 'grupo';
 export type TipoPregunta = 'si_no' | 'opcion_multiple' | 'texto_breve';
@@ -229,7 +231,7 @@ export const listarPlanes = (): Promise<Plan[]> => req('/admin/planes');
 export const crearPlan = (
   d: {
     nombre: string; precioMensual: number; precioAnual: number;
-    limitesRoles: Record<string, number>; descripcion?: string;
+    limitesRoles: Record<string, number>; descripcion?: string; mesesBonificados?: number;
   },
 ): Promise<Plan> => req('/admin/planes', { method: 'POST', body: JSON.stringify(d) });
 
@@ -237,7 +239,7 @@ export const actualizarPlan = (
   id: string,
   d: {
     nombre?: string; precioMensual?: number | null; precioAnual?: number | null;
-    limitesRoles?: Record<string, number>; descripcion?: string; activo?: boolean;
+    limitesRoles?: Record<string, number>; descripcion?: string; activo?: boolean; mesesBonificados?: number;
   },
 ): Promise<Plan> => req(`/admin/planes/${id}`, { method: 'PATCH', body: JSON.stringify(d) });
 

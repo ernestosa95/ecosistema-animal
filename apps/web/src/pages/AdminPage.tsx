@@ -1067,12 +1067,14 @@ function Planes({ planes, onCambio }: { planes: Plan[]; onCambio: () => void }) 
   const [precioAnual, setPrecioAnual] = useState('');
   const [limitesRoles, setLimitesRoles] = useState<Record<string, string>>(limitesEnCero);
   const [descripcion, setDescripcion] = useState('');
+  const [mesesBonificados, setMesesBonificados] = useState('0');
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
 
   const [editando, setEditando] = useState<string | null>(null);
   const [nombreEdit, setNombreEdit] = useState('');
   const [descripcionEdit, setDescripcionEdit] = useState('');
+  const [mesesBonificadosEdit, setMesesBonificadosEdit] = useState('0');
   const [limitesEdit, setLimitesEdit] = useState<Record<string, string>>({});
   const [errorEdit, setErrorEdit] = useState<string | null>(null);
   const [guardandoLimites, setGuardandoLimites] = useState(false);
@@ -1091,8 +1093,9 @@ function Planes({ planes, onCambio }: { planes: Plan[]; onCambio: () => void }) 
         precioAnual: Number(precioAnual),
         limitesRoles: limitesANumeros(limitesRoles),
         descripcion: descripcion.trim() || undefined,
+        mesesBonificados: Number(mesesBonificados) || 0,
       });
-      setNombre(''); setPrecioMensual(''); setPrecioAnual(''); setLimitesRoles(limitesEnCero()); setDescripcion(''); onCambio();
+      setNombre(''); setPrecioMensual(''); setPrecioAnual(''); setLimitesRoles(limitesEnCero()); setDescripcion(''); setMesesBonificados('0'); onCambio();
     } catch (e: any) { setError(e.message ?? 'No se pudo crear'); }
     finally { setCargando(false); }
   }
@@ -1109,6 +1112,7 @@ function Planes({ planes, onCambio }: { planes: Plan[]; onCambio: () => void }) 
     setEditando(p.id);
     setNombreEdit(p.nombre);
     setDescripcionEdit(p.descripcion ?? '');
+    setMesesBonificadosEdit(String(p.mesesBonificados ?? 0));
     setLimitesEdit(limitesAStrings(p.limitesRoles));
     setErrorEdit(null);
   }
@@ -1119,6 +1123,7 @@ function Planes({ planes, onCambio }: { planes: Plan[]; onCambio: () => void }) 
       await actualizarPlan(p.id, {
         nombre: nombreEdit.trim(),
         descripcion: descripcionEdit.trim() || undefined,
+        mesesBonificados: Number(mesesBonificadosEdit) || 0,
         limitesRoles: limitesANumeros(limitesEdit),
       });
       setEditando(null);
@@ -1156,6 +1161,7 @@ function Planes({ planes, onCambio }: { planes: Plan[]; onCambio: () => void }) 
                     {p.precioMensual ? `$${p.precioMensual}/mes` : 'Sin precio mensual'}
                     {p.precioAnual ? ` · $${p.precioAnual}/año` : ''}
                     {descuento != null && <> <span className="chip">-{descuento}% anual</span></>}
+                    {p.mesesBonificados > 0 && <> <span className="chip">🎁 {p.mesesBonificados} {p.mesesBonificados === 1 ? 'mes bonificado' : 'meses bonificados'}</span></>}
                     {p.descripcion ? ` · ${p.descripcion}` : ''}
                   </div>
                   {limitesActivos.length > 0 && (
@@ -1191,6 +1197,10 @@ function Planes({ planes, onCambio }: { planes: Plan[]; onCambio: () => void }) 
                         onChange={(e) => setDescripcionEdit(e.target.value)}
                         placeholder="Se muestra en la landing pública"
                       />
+                    </label>
+                    <label>
+                      Meses bonificados
+                      <input type="number" min={0} value={mesesBonificadosEdit} onChange={(e) => setMesesBonificadosEdit(e.target.value)} />
                     </label>
                   </div>
                   <p className="muted" style={{ fontSize: '0.82rem' }}>
@@ -1229,10 +1239,16 @@ function Planes({ planes, onCambio }: { planes: Plan[]; onCambio: () => void }) 
         </div>
         <label>Cupo de miembros por rol</label>
         <LimitesRolesEditor valores={limitesRoles} onChange={setLimitesRoles} />
-        <label>
-          Descripción (opcional)
-          <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
-        </label>
+        <div className="form-grid">
+          <label>
+            Descripción (opcional)
+            <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
+          </label>
+          <label>
+            Meses bonificados (opcional)
+            <input type="number" min={0} value={mesesBonificados} onChange={(e) => setMesesBonificados(e.target.value)} placeholder="Ej: 3" />
+          </label>
+        </div>
         <button className="btn" disabled={cargando} onClick={crear}>
           {cargando ? 'Creando…' : 'Crear plan'}
         </button>

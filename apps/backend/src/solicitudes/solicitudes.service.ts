@@ -197,6 +197,7 @@ export class SolicitudesService {
         precioAnual: planes.precioAnual,
         limitesRoles: planes.limitesRoles,
         descripcion: planes.descripcion,
+        mesesBonificados: planes.mesesBonificados,
       })
       .from(planes)
       .where(and(eq(planes.activo, true), isNull(planes.deletedAt)))

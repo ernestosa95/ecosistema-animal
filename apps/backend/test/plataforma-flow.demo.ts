@@ -53,7 +53,7 @@ async function main() {
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), nombre text NOT NULL,
       precio_mensual numeric(12,2), precio_anual numeric(12,2),
       limites_roles jsonb NOT NULL DEFAULT '{}'::jsonb,
-      descripcion text, activo boolean NOT NULL DEFAULT true,
+      descripcion text, activo boolean NOT NULL DEFAULT true, meses_bonificados integer NOT NULL DEFAULT 0,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
     CREATE TABLE plataforma.grupos_organizaciones (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(), nombre text NOT NULL, descripcion text,

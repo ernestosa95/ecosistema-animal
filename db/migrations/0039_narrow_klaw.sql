@@ -1,0 +1,1 @@
+ALTER TABLE "plataforma"."planes" ADD COLUMN "meses_bonificados" integer DEFAULT 0 NOT NULL;

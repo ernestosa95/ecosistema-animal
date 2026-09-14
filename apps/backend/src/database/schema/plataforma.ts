@@ -4,7 +4,7 @@
  * organizaciones (para poder dirigir mensajes a un conjunto, ej. "cadena de
  * veterinarias") y anuncios/mensajes del super-admin hacia usuarios.
  */
-import { pgSchema, uuid, text, numeric, boolean, timestamp, jsonb, date } from 'drizzle-orm/pg-core';
+import { pgSchema, uuid, text, numeric, boolean, timestamp, jsonb, date, integer } from 'drizzle-orm/pg-core';
 import { organizaciones, usuarios } from './core';
 
 export const plataforma = pgSchema('plataforma');
@@ -26,6 +26,13 @@ export const planes = plataforma.table('planes', {
   // contra esto, sólo leerlo entero al validar (ver admin.service.ts). Se
   // hace cumplir en AdminService.agregarMiembro()/setRoles().
   limitesRoles: jsonb('limites_roles').notNull().default({}),
+  // Meses gratis al arrancar (ej. "3 meses bonificados") — decisión
+  // comercial del super-admin al armar el plan, reemplaza al cupo fijo de
+  // 10 con "3 meses gratis" hardcodeado que usaba la campaña de lanzamiento
+  // (interesados/ModalInteres, 2026-09-13) — ese código queda en el repo
+  // sin usarse, no se borró, por si hace falta reactivarlo. 0 = sin
+  // bonificación, se muestra igual en la tarjeta del plan.
+  mesesBonificados: integer('meses_bonificados').notNull().default(0),
   descripcion: text('descripcion'),
   activo: boolean('activo').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

@@ -21,14 +21,14 @@ import type { Sesion } from '../api/types';
 const PASOS_REGISTRO = ['Tus datos', 'Tu organización', 'Tu plan', 'Tu acceso'] as const;
 
 export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
-  // Estrategia de lanzamiento (ver LandingPage.tsx): el alta de cuenta nueva
-  // sólo se pide desde la landing pública ("Estoy interesado" → ModalInteres),
-  // nunca desde acá — este login queda exclusivamente para ingresar o
-  // recuperar contraseña. El "modo registro" de acá abajo (alta self-service
-  // directa vía solicitudes/) queda sin ningún botón que lo dispare, mismo
-  // motivo: no duplicar una vía de alta paralela a la landing.
+  // La landing pública pasa el plan elegido como ?plan=<id> al mandar acá
+  // (ver LandingPage.tsx) — si viene, arranca directo en modo registro con
+  // ese plan preseleccionado en cuanto la lista de planes carga. Desde
+  // 2026-09-14 este es otra vez el único camino de alta (reemplaza a la
+  // campaña de lanzamiento con "Estoy interesado"/cupo de 10, ahora que los
+  // planes pueden traer sus propios meses bonificados).
   const [planIdInicial] = useState(() => new URLSearchParams(window.location.search).get('plan'));
-  const [modo, setModo] = useState<'login' | 'registro' | 'olvide'>('login');
+  const [modo, setModo] = useState<'login' | 'registro' | 'olvide'>(planIdInicial ? 'registro' : 'login');
   const [paso, setPaso] = useState(0);
   const [enviada, setEnviada] = useState(false);
   const [olvideEnviado, setOlvideEnviado] = useState(false);
@@ -314,7 +314,7 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
                       <option value="">Elegí un plan…</option>
                       {planes.map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.nombre}{p.precioMensual ? ` — $${p.precioMensual}/mes` : ''}
+                          {p.nombre}{p.precioMensual ? ` — $${p.precioMensual}/mes` : ''}{p.mesesBonificados > 0 ? ` (${p.mesesBonificados} ${p.mesesBonificados === 1 ? 'mes gratis' : 'meses gratis'})` : ''}
                         </option>
                       ))}
                     </select>
@@ -323,6 +323,11 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
                     <div className="card login-card-plan span-2">
                       {planElegido.descripcion && (
                         <p className="muted" style={{ fontSize: '0.85rem', margin: '0 0 0.4rem' }}>{planElegido.descripcion}</p>
+                      )}
+                      {planElegido.mesesBonificados > 0 && (
+                        <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '0 0 0.4rem', color: 'var(--verde-dark)' }}>
+                          🎁 Este plan incluye {planElegido.mesesBonificados} {planElegido.mesesBonificados === 1 ? 'mes bonificado' : 'meses bonificados'} al arrancar.
+                        </p>
                       )}
                       <p style={{ fontSize: '0.85rem', fontWeight: 600, margin: '0 0 0.3rem' }}>Este plan incluye:</p>
                       <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '0.85rem' }}>
@@ -513,7 +518,14 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
               Ingresar
             </button>
           </p>
-        ) : null}
+        ) : (
+          <p className="switch">
+            ¿No tenés cuenta?{' '}
+            <button type="button" className="link" onClick={() => { setError(null); setModo('registro'); }}>
+              Crear cuenta
+            </button>
+          </p>
+        )}
       </form>
     </div>
   );

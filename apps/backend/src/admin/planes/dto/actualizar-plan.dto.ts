@@ -1,4 +1,4 @@
-import { IsBoolean, IsNumber, IsObject, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsInt, IsNumber, IsObject, IsOptional, IsString, Min, MinLength } from 'class-validator';
 
 export class ActualizarPlanDto {
   @IsOptional()
@@ -28,4 +28,10 @@ export class ActualizarPlanDto {
   @IsOptional()
   @IsBoolean()
   activo?: boolean;
+
+  /** Meses gratis al arrancar (ej. "3 meses bonificados") — 0 = sin bonificación. */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  mesesBonificados?: number;
 }

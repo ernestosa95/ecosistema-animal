@@ -1,59 +1,39 @@
 import { useEffect, useState } from 'react';
 import { listarPlanesPublicos, type PlanPublico } from '../api/solicitudes';
-import { consultarCupoInteresados, type CupoInteresados } from '../api/interesados';
-import { ModalInteres } from '../components/ModalInteres';
 import { ROLES_INFO } from '../config/rolesInfo';
 
 /**
  * Landing pública para campañas de marketing (no requiere sesión) —
  * enfocada en Huella (la solución más madura hoy; Tropera puede sumar su
- * propia landing/sección más adelante). Vive en '/' (ver App.tsx).
+ * propia landing/sección más adelante). Vive en '/' (ver App.tsx). Todos los
+ * CTA navegan a '/login', que ya resuelve tanto iniciar sesión como el alta
+ * de cuenta con selección de plan (LoginPage.tsx) — acá no se duplica ese
+ * formulario, sólo se lo linkea, opcionalmente con `?plan=<id>`
+ * preseleccionado cuando el click viene de una tarjeta de precio puntual.
  *
- * Estrategia de lanzamiento (temporal): el alta self-service directa a
- * '/login' queda reemplazada en todos los CTA por una captura de interés
- * ("Estoy interesado" → ModalInteres, cupo fijo de 10, ver
- * `api/interesados.ts`/`InteresadosService` en el backend) — el dueño del
- * negocio hace el alta a mano de esas primeras 10 veterinarias. "Iniciar
- * sesión" no cambia, es para quien ya tiene cuenta. Si en algún momento se
- * vuelve a habilitar el alta directa, restaurar `irALogin()` (todavía la usa
- * el botón de "Iniciar sesión") en los CTA que ahora usan `BotonInteres`.
+ * 2026-09-14: reemplaza a la campaña de lanzamiento con captura de interés
+ * ("Estoy interesado" → ModalInteres, cupo fijo de 10) — a pedido del
+ * usuario, ahora que los planes pueden traer sus propios meses bonificados
+ * (`Plan.mesesBonificados`), volvió el alta directa de siempre. El código de
+ * `interesados/`/`ModalInteres.tsx` queda en el repo sin usarse acá, por si
+ * hace falta reactivarlo.
  */
 export function LandingPage() {
   const [planes, setPlanes] = useState<PlanPublico[] | null>(null);
   const [tabActiva, setTabActiva] = useState<string>(FEATURES[0].id);
-  const [cupo, setCupo] = useState<CupoInteresados | null>(null);
-  const [modalAbierta, setModalAbierta] = useState(false);
 
   useEffect(() => {
     listarPlanesPublicos()
       .then(setPlanes)
       .catch(() => setPlanes([]));
-    consultarCupoInteresados()
-      .then(setCupo)
-      .catch(() => setCupo({ disponible: true, restantes: 10 })); // si falla la consulta, no bloquear el CTA
   }, []);
 
   function irALogin(planId?: string) {
     window.location.href = planId ? `/login?plan=${planId}` : '/login';
   }
 
-  /** CTA de alta: botón mientras haya cupo, aviso de cupo completo si no. */
-  function BotonInteres({ className, children }: { className: string; children: React.ReactNode }) {
-    if (cupo && !cupo.disponible) {
-      return (
-        <span className={className} style={{ opacity: 0.6, cursor: 'default', pointerEvents: 'none' }}>
-          Cupo completo por ahora
-        </span>
-      );
-    }
-    return (
-      <button className={className} onClick={() => setModalAbierta(true)}>
-        {children}
-      </button>
-    );
-  }
-
   const tab = FEATURES.find((f) => f.id === tabActiva) ?? FEATURES[0];
+  const hayBonificacion = (planes ?? []).some((p) => p.mesesBonificados > 0);
 
   return (
     <div className="landing">
@@ -68,7 +48,9 @@ export function LandingPage() {
           <button className="landing-btn-ghost landing-btn-sm" onClick={() => irALogin()}>
             Iniciar sesión
           </button>
-          <BotonInteres className="landing-btn landing-btn-sm">Estoy interesado</BotonInteres>
+          <button className="landing-btn landing-btn-sm" onClick={() => irALogin()}>
+            Crear cuenta
+          </button>
         </div>
       </nav>
 
@@ -85,14 +67,18 @@ export function LandingPage() {
           funcione de punta a punta sin planillas sueltas ni WhatsApp como sistema de turnos.
         </p>
         <div className="landing-hero-acciones">
-          <BotonInteres className="landing-btn">Estoy interesado</BotonInteres>
+          <button className="landing-btn" onClick={() => irALogin()}>
+            Crear cuenta
+          </button>
           <a className="landing-btn-ghost" href="#planes">
             Ver planes
           </a>
         </div>
-        <p className="muted" style={{ marginTop: '0.6rem', fontSize: '0.85rem' }}>
-          Los primeros 10 en anotarse tienen los primeros 3 meses gratis.
-        </p>
+        {hayBonificacion && (
+          <p className="muted" style={{ marginTop: '0.6rem', fontSize: '0.85rem' }}>
+            Algunos planes incluyen meses bonificados al arrancar.
+          </p>
+        )}
 
         <div className="landing-mockup">
           <div className="landing-mockup-top">
@@ -258,6 +244,11 @@ export function LandingPage() {
                       o ${Number(p.precioAnual).toLocaleString('es-AR')} /año
                     </div>
                   )}
+                  {p.mesesBonificados > 0 && (
+                    <div className="landing-tag" style={{ marginBottom: '0.6rem' }}>
+                      🎁 {p.mesesBonificados} {p.mesesBonificados === 1 ? 'mes bonificado' : 'meses bonificados'} al arrancar
+                    </div>
+                  )}
                   <ul className="landing-plan-cupos">
                     {cupos.length === 0 ? (
                       <li>Miembros sin límite por rol</li>
@@ -269,7 +260,9 @@ export function LandingPage() {
                       ))
                     )}
                   </ul>
-                  <BotonInteres className="landing-btn">Estoy interesado</BotonInteres>
+                  <button className="landing-btn" onClick={() => irALogin(p.id)}>
+                    Elegir este plan
+                  </button>
                 </div>
               );
             })}
@@ -288,14 +281,6 @@ export function LandingPage() {
           © {new Date().getFullYear()} Ecosistema de Salud Animal.
         </p>
       </footer>
-
-      {modalAbierta && (
-        <ModalInteres
-          restantes={cupo?.restantes ?? 10}
-          onCerrar={() => setModalAbierta(false)}
-          onEnviado={() => setCupo((c) => (c ? { disponible: c.restantes > 1, restantes: c.restantes - 1 } : c))}
-        />
-      )}
     </div>
   );
 }
