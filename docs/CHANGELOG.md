@@ -2,6 +2,15 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-09-14] — Se cierran las dos vías para crear una cuenta sin elegir plan
+
+El usuario señaló la regla: la única manera de crear una cuenta tiene que ser desde la selección de un plan (`solicitudes/`, `LoginPage.tsx`). Revisando el código aparecieron dos puertas que la saltaban:
+
+- **`POST /auth/register`** — endpoint público, sin autenticación ni rate-limiting, activo desde antes de que existiera `solicitudes/` (se usó una sola vez para crear la primera cuenta del deploy). `AuthService.register()` creaba organización + usuario `propietario` sin plan, sin `fechaActivacion`, sin términos aceptados ni email verificado — cualquiera que lo llamara directo (curl/Postman) se armaba una cuenta gratis. **Eliminado** del todo: `AuthController`, `AuthService.register()` y `RegisterDto` se borraron (no se dejó código muerto acá, a diferencia de otros retiros de esta semana — no tenía ningún caller real ni razón para reactivarse). `test/auth-flow.demo.ts` ya no prueba "registro", siembra el usuario/organización directo en la base para las pruebas de login/token/tenant que siguen vigentes (el caso de "email duplicado" que antes cubría acá ya lo prueba `solicitudes-flow.demo.ts` contra el alta real).
+- **El botón "🚀 Habilitar alta para todos"** de "Interesados del lanzamiento" (`AdminPage.tsx`) — disparaba `POST /interesados/activar`, que también crea una organización sin ningún plan asignado. Cuando se retiró "Estoy interesado" de la landing (2026-09-13) sólo se cerró la puerta de entrada pública; esta seguía intacta. Se sacó el botón y la ruta `?activarToken=` de `main.tsx` — ya no se puede generar ni abrir un link que cree una cuenta así. `InteresadosService.invitarTodos()`/`.activar()` quedan en el backend sin caller, mismo criterio que el resto de interesados/ (no se borran, por si hace falta reactivar una campaña de cupo limitado más adelante).
+
+Las 19 `test:*-demo` pasan. `tsc`/`vite build` limpios (mismos 3 errores de baseline preexistente, sin relación).
+
 ## [2026-09-14] — Fix: token vencido en /admin mostraba el JSON crudo del error
 
 El usuario lo vio en el panel: al vencer el token del super-admin, "Interesados" y "Solicitudes" mostraban `{"message":"Token inválido o expirado",...}` en pantalla en vez de mandarlo al login. `api/admin.ts` ya resolvía esto desde antes (`req()` detecta el 401, limpia el token y llama `alExpirar()`, que `AdminPage.tsx` usa para volver a la pantalla de login) — pero `api/interesados.ts` y `api/solicitudes.ts` tienen su propio fetch duplicado (mismo patrón deliberado que `api/client.ts`/`api/turnos.ts` del lado de la app principal) y ninguno de los dos replicaba ese chequeo.

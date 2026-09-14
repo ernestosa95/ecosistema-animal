@@ -1,7 +1,6 @@
 import { Body, Controller, Post, HttpCode, HttpStatus } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -16,11 +15,6 @@ const LIMITE_AUTH_SENSIBLE = { default: { limit: 5, ttl: 900_000 } }; // 5 cada 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
-
-  @Post('register')
-  register(@Body() dto: RegisterDto) {
-    return this.auth.register(dto);
-  }
 
   @Throttle(LIMITE_AUTH_SENSIBLE)
   @Post('login')

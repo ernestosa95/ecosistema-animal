@@ -21,7 +21,6 @@ import {
 } from '../api/solicitudes';
 import {
   listarInteresadosAdmin, editarInteresadoAdmin, eliminarInteresadoAdmin, reenviarConfirmacionInteresado,
-  invitarTodosInteresados,
   type Interesado,
 } from '../api/interesados';
 import { InfoRoles } from '../components/InfoRoles';
@@ -1699,11 +1698,18 @@ function Analitica() {
 
 // ── Bandeja de solicitudes ────────────────────────────────────────────────
 /**
- * Interesados del lanzamiento (botón "Estoy interesado" de la landing, cupo
- * fijo de 10 — ver InteresadosService en el backend). Sólo lectura: el alta
- * real de la organización se hace a mano acá mismo, en "Organizaciones",
+ * Interesados del lanzamiento (ex botón "Estoy interesado" de la landing,
+ * cupo fijo de 10 — ver InteresadosService en el backend, campaña retirada
+ * 2026-09-13/14). Sólo lectura: el alta real de la organización se hace a
+ * mano acá mismo, en "Organizaciones" (con su plan elegido en "Acceso"),
  * usando el contacto que dejaron. No tiene aprobar/rechazar como
  * Solicitudes porque no es un flujo de aprobación, es una lista de contacto.
+ *
+ * El botón "Habilitar alta para todos" se sacó (2026-09-14): esa activación
+ * creaba la cuenta sin pasar por la selección de plan — la única vía
+ * pensada para eso es `solicitudes/`. `InteresadosService.invitarTodos()`/
+ * `.activar()` quedan en el backend sin caller, por si hace falta reactivar
+ * una campaña de cupo limitado más adelante.
  */
 function Interesados() {
   const [items, setItems] = useState<Interesado[]>([]);
@@ -1713,7 +1719,6 @@ function Interesados() {
   const [emailForm, setEmailForm] = useState('');
   const [celularForm, setCelularForm] = useState('');
   const [ocupado, setOcupado] = useState<string | null>(null); // id con una acción en curso (guardar/eliminar/reenviar)
-  const [invitando, setInvitando] = useState(false);
 
   function cargar() {
     setCargando(true);
@@ -1772,33 +1777,13 @@ function Interesados() {
     }
   }
 
-  async function invitarTodos() {
-    const conEmail = items.filter((i) => i.email).length;
-    if (!confirm(`Se les va a mandar el link para terminar el alta a los ${conEmail} interesados que tienen email cargado. ¿Confirmás?`)) return;
-    setInvitando(true);
-    setError(null);
-    try {
-      const r = await invitarTodosInteresados();
-      alert(`Listo, se mandaron ${r.enviados} invitaciones.`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo enviar');
-    } finally {
-      setInvitando(false);
-    }
-  }
-
   if (cargando) return null;
   if (items.length === 0 && !error) return null;
 
   return (
     <div style={{ marginBottom: '1.25rem' }}>
-      <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', justifyContent: 'space-between' }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-          Interesados del lanzamiento <EstadoChip texto={`${items.length}/10`} />
-        </span>
-        <button className="btn-ghost" disabled={invitando} onClick={invitarTodos}>
-          {invitando ? 'Enviando…' : '🚀 Habilitar alta para todos'}
-        </button>
+      <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        Interesados del lanzamiento <EstadoChip texto={`${items.length}/10`} />
       </h3>
       {error && <div className="alerta" style={{ marginBottom: 8 }}>{error}</div>}
       <div className="card">

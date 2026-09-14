@@ -126,11 +126,10 @@ export class InteresadosService {
 
   /**
    * STAFF — dispara el link de "terminá tu alta" a todos los que tengan
-   * email cargado. Pensado para apretarse UNA vez (o de nuevo, sin problema:
-   * a quien ya activó su cuenta, `activar()` le va a devolver un error claro
-   * de "ya existe una cuenta" en vez de duplicar nada) cuando la app esté
-   * lista para usuarios reales — no hay aprobación manual después: son los
-   * 10 que el super-admin ya eligió a mano.
+   * email cargado. Sin aprobación manual después: son los 10 que el
+   * super-admin ya eligió a mano. Sin caller desde el frontend desde
+   * 2026-09-14 (se sacó el botón que lo llamaba, ver el comentario de
+   * `activar()`) — queda el método, sin usarse.
    */
   async invitarTodos(): Promise<{ enviados: number }> {
     const todos = await this.listar();
@@ -175,10 +174,17 @@ export class InteresadosService {
 
   /**
    * Público — crea la organización + usuario propietario y devuelve la
-   * sesión ya lista (mismos tokens que `AuthService.register()`, más
-   * organizacionId/roles para que el cliente arme la sesión sin un login
-   * aparte). Sin aprobación manual a propósito, a diferencia de
-   * `solicitudes/` — ver el comentario de `invitarTodos()`.
+   * sesión ya lista (organizacionId/roles incluidos para que el cliente arme
+   * la sesión sin un login aparte). Sin aprobación manual a propósito, a
+   * diferencia de `solicitudes/` — ver el comentario de `invitarTodos()`.
+   *
+   * Sin plan asignado (a diferencia de `solicitudes/`, que lo exige) — por
+   * eso, 2026-09-14, se sacaron del frontend tanto el botón que emite el
+   * link ("Habilitar alta para todos" en AdminPage.tsx) como la ruta
+   * `?activarToken=` que lo abre (`main.tsx`): ya no se puede generar ni
+   * abrir un link nuevo que cree una cuenta sin pasar por la selección de
+   * plan. Este método queda igual, sin usarse — mismo criterio que el resto
+   * de interesados/ (ver plataforma.ts, `mesesBonificados`).
    */
   async activar(dto: ActivarInteresadoDto) {
     const interesado = await this.verificarToken(dto.token);

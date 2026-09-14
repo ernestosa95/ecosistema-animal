@@ -1,7 +1,14 @@
 /**
- * Integración: registro -> login -> verificación de token -> chequeo de tenant,
+ * Integración: login -> verificación de token -> chequeo de tenant,
  * ejecutado contra un Postgres real (PGlite/WASM) usando el schema `core` real
  * y la MISMA lógica que apps/backend/src/core/auth/auth.service.ts.
+ *
+ * El usuario/organización de la prueba se siembran directo en la base (no vía
+ * `AuthService.register()` — ese endpoint se eliminó, 2026-09-14: era público,
+ * sin plan ni ninguna otra validación, y quedó de cuando hizo falta crear la
+ * primera cuenta antes de que existiera `solicitudes/`. El caso de "email
+ * duplicado" que antes se probaba acá ya lo cubre `solicitudes-flow.demo.ts`
+ * contra el alta real).
  *
  * Correr:  pnpm --filter backend test:auth-demo   (o: npx tsx test/auth-flow.demo.ts)
  * No requiere Postgres instalado: PGlite levanta un Postgres embebido (WASM).
@@ -64,15 +71,12 @@ await client.exec(`
 const db = drizzle(client, { schema: { organizaciones, usuarios, membresias } });
 
 // ============ Lógica replicada de AuthService (misma que el backend) ============
-async function register(dto: {
+/** Siembra directo en la base — reemplaza al viejo `register()` de prueba (ver comentario de arriba). */
+async function sembrarUsuario(dto: {
   email: string; password: string; nombre: string; apellido: string; nombreOrganizacion: string;
 }) {
-  const existe = await db.select({ id: usuarios.id }).from(usuarios)
-    .where(eq(usuarios.email, dto.email)).limit(1);
-  if (existe.length) throw new Error('El email ya está registrado');
-
   const passwordHash = await bcrypt.hash(dto.password, 10);
-  const { user } = await db.transaction(async (tx) => {
+  const { user, org } = await db.transaction(async (tx) => {
     const [org] = await tx.insert(organizaciones)
       .values({ nombre: dto.nombreOrganizacion }).returning();
     const [u] = await tx.insert(usuarios)
@@ -81,7 +85,7 @@ async function register(dto: {
       .values({ usuarioId: u.id, organizacionId: org.id, roles: ['propietario'] });
     return { user: u, org };
   });
-  return { accessToken: jwt.sign({ sub: user.id, email: user.email }, SECRET, { expiresIn: '15m' }) };
+  return { user, org };
 }
 
 async function login(dto: { email: string; password: string }) {
@@ -95,13 +99,11 @@ async function login(dto: { email: string; password: string }) {
 }
 
 // ============================== Pruebas ==============================
-console.log('1) Registro');
-const reg = await register({
+console.log('1) Setup: sembrar un usuario/organización directo en la base');
+await sembrarUsuario({
   email: 'vet@clinica.com', password: 'unaClaveSegura',
   nombre: 'Ana', apellido: 'Vet', nombreOrganizacion: 'Clínica del Sur',
 });
-check('devuelve accessToken', typeof reg.accessToken === 'string' && reg.accessToken.length > 20);
-
 const usuariosCreados = await db.select().from(usuarios);
 check('el usuario quedó en la base', usuariosCreados.length === 1);
 check('la contraseña se guardó hasheada (no en claro)',
@@ -110,24 +112,18 @@ check('la contraseña se guardó hasheada (no en claro)',
 const membresiasCreadas = await db.select().from(membresias);
 check('se creó la membresía como propietario', membresiasCreadas[0]?.roles.includes('propietario'));
 
-console.log('2) Email duplicado');
-let rechazoDuplicado = false;
-try { await register({ email: 'vet@clinica.com', password: 'otraClave123', nombre: 'X', apellido: 'Y', nombreOrganizacion: 'Otra' }); }
-catch { rechazoDuplicado = true; }
-check('rechaza registrar el mismo email dos veces', rechazoDuplicado);
-
-console.log('3) Login correcto');
+console.log('2) Login correcto');
 const log = await login({ email: 'vet@clinica.com', password: 'unaClaveSegura' });
 check('login devuelve token', typeof log.accessToken === 'string');
 check('login devuelve las organizaciones del usuario', log.organizaciones.length === 1);
 
-console.log('4) Login con clave incorrecta');
+console.log('3) Login con clave incorrecta');
 let rechazoClave = false;
 try { await login({ email: 'vet@clinica.com', password: 'claveEquivocada' }); }
 catch { rechazoClave = true; }
 check('rechaza contraseña incorrecta', rechazoClave);
 
-console.log('5) Verificación del token (JwtAuthGuard)');
+console.log('4) Verificación del token (JwtAuthGuard)');
 const payload = jwt.verify(log.accessToken, SECRET) as any;
 check('el token verifica y trae el sub (userId)', !!payload.sub);
 check('el token trae el email', payload.email === 'vet@clinica.com');
@@ -135,7 +131,7 @@ let rechazoTokenMalo = false;
 try { jwt.verify(log.accessToken, 'secreto-incorrecto'); } catch { rechazoTokenMalo = true; }
 check('rechaza un token firmado con otro secreto', rechazoTokenMalo);
 
-console.log('6) Chequeo de tenant (TenantGuard)');
+console.log('5) Chequeo de tenant (TenantGuard)');
 const orgId = log.organizaciones[0].organizacionId;
 const [m] = await db.select({ roles: membresias.roles }).from(membresias)
   .where(and(eq(membresias.usuarioId, payload.sub), eq(membresias.organizacionId, orgId), eq(membresias.activo, true)))

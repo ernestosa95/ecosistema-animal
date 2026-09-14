@@ -1,7 +1,6 @@
 import {
   Injectable,
   Inject,
-  ConflictException,
   UnauthorizedException,
   BadRequestException,
 } from '@nestjs/common';
@@ -11,7 +10,6 @@ import * as bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDB } from '../../database/drizzle.provider';
 import { usuarios, organizaciones, membresias } from '../../database/schema';
-import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { MailService } from '../../common/mail/mail.service';
 
@@ -23,47 +21,6 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly mail: MailService,
   ) {}
-
-  /**
-   * Registra un usuario nuevo, le crea su organización y lo deja como
-   * propietario de la misma. Todo en una transacción.
-   */
-  async register(dto: RegisterDto) {
-    const existe = await this.db
-      .select({ id: usuarios.id })
-      .from(usuarios)
-      .where(eq(usuarios.email, dto.email))
-      .limit(1);
-    if (existe.length) {
-      throw new ConflictException('El email ya está registrado');
-    }
-
-    const passwordHash = await bcrypt.hash(dto.password, 10);
-
-    const { user } = await this.db.transaction(async (tx) => {
-      const [org] = await tx
-        .insert(organizaciones)
-        .values({ nombre: dto.nombreOrganizacion })
-        .returning();
-      const [usuario] = await tx
-        .insert(usuarios)
-        .values({
-          email: dto.email,
-          passwordHash,
-          nombre: dto.nombre,
-          apellido: dto.apellido,
-        })
-        .returning();
-      await tx.insert(membresias).values({
-        usuarioId: usuario.id,
-        organizacionId: org.id,
-        roles: ['propietario'],
-      });
-      return { user: usuario, org };
-    });
-
-    return this.emitirTokens(user.id, user.email);
-  }
 
   /**
    * Verifica credenciales y devuelve un access token + las organizaciones
