@@ -833,7 +833,7 @@ function ConsultaForm({
       <label>
         Tratamiento
         <MacroPicker categoria="tratamiento" macros={macros} onInsertar={(t) => campo('tratamiento')(t)} />
-        <input value={tratamiento} onChange={(e) => campo('tratamiento')(e.target.value)} />
+        <textarea rows={3} value={tratamiento} onChange={(e) => campo('tratamiento')(e.target.value)} />
       </label>
       <div className="span-2" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
         <label style={{ flex: '0 0 110px' }}>

@@ -38,7 +38,8 @@ export function BuscadorCatalogoDiagnosticos({
 
   return (
     <div className="selector-busqueda">
-      <input
+      <textarea
+        rows={3}
         value={valor}
         onChange={(e) => {
           onCambiar(e.target.value);
