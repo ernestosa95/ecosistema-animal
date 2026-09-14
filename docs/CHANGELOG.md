@@ -15,6 +15,10 @@ Pedido del usuario: los planes de suscripción pueden ahora nacer con meses de d
 - **`LandingPage.tsx`/`LoginPage.tsx`**: se saca el `ModalInteres`/cupo de 10 del todo — el CTA "Estoy interesado" vuelve a ser "Crear cuenta", que lleva directo al alta (`LoginPage` en modo registro, con el plan preseleccionado si vino de una tarjeta de la landing). Cada plan con `mesesBonificados > 0` muestra su propio cartel ("🎁 N meses bonificados al arrancar") en vez del texto fijo de "los primeros 10". El código de `interesados/` (backend, `ModalInteres.tsx`, `ActivarInteresadoPage.tsx`) queda en el repo sin usarse — no se borró, por si hace falta reactivar una campaña de cupo limitado más adelante.
 - Las 19 `test:*-demo` pasan — hubo que sumar `meses_bonificados` a los mini-schemas de `plataforma.planes` hand-armados en `plataforma-flow.demo.ts`, `solicitudes-flow.demo.ts` y `usuarios-flow.demo.ts` (cada `*-flow.demo.ts` arma su propio DDL contra PGlite, no corre las migraciones reales — quedaron desincronizados hasta este ajuste).
 
+## [2026-09-14] — Diagnóstico y Tratamiento con 3 renglones mínimo
+
+El usuario señaló que ambos campos de la consulta suelen llevar texto largo y quedaban en un `<input>` de una sola línea. Pasan a `<textarea rows={3}>`: el campo Diagnóstico (`BuscadorCatalogoDiagnosticos.tsx`, sin tocar el listado de sugerencias que sigue debajo) y el campo Tratamiento (`PacienteDetallePage.tsx`). Sin cambios de datos ni de backend.
+
 ## [2026-09-14] — Los egresos también abren la caja del día solos (apertura rápida)
 
 Decisión anterior revertida: `EgresosService.crear()` exigía una caja ya abierta y rechazaba con "abrí la caja primero" si no había ninguna — a diferencia de `CobrosService.crear()`, que desde 2026-09-03 abre una sola si hace falta. El usuario señaló el caso real que rompía esto: el flujo "+ Ingresos" de Farmacia genera un egreso automático por la compra a proveedor (`IngresoStockForm.tsx`), y eso puede ser la primera plata del día — antes de cualquier venta o cobro — con lo cual el egreso fallaba silenciosamente (el ingreso de stock ya se había guardado, sólo fallaba el gasto en Caja).
