@@ -589,8 +589,8 @@ function ModalNuevo({ fechaDefault, onClose, onOk }: {
     // Todo animal identificado en Huella tiene que tener un dueño — no existe
     // el paciente "suelto".
     if (!duenoSel) { setErr('Elegí un dueño para el paciente (o creá uno nuevo).'); return; }
-    if (duenoSel === '__nuevo__' && (!dNombre.trim() || !dApellido.trim())) {
-      setErr('Para crear un dueño nuevo, nombre y apellido son obligatorios.'); return;
+    if (duenoSel === '__nuevo__' && (!dNombre.trim() || !dApellido.trim() || !dCelular.trim() || !dDni.trim())) {
+      setErr('Para crear un dueño nuevo, nombre, apellido, celular y DNI son obligatorios.'); return;
     }
     setErr(null); setCreando(true);
     try {
@@ -599,7 +599,7 @@ function ModalNuevo({ fechaDefault, onClose, onOk }: {
         especieId: nEspecieId,
         personaId: duenoSel !== '__nuevo__' ? duenoSel : undefined,
         duenoNuevo: duenoSel === '__nuevo__'
-          ? { nombre: dNombre.trim(), apellido: dApellido.trim(), celular: dCelular.trim() || undefined, dni: dDni.trim() || undefined }
+          ? { nombre: dNombre.trim(), apellido: dApellido.trim(), celular: dCelular.trim(), dni: dDni.trim() }
           : undefined,
       });
       // Resolvemos los nombres para mostrar con los catálogos ya cargados en el modal.
@@ -656,8 +656,8 @@ function ModalNuevo({ fechaDefault, onClose, onOk }: {
                   <Field label="Apellido"><input type="text" value={dApellido} onChange={e => setDApellido(e.target.value)} /></Field>
                 </div>
                 <div className="hu-row2">
-                  <Field label="Celular"><input type="text" value={dCelular} onChange={e => setDCelular(e.target.value)} placeholder="Opcional" /></Field>
-                  <Field label="DNI"><input type="text" value={dDni} onChange={e => setDDni(e.target.value)} placeholder="Opcional" /></Field>
+                  <Field label="Celular"><input type="text" value={dCelular} onChange={e => setDCelular(e.target.value)} required /></Field>
+                  <Field label="DNI"><input type="text" value={dDni} onChange={e => setDDni(e.target.value)} required /></Field>
                 </div>
               </>
             )}

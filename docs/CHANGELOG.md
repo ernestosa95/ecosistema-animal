@@ -2,6 +2,15 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-09-14] — DNI y celular de un dueño pasan a ser siempre obligatorios
+
+A pedido del usuario: hasta ahora `dni`/`celular` de `core.personas` eran opcionales en el alta — quedaba a criterio de quien cargaba. Regla de negocio explícita: **nunca opcionales**, y el DNI además es el marcador para no duplicar dueños dentro de una organización (chequeo que ya existía en `PersonasService.crear()`/`actualizar()`, sólo corría cuando el DNI venía informado — ahora corre siempre).
+
+- **Backend**: `CreatePersonaDto.dni`/`.celular` pasan de opcionales a obligatorios (`@IsNotEmpty()`); `UpdatePersonaDto` los mantiene opcionales en el sentido de "no tocar este campo en el PATCH", pero si vienen no pueden llegar vacíos. Sin cambio de schema/migración — igual criterio que otros campos "obligatorios a nivel de DTO, nullable en DB" para no romper filas viejas sin estos datos.
+- **Web**: los 5 lugares que dan de alta un dueño (`PersonasPage.tsx`, y el alta rápida inline de `SeleccionarAnimalModal.tsx`, `PacientesPage.tsx`, `TurnosPage.tsx`, `AccesoPortalModal.tsx`) piden DNI y celular como campos obligatorios, ya no "(opcional)".
+- **Mobile**: `SelectorDueno.tsx` ya exigía DNI (a diferencia de la web vieja) — ahora también exige celular; `altaPaciente.ts` actualizado.
+- Las 19 `test:*-demo` siguen pasando (instancian los servicios directo, sin pasar por el `ValidationPipe` de Nest — no ejercitan esta validación en particular, pero confirman que no se rompió nada del resto).
+
 ## [2026-09-13] — Revisión de UX post-deploy: onboarding, formularios y accesos al portal
 
 El usuario probó la app recién desplegada de punta a punta y fue señalando ajustes puntuales de UX — todos en `apps/web`, sin tocar backend ni schema:

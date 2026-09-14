@@ -317,12 +317,15 @@ function DuenoForm({
     e.preventDefault();
     setError(null);
     setGuardando(true);
+    if (!dni.trim() || !celular.trim()) {
+      setError('DNI y celular son obligatorios');
+      setGuardando(false);
+      return;
+    }
     try {
-      const data: Record<string, unknown> = { nombre, apellido };
-      data.dni = dni || null;
+      const data: Record<string, unknown> = { nombre, apellido, dni: dni.trim(), celular: celular.trim() };
       data.sexo = sexo || undefined;
       data.fechaNacimiento = fechaNacimiento || undefined;
-      data.celular = celular || undefined;
       data.email = email || undefined;
       data.domicilio = domicilio || undefined;
       if (esEdicion && inicial) {
@@ -353,7 +356,7 @@ function DuenoForm({
       </label>
       <label>
         DNI
-        <input value={dni} onChange={(e) => setDni(e.target.value)} />
+        <input value={dni} onChange={(e) => setDni(e.target.value)} required />
       </label>
       <label>
         Sexo
@@ -370,7 +373,7 @@ function DuenoForm({
       </label>
       <label>
         Celular
-        <input value={celular} onChange={(e) => setCelular(e.target.value)} />
+        <input value={celular} onChange={(e) => setCelular(e.target.value)} required />
       </label>
       <label className="span-2">
         Email

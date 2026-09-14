@@ -8,9 +8,11 @@ import {
 } from 'class-validator';
 
 export class CreatePersonaDto {
-  @IsOptional()
+  // Obligatorio: además de dato de contacto, es el marcador para evitar
+  // dueños duplicados (ver PersonasService.crear(), único por organización).
   @IsString()
-  dni?: string;
+  @IsNotEmpty()
+  dni!: string;
 
   @IsString()
   @IsNotEmpty()
@@ -28,9 +30,12 @@ export class CreatePersonaDto {
   @IsDateString()
   fechaNacimiento?: string;
 
-  @IsOptional()
+  // Obligatorio: es el canal de contacto real con el dueño (WhatsApp del
+  // portal, recordatorios) — sin esto la organización no tiene forma de
+  // avisarle nada.
   @IsString()
-  celular?: string;
+  @IsNotEmpty()
+  celular!: string;
 
   @IsOptional()
   @IsString()

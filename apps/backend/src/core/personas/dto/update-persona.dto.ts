@@ -8,8 +8,12 @@ import {
 } from 'class-validator';
 
 export class UpdatePersonaDto {
+  // Optional a nivel de "no lo estoy tocando en este PATCH", pero si viene
+  // no puede llegar vacío — dni/celular son obligatorios desde el alta, una
+  // edición no puede vaciarlos (ver CreatePersonaDto).
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   dni?: string;
 
   @IsOptional()
@@ -32,6 +36,7 @@ export class UpdatePersonaDto {
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   celular?: string;
 
   @IsOptional()

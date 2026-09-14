@@ -73,14 +73,17 @@ function BuscarDueno({ personas, sesion, onSeleccionar, onCreado, onCerrar }: {
   async function crear(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!dNombre.trim() || !dApellido.trim()) { setError('Completá nombre y apellido'); return; }
+    if (!dNombre.trim() || !dApellido.trim() || !dCelular.trim() || !dDni.trim()) {
+      setError('Completá nombre, apellido, celular y DNI');
+      return;
+    }
     setGuardando(true);
     try {
       const p = await api.crearPersona(sesion, {
         nombre: dNombre.trim(),
         apellido: dApellido.trim(),
-        ...(dCelular ? { celular: dCelular } : {}),
-        ...(dDni ? { dni: dDni } : {}),
+        celular: dCelular.trim(),
+        dni: dDni.trim(),
       });
       onCreado(p);
     } catch (err) {
@@ -109,12 +112,12 @@ function BuscarDueno({ personas, sesion, onSeleccionar, onCreado, onCerrar }: {
             <input value={dApellido} onChange={(e) => setDApellido(e.target.value)} required />
           </label>
           <label>
-            Celular (opcional)
-            <input value={dCelular} onChange={(e) => setDCelular(e.target.value)} />
+            Celular
+            <input value={dCelular} onChange={(e) => setDCelular(e.target.value)} required />
           </label>
           <label>
-            DNI (opcional, hace falta para el código de acceso)
-            <input value={dDni} onChange={(e) => setDDni(e.target.value)} />
+            DNI
+            <input value={dDni} onChange={(e) => setDDni(e.target.value)} required />
           </label>
           {error && <div className="alerta span-2">{error}</div>}
           <div className="span-2" style={{ display: 'flex', gap: '0.5rem' }}>

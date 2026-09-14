@@ -10,7 +10,7 @@ export const NUEVO_DUENO = '__nuevo__';
 interface DatosDuenoNuevo {
   nombre: string;
   apellido: string;
-  celular?: string;
+  celular: string;
   dni: string;
 }
 
@@ -40,8 +40,8 @@ export async function altaPacienteOffline(sesion: Sesion, dto: DatosAltaPaciente
         p.organizacionId = sesion.organizacionId;
         p.nombre = dto.duenoNuevo!.nombre.trim();
         p.apellido = dto.duenoNuevo!.apellido.trim();
-        p.celular = dto.duenoNuevo!.celular?.trim() || null;
-        p.dni = dto.duenoNuevo!.dni?.trim() || null;
+        p.celular = dto.duenoNuevo!.celular.trim();
+        p.dni = dto.duenoNuevo!.dni.trim();
         p.sexo = null;
         p.fechaNacimiento = null;
         p.telefono = null;

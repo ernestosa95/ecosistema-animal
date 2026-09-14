@@ -8,13 +8,14 @@ import { Field } from './Field';
 
 export interface DuenoElegido {
   duenoId: string;
-  duenoNuevo?: { nombre: string; apellido: string; celular?: string; dni: string };
+  duenoNuevo?: { nombre: string; apellido: string; celular: string; dni: string };
 }
 
 /**
- * El dueño de un paciente ya no es opcional (a diferencia de la web, que sí
- * lo permite) — acá siempre hay que elegir uno existente o cargar uno
- * nuevo, con DNI obligatorio. Reemplaza el viejo "chip por cada persona" de
+ * El dueño de un paciente nunca es opcional — siempre hay que elegir uno
+ * existente o cargar uno nuevo, con DNI y celular obligatorios los dos (el
+ * DNI además funciona como marcador para no duplicar dueños). Reemplaza el
+ * viejo "chip por cada persona" de
  * `SeleccionarAnimalModal`/`paciente/nuevo.tsx` (no escalaba pasadas unas
  * pocas personas) por un buscador — mismo patrón que el buscador de
  * pacientes/productos. `onChange(null)` mientras la selección está
@@ -58,8 +59,8 @@ export function SelectorDueno({
   }
 
   function emitir(n: string, a: string, d: string, c: string) {
-    if (n.trim() && a.trim() && d.trim()) {
-      onChange({ duenoId: NUEVO_DUENO, duenoNuevo: { nombre: n.trim(), apellido: a.trim(), dni: d.trim(), celular: c.trim() || undefined } });
+    if (n.trim() && a.trim() && d.trim() && c.trim()) {
+      onChange({ duenoId: NUEVO_DUENO, duenoNuevo: { nombre: n.trim(), apellido: a.trim(), dni: d.trim(), celular: c.trim() } });
     } else {
       onChange(null);
     }
@@ -71,7 +72,7 @@ export function SelectorDueno({
         <Field label="Nombre del dueño" value={nombre} onChangeText={(t) => { setNombre(t); emitir(t, apellido, dni, celular); }} />
         <Field label="Apellido del dueño" value={apellido} onChangeText={(t) => { setApellido(t); emitir(nombre, t, dni, celular); }} />
         <Field label="DNI" value={dni} onChangeText={(t) => { setDni(t); emitir(nombre, apellido, t, celular); }} keyboardType="numeric" />
-        <Field label="Celular (opcional)" value={celular} onChangeText={(t) => { setCelular(t); emitir(nombre, apellido, dni, t); }} keyboardType="phone-pad" />
+        <Field label="Celular" value={celular} onChangeText={(t) => { setCelular(t); emitir(nombre, apellido, dni, t); }} keyboardType="phone-pad" />
         <Pressable
           style={styles.linkAccion}
           onPress={() => {

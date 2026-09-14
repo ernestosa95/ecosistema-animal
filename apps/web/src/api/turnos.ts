@@ -466,7 +466,7 @@ export async function crearPacienteRapido(input: {
   nombre: string;
   especieId: string;
   personaId?: string; // dueño existente
-  duenoNuevo?: { nombre: string; apellido: string; celular?: string; dni?: string };
+  duenoNuevo?: { nombre: string; apellido: string; celular: string; dni: string };
 }): Promise<PacienteCreado> {
   let personaId = input.personaId;
   let duenoNombre: string | undefined;
@@ -477,8 +477,8 @@ export async function crearPacienteRapido(input: {
       body: JSON.stringify({
         nombre: input.duenoNuevo.nombre,
         apellido: input.duenoNuevo.apellido,
-        ...(input.duenoNuevo.celular ? { celular: input.duenoNuevo.celular } : {}),
-        ...(input.duenoNuevo.dni ? { dni: input.duenoNuevo.dni } : {}),
+        celular: input.duenoNuevo.celular,
+        dni: input.duenoNuevo.dni,
       }),
     });
     personaId = String(persona.id);

@@ -188,8 +188,8 @@ function NuevoPacienteForm({
       setError('Elegí un dueño para el paciente (o creá uno nuevo)');
       return;
     }
-    if (personaId === '__nuevo__' && (!dNombre.trim() || !dApellido.trim())) {
-      setError('Completá nombre y apellido del dueño nuevo');
+    if (personaId === '__nuevo__' && (!dNombre.trim() || !dApellido.trim() || !dCelular.trim() || !dDni.trim())) {
+      setError('Completá nombre, apellido, celular y DNI del dueño nuevo');
       return;
     }
     setGuardando(true);
@@ -199,8 +199,8 @@ function NuevoPacienteForm({
         const dueno = await api.crearPersona(sesion, {
           nombre: dNombre.trim(),
           apellido: dApellido.trim(),
-          ...(dCelular ? { celular: dCelular } : {}),
-          ...(dDni ? { dni: dDni } : {}),
+          celular: dCelular.trim(),
+          dni: dDni.trim(),
         });
         duenoId = dueno.id;
       }
@@ -263,12 +263,12 @@ function NuevoPacienteForm({
             <input value={dApellido} onChange={(e) => campo('dApellido')(e.target.value)} required />
           </label>
           <label>
-            Celular (opcional)
-            <input value={dCelular} onChange={(e) => campo('dCelular')(e.target.value)} />
+            Celular del dueño
+            <input value={dCelular} onChange={(e) => campo('dCelular')(e.target.value)} required />
           </label>
           <label>
-            DNI (opcional)
-            <input value={dDni} onChange={(e) => campo('dDni')(e.target.value)} />
+            DNI del dueño
+            <input value={dDni} onChange={(e) => campo('dDni')(e.target.value)} required />
           </label>
         </div>
       )}
