@@ -14,7 +14,11 @@ import {
   type ResumenPagoOrg, type GananciasPeriodo, type Pago, type ResumenAnalitica, type PagoPendiente,
   type Pregunta, type TipoPregunta, type RespuestasMensaje,
 } from '../api/admin';
-import { listarSolicitudes, aprobarSolicitud, rechazarSolicitud, type Solicitud } from '../api/solicitudes';
+import {
+  listarSolicitudes, aprobarSolicitud, rechazarSolicitud,
+  obtenerConfiguracionSolicitudes, actualizarConfiguracionSolicitudes,
+  type Solicitud,
+} from '../api/solicitudes';
 import {
   listarInteresadosAdmin, editarInteresadoAdmin, eliminarInteresadoAdmin, reenviarConfirmacionInteresado,
   invitarTodosInteresados,
@@ -1877,18 +1881,71 @@ function Solicitudes({ orgs, planes, onCambio }: { orgs: Organizacion[]; planes:
     onCambio();
   }
 
-  if (cargando) return null;
-  if (error) return <div className="alerta" style={{ marginBottom: 12 }}>{error}</div>;
-  if (items.length === 0) return null;
-
   return (
     <div style={{ marginBottom: '1.25rem' }}>
-      <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-        Solicitudes pendientes <EstadoChip texto={String(items.length)} />
-      </h3>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-        {items.map((s) => <SolicitudCard key={s.id} s={s} orgs={orgs} planes={planes} onResuelta={resuelta} />)}
+      <ConfiguracionAprobacionAutomatica />
+      {error && <div className="alerta" style={{ marginBottom: 12 }}>{error}</div>}
+      {!cargando && !error && items.length > 0 && (
+        <>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            Solicitudes pendientes <EstadoChip texto={String(items.length)} />
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            {items.map((s) => <SolicitudCard key={s.id} s={s} orgs={orgs} planes={planes} onResuelta={resuelta} />)}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Toggle del super-admin: con esto prendido, `SolicitudesService.crear()`
+ * aprueba cada solicitud nueva sola (ver CHANGELOG) — deja de pasar por la
+ * bandeja de arriba. Siempre visible (no depende de si hay pendientes),
+ * así el admin la encuentra sin importar el estado de la bandeja.
+ */
+function ConfiguracionAprobacionAutomatica() {
+  const [valor, setValor] = useState(false);
+  const [cargando, setCargando] = useState(true);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    obtenerConfiguracionSolicitudes()
+      .then((c) => setValor(c.aprobacionAutomatica))
+      .catch((e: any) => setError(e.message ?? 'No se pudo cargar la configuración'))
+      .finally(() => setCargando(false));
+  }, []);
+
+  async function cambiar(nuevo: boolean) {
+    setGuardando(true); setError(null);
+    try {
+      const r = await actualizarConfiguracionSolicitudes(nuevo);
+      setValor(r.aprobacionAutomatica);
+    } catch (e: any) { setError(e.message ?? 'No se pudo guardar'); }
+    finally { setGuardando(false); }
+  }
+
+  if (cargando) return null;
+
+  return (
+    <div className="card" style={{
+      marginBottom: '0.75rem', display: 'flex', alignItems: 'center',
+      justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap',
+    }}>
+      <div>
+        <b>Aprobación automática de solicitudes nuevas</b>
+        <p className="muted" style={{ fontSize: '0.85rem', margin: '0.2rem 0 0' }}>
+          Con esto activado, cada solicitud de cuenta nueva se aprueba sola al llegar — no pasa por esta bandeja.
+          A quien la pidió le llega igual el mail de "tu cuenta ya está lista".
+        </p>
+        {error && <p className="alerta" style={{ marginTop: '0.4rem' }}>{error}</p>}
       </div>
+      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: guardando ? 'default' : 'pointer' }}>
+        <input type="checkbox" checked={valor} disabled={guardando} onChange={(e) => cambiar(e.target.checked)} />
+        {valor ? 'Activada' : 'Desactivada'}
+      </label>
     </div>
   );
 }

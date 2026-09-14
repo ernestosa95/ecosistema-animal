@@ -105,3 +105,9 @@ export const aprobarSolicitud = (id: string, d: { organizacionId?: string; rol?:
 
 export const rechazarSolicitud = (id: string, motivo?: string) =>
   adminReq(`/admin/solicitudes/${id}/rechazar`, { method: 'POST', body: JSON.stringify({ motivo }) });
+
+export const obtenerConfiguracionSolicitudes = (): Promise<{ aprobacionAutomatica: boolean }> =>
+  adminReq('/admin/solicitudes/configuracion');
+
+export const actualizarConfiguracionSolicitudes = (aprobacionAutomatica: boolean): Promise<{ aprobacionAutomatica: boolean }> =>
+  adminReq('/admin/solicitudes/configuracion', { method: 'PATCH', body: JSON.stringify({ aprobacionAutomatica }) });

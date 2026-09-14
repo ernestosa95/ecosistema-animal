@@ -175,6 +175,18 @@ export const eventosUso = plataforma.table('eventos_uso', {
 // (ver interesados/interesados.service.ts, cupo fijo en el código). Sin
 // estado/aprobación ni soft-delete a propósito: es un ledger simple de
 // lectura para seguimiento manual, mismo espíritu que `eventos_uso`.
+// Configuración global de la plataforma — fila única de id fijo 'global',
+// se crea perezosamente en `SolicitudesService.obtenerOCrearConfiguracion()`
+// en vez de sembrarse en una migración (no depende de un seed en el deploy).
+// Hoy sólo `aprobacionAutomatica` (aprobar cada solicitud de cuenta nueva
+// sola, sin pasar por la bandeja del super-admin), pero la tabla queda
+// genérica por si suma otro flag de plataforma más adelante.
+export const configuracion = plataforma.table('configuracion', {
+  id: text('id').primaryKey().default('global'),
+  aprobacionAutomatica: boolean('aprobacion_automatica').notNull().default(false),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const interesados = plataforma.table('interesados', {
   id: uuid('id').primaryKey().defaultRandom(),
   nombre: text('nombre').notNull(),

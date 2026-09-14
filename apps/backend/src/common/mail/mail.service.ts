@@ -2,11 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Resend } from 'resend';
 
 /**
- * Envío de emails transaccionales — hoy sólo lo usa el flujo de "olvidé mi
- * contraseña" (`auth.service.ts`), pero queda genérico por si después hace
- * falta para otra notificación. Usa Resend (`RESEND_API_KEY`); si no está
- * configurada, loguea el email en vez de fallar — así el resto del flujo
- * (dev local sin cuenta de Resend) sigue funcionando, sólo sin el envío real.
+ * Envío de emails transaccionales — usado por "olvidé mi contraseña"
+ * (`auth.service.ts`), verificación de email y aviso de cuenta lista
+ * (`solicitudes.service.ts`) e interesados/. Usa Resend (`RESEND_API_KEY`);
+ * si no está configurada, loguea el email en vez de fallar — así el resto
+ * del flujo (dev local sin cuenta de Resend) sigue funcionando, sólo sin el
+ * envío real.
  */
 @Injectable()
 export class MailService {

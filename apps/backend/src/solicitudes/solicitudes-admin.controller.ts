@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { SuperAdminGuard } from '../common/guards/super-admin.guard';
 import { CurrentUser } from '../common/decorators/current-context.decorator';
 import { SolicitudesService } from './solicitudes.service';
 import { AprobarSolicitudDto, RechazarSolicitudDto } from './dto/aprobar-solicitud.dto';
+import { ActualizarConfiguracionDto } from './dto/actualizar-configuracion.dto';
 
 /** Bandeja del super-admin: ver, aprobar y rechazar solicitudes. */
 @Controller('admin/solicitudes')
@@ -14,6 +15,16 @@ export class SolicitudesAdminController {
   @Get()
   listar(@Query('estado') estado?: string) {
     return this.solicitudes.listar(estado ?? 'pendiente');
+  }
+
+  @Get('configuracion')
+  obtenerConfiguracion() {
+    return this.solicitudes.obtenerConfiguracion();
+  }
+
+  @Patch('configuracion')
+  actualizarConfiguracion(@Body() dto: ActualizarConfiguracionDto) {
+    return this.solicitudes.actualizarConfiguracion(dto);
   }
 
   @Post(':id/aprobar')

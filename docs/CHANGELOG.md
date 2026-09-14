@@ -2,6 +2,14 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-09-14] — Mail de "cuenta lista" al aprobar + aprobación automática de solicitudes
+
+El usuario preguntó si al aprobar una cuenta le llegaba un mail avisando — no llegaba ninguno. Dos pedidos juntos: agregar ese mail, y darle al super-admin un modo para que las solicitudes nuevas se aprueben solas sin pasar por la bandeja manual.
+
+- **Mail de bienvenida**: `SolicitudesService.aprobar()` ahora dispara un mail (plantilla de marca `envolverEmailHuella()`, mismo criterio que el resto de las notificaciones — no bloquea la aprobación si falla) avisando que la cuenta ya está activa, con un botón "Iniciar sesión" a `${PORTAL_BASE_URL}/login`. Como el registro ya pide contraseña al solicitar la cuenta (no es la vieja campaña de interesados que activaba después), no hace falta "configurar" nada — el mail es sólo el aviso de que ya puede entrar.
+- **Aprobación automática**: nueva tabla singleton `plataforma.configuracion` (migración `0040`, fila única id `'global'`, se crea sola la primera vez que se lee o se escribe) con el flag `aprobacionAutomatica` (default `false`). `SolicitudesService.crear()` la consulta al final del alta pública: si está prendida, aprueba la solicitud al toque (mismo camino que `aprobar()`, con `resolvedPor: null` porque no hay un admin de por medio) en vez de dejarla `pendiente`. `GET`/`PATCH /admin/solicitudes/configuracion` (super-admin) para prenderla/apagarla — `AdminPage.tsx` la muestra como un toggle siempre visible arriba de la bandeja de solicitudes (no depende de si hay pendientes).
+- 7 checks nuevos en `test:solicitudes-demo` (28 en total): default apagado, prender/apagar, y que `crear()` con el flag prendido aprueba sin pasar por `aprobar()`. Las 19 `test:*-demo` pasan.
+
 ## [2026-09-14] — Alta manual de organización también fija la fecha de activación
 
 `AdminService.crearOrganizacion()` (el form "Nueva organización" del panel, alta directa por el super-admin) dejaba `fechaActivacion` en null — a diferencia de `SolicitudesService.aprobar()`, que desde el 2026-09-03 la fija en `now()` al aprobar una solicitud. En la práctica ambos caminos ya facturaban igual (`proximoVencimiento`/`resumenPagos` caen a `createdAt` cuando `fechaActivacion` es null), pero el campo quedaba vacío en el detalle de la organización sin motivo — el criterio que pidió el usuario es que la fecha de activación por defecto sea el momento en que se aprueba/crea la cuenta, sin importar el camino (solicitud pública o alta manual). Ahora `crearOrganizacion()` también la fija en `new Date()` al insertar. Las 19 `test:*-demo` pasan.

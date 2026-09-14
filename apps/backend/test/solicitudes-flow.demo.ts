@@ -60,6 +60,11 @@ async function main() {
       limites_roles jsonb NOT NULL DEFAULT '{}'::jsonb,
       descripcion text, activo boolean NOT NULL DEFAULT true, meses_bonificados integer NOT NULL DEFAULT 0,
       created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);
+
+    CREATE TABLE plataforma.configuracion (
+      id text PRIMARY KEY DEFAULT 'global',
+      aprobacion_automatica boolean NOT NULL DEFAULT false,
+      updated_at timestamptz NOT NULL DEFAULT now());
   `);
 
   const db = drizzle(client, { schema: { ...core, ...plataforma } });
@@ -167,6 +172,33 @@ async function main() {
   await solicitudesService.rechazar(otra.id, adminFicticio.id, { motivo: 'No cumple los requisitos' });
   const [solRechazada] = await db.select().from(core.solicitudes).where(eq(core.solicitudes.id, otra.id));
   check('queda "rechazada" con el motivo guardado', solRechazada.estado === 'rechazada' && solRechazada.motivoRechazo === 'No cumple los requisitos');
+
+  console.log('10) configuración: aprobación automática (off por defecto, on la aplica el super-admin)');
+  const configInicial = await solicitudesService.obtenerConfiguracion();
+  check('arranca en false', configInicial.aprobacionAutomatica === false);
+  const configActualizada = await solicitudesService.actualizarConfiguracion({ aprobacionAutomatica: true });
+  check('actualizarConfiguracion() la prende', configActualizada.aprobacionAutomatica === true);
+
+  console.log('11) crear(): con aprobación automática prendida, la solicitud queda aprobada al toque (sin pasar por aprobar())');
+  const autoAprobada = await solicitudesService.crear({
+    ...dtoBase, email: 'auto@vet.com', nombreOrganizacion: 'Veterinaria Automática',
+    planId: planActivo.id, emailVerificadoToken: tokenVerificado('auto@vet.com'),
+  } as any);
+  const [solAutoAprobada] = await db.select().from(core.solicitudes).where(eq(core.solicitudes.id, autoAprobada.id));
+  check('queda "aprobada", no "pendiente"', solAutoAprobada.estado === 'aprobada');
+  check('resolvedPor queda null (no hay admin de por medio)', solAutoAprobada.resolvedPor == null);
+  const [orgAutoCreada] = await db.select().from(core.organizaciones).where(eq(core.organizaciones.nombre, 'Veterinaria Automática'));
+  check('la organización se creó igual que con aprobación manual', !!orgAutoCreada && orgAutoCreada.planId === planActivo.id);
+
+  console.log('12) configuración: se puede apagar de nuevo (vuelve al flujo manual)');
+  const configApagada = await solicitudesService.actualizarConfiguracion({ aprobacionAutomatica: false });
+  check('actualizarConfiguracion() la apaga', configApagada.aprobacionAutomatica === false);
+  const nuevaConManual = await solicitudesService.crear({
+    ...dtoBase, email: 'manual2@vet.com', nombreOrganizacion: 'Veterinaria Manual 2',
+    planId: planActivo.id, emailVerificadoToken: tokenVerificado('manual2@vet.com'),
+  } as any);
+  const [solManual2] = await db.select().from(core.solicitudes).where(eq(core.solicitudes.id, nuevaConManual.id));
+  check('con la config apagada, vuelve a quedar "pendiente"', solManual2.estado === 'pendiente');
 
   console.log(`\nRESULTADO: ${ok} OK, ${fail} fallas`);
   await client.close();

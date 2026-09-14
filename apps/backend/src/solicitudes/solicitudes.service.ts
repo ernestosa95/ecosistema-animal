@@ -9,10 +9,12 @@ import * as bcrypt from 'bcryptjs';
 import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import { JwtService } from '@nestjs/jwt';
 import { DRIZZLE, DrizzleDB } from '../database/drizzle.provider';
-import { solicitudes, usuarios, organizaciones, membresias, planes } from '../database/schema';
+import { solicitudes, usuarios, organizaciones, membresias, planes, configuracion } from '../database/schema';
 import { CrearSolicitudDto } from './dto/crear-solicitud.dto';
 import { AprobarSolicitudDto, RechazarSolicitudDto } from './dto/aprobar-solicitud.dto';
+import { ActualizarConfiguracionDto } from './dto/actualizar-configuracion.dto';
 import { MailService } from '../common/mail/mail.service';
+import { envolverEmailHuella } from '../common/mail/plantilla';
 
 type Rol = 'propietario' | 'admin' | 'capataz' | 'veterinario' | 'recepcion';
 
@@ -184,7 +186,50 @@ export class SolicitudesService {
       })
       .returning({ id: solicitudes.id });
 
+    // Aprobación automática (config del super-admin, ver actualizarConfiguracion()):
+    // salta la bandeja manual y activa la cuenta al toque. adminUserId null —
+    // no hay una persona resolviendo esto, y resolvedPor acepta null.
+    const { aprobacionAutomatica } = await this.obtenerConfiguracion();
+    if (aprobacionAutomatica) {
+      await this.aprobar(sol.id, null, {});
+    }
+
     return { ok: true, id: sol.id };
+  }
+
+  /**
+   * Fila única (id fijo 'global'), creada perezosamente la primera vez que
+   * se lee o se escribe — no depende de un seed en el flujo de deploy.
+   */
+  private async obtenerOCrearConfiguracion() {
+    const [fila] = await this.db.select().from(configuracion).where(eq(configuracion.id, 'global')).limit(1);
+    if (fila) return fila;
+    const [nueva] = await this.db
+      .insert(configuracion)
+      .values({ id: 'global' })
+      .onConflictDoNothing()
+      .returning();
+    if (nueva) return nueva;
+    // Carrera rara (dos requests concurrentes creándola a la vez): releer.
+    const [fila2] = await this.db.select().from(configuracion).where(eq(configuracion.id, 'global')).limit(1);
+    return fila2;
+  }
+
+  /** STAFF (super-admin) — para el toggle de "aprobación automática" del panel. */
+  async obtenerConfiguracion(): Promise<{ aprobacionAutomatica: boolean }> {
+    const c = await this.obtenerOCrearConfiguracion();
+    return { aprobacionAutomatica: c.aprobacionAutomatica };
+  }
+
+  /** STAFF (super-admin). */
+  async actualizarConfiguracion(dto: ActualizarConfiguracionDto): Promise<{ aprobacionAutomatica: boolean }> {
+    await this.obtenerOCrearConfiguracion();
+    const [fila] = await this.db
+      .update(configuracion)
+      .set({ aprobacionAutomatica: dto.aprobacionAutomatica, updatedAt: new Date() })
+      .where(eq(configuracion.id, 'global'))
+      .returning();
+    return { aprobacionAutomatica: fila.aprobacionAutomatica };
   }
 
   /** Planes disponibles para elegir en el form público de alta (sólo los habilitados para altas nuevas). */
@@ -211,8 +256,13 @@ export class SolicitudesService {
     return q.orderBy(desc(solicitudes.createdAt));
   }
 
-  /** Aprueba una solicitud: crea usuario/organización/membresía según corresponda. */
-  async aprobar(id: string, adminUserId: string, dto: AprobarSolicitudDto) {
+  /**
+   * Aprueba una solicitud: crea usuario/organización/membresía según
+   * corresponda y avisa por mail que la cuenta ya está lista. `adminUserId`
+   * es null cuando la aprobación es automática (ver `crear()` arriba) — no
+   * hay una persona resolviéndola, y `resolvedPor` acepta null.
+   */
+  async aprobar(id: string, adminUserId: string | null, dto: AprobarSolicitudDto) {
     const [sol] = await this.db.select().from(solicitudes).where(eq(solicitudes.id, id)).limit(1);
     if (!sol) throw new NotFoundException('Solicitud no encontrada');
     if (sol.estado !== 'pendiente') throw new BadRequestException('La solicitud ya fue resuelta');
@@ -298,7 +348,24 @@ export class SolicitudesService {
         .where(eq(solicitudes.id, id));
     });
 
+    // No bloquea la aprobación si el mail falla — mismo criterio que el
+    // resto de las notificaciones fire-and-forget (interesados/, analitica/).
+    void this.enviarCuentaLista(sol.nombre, sol.email).catch(() => {});
+
     return { ok: true };
+  }
+
+  /** Mail de bienvenida al aprobar — dispara igual si la aprobación fue manual o automática. */
+  private async enviarCuentaLista(nombre: string, email: string): Promise<void> {
+    const frontendUrl = process.env.PORTAL_BASE_URL ?? 'http://localhost:5173';
+    const html = envolverEmailHuella({
+      contenidoHtml: `<p style="margin:0 0 12px;">Hola ${nombre},</p>
+        <p style="margin:0 0 12px;">¡Buenas noticias! Tu cuenta de <b>Huella</b> ya está activa — podés iniciar
+        sesión con el email y la contraseña que elegiste al registrarte.</p>`,
+      botonTexto: 'Iniciar sesión',
+      botonUrl: `${frontendUrl}/login`,
+    });
+    await this.mail.enviar(email, '¡Tu cuenta de Huella ya está lista!', html);
   }
 
   /** Rechaza una solicitud. */
