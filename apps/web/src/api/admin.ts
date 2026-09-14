@@ -14,6 +14,15 @@ export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 let alExpirar: (() => void) | null = null;
 export const suscribirseAExpiracion = (cb: () => void) => { alExpirar = cb; };
 
+/**
+ * `api/interesados.ts` y `api/solicitudes.ts` también llaman al panel /admin
+ * con este mismo token, pero con su propio fetch duplicado — sin esto,
+ * un 401 ahí se mostraba como el JSON crudo del error en vez de sacar a la
+ * persona de un panel al que ya no tiene acceso. `req()`, acá abajo, usa lo
+ * mismo — un solo lugar con la lógica real.
+ */
+export const manejar401 = () => { clearToken(); alExpirar?.(); };
+
 async function req(path: string, options: RequestInit = {}): Promise<any> {
   const res = await fetch(`${BASE}${path}`, {
     ...options,
@@ -23,10 +32,7 @@ async function req(path: string, options: RequestInit = {}): Promise<any> {
       ...(options.headers as Record<string, string> || {}),
     },
   });
-  if (res.status === 401) {
-    clearToken();
-    alExpirar?.();
-  }
+  if (res.status === 401) manejar401();
   if (!res.ok) {
     const msg = await res.text().catch(() => '');
     throw new Error(msg || `Error ${res.status}`);

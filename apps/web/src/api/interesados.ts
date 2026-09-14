@@ -6,7 +6,7 @@
 // públicas (sin sesión, las usa la landing); `listarInteresadosAdmin` usa el
 // token del panel /admin (mismo patrón que `adminReq` en api/solicitudes.ts)
 // para que el super-admin vea la lista y haga el seguimiento manual.
-import { getToken } from './admin';
+import { getToken, manejar401 } from './admin';
 import type { Sesion } from './types';
 
 const API = (import.meta.env.VITE_API_URL as string) || 'http://localhost:3000';
@@ -53,59 +53,42 @@ export interface Interesado {
   createdAt: string;
 }
 
-/** Admin (super-admin, panel /admin) — lista de interesados para el seguimiento manual. */
-export async function listarInteresadosAdmin(): Promise<Interesado[]> {
-  const res = await fetch(`${API}/admin/interesados`, {
-    headers: { Authorization: `Bearer ${getToken()}` },
+/** Las 5 llamadas admin de acá abajo comparten este helper (mismo criterio que `adminReq` en api/solicitudes.ts) — así el chequeo de 401 vive en un solo lugar. */
+async function adminReq(path: string, options: RequestInit = {}): Promise<any> {
+  const res = await fetch(`${API}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${getToken()}`,
+      ...(options.headers as Record<string, string> || {}),
+    },
   });
+  if (res.status === 401) manejar401();
   if (!res.ok) throw new Error((await res.text().catch(() => '')) || `Error ${res.status}`);
-  return res.json();
+  return res.status === 204 ? null : res.json();
 }
+
+/** Admin (super-admin, panel /admin) — lista de interesados para el seguimiento manual. */
+export const listarInteresadosAdmin = (): Promise<Interesado[]> => adminReq('/admin/interesados');
 
 /** Admin — corrige/completa datos a mano (ej. cargar el email de alguien que se anotó antes de que fuera obligatorio). */
-export async function editarInteresadoAdmin(
+export const editarInteresadoAdmin = (
   id: string,
   dto: Partial<Pick<Interesado, 'nombre' | 'email' | 'celular' | 'nombreVeterinaria'>>,
-): Promise<Interesado> {
-  const res = await fetch(`${API}/admin/interesados/${id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-    body: JSON.stringify(dto),
-  });
-  if (!res.ok) throw new Error((await res.text().catch(() => '')) || `Error ${res.status}`);
-  return res.json();
-}
+): Promise<Interesado> =>
+  adminReq(`/admin/interesados/${id}`, { method: 'PATCH', body: JSON.stringify(dto) });
 
 /** Admin — saca el registro y libera su lugar en el cupo. */
-export async function eliminarInteresadoAdmin(id: string): Promise<void> {
-  const res = await fetch(`${API}/admin/interesados/${id}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${getToken()}` },
-  });
-  if (!res.ok) throw new Error((await res.text().catch(() => '')) || `Error ${res.status}`);
-}
+export const eliminarInteresadoAdmin = (id: string): Promise<void> =>
+  adminReq(`/admin/interesados/${id}`, { method: 'DELETE' });
 
 /** Admin — reenvía el mail de confirmación (sólo si ya tiene email cargado). */
-export async function reenviarConfirmacionInteresado(id: string): Promise<void> {
-  const res = await fetch(`${API}/admin/interesados/${id}/reenviar`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${getToken()}` },
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.message || `Error ${res.status}`);
-  }
-}
+export const reenviarConfirmacionInteresado = (id: string): Promise<void> =>
+  adminReq(`/admin/interesados/${id}/reenviar`, { method: 'POST' });
 
 /** Admin — dispara el link de "terminá tu alta" a todos los interesados que tengan email cargado. */
-export async function invitarTodosInteresados(): Promise<{ enviados: number }> {
-  const res = await fetch(`${API}/admin/interesados/invitar-todos`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${getToken()}` },
-  });
-  if (!res.ok) throw new Error((await res.text().catch(() => '')) || `Error ${res.status}`);
-  return res.json();
-}
+export const invitarTodosInteresados = (): Promise<{ enviados: number }> =>
+  adminReq('/admin/interesados/invitar-todos', { method: 'POST' });
 
 // ── Activación (link que abre ActivarInteresadoPage.tsx, ?activarToken=) ──
 

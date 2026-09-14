@@ -1,5 +1,5 @@
 // apps/web/src/api/solicitudes.ts
-import { getToken } from './admin';
+import { getToken, manejar401 } from './admin';
 
 const BASE = (import.meta as any).env?.VITE_API_URL ?? 'http://localhost:3000';
 
@@ -93,6 +93,7 @@ async function adminReq(path: string, options: RequestInit = {}): Promise<any> {
       ...(options.headers as Record<string, string> || {}),
     },
   });
+  if (res.status === 401) manejar401();
   if (!res.ok) throw new Error((await res.text().catch(() => '')) || `Error ${res.status}`);
   return res.status === 204 ? null : res.json();
 }

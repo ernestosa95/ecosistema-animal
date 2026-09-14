@@ -2,6 +2,16 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-09-14] — Fix: token vencido en /admin mostraba el JSON crudo del error
+
+El usuario lo vio en el panel: al vencer el token del super-admin, "Interesados" y "Solicitudes" mostraban `{"message":"Token inválido o expirado",...}` en pantalla en vez de mandarlo al login. `api/admin.ts` ya resolvía esto desde antes (`req()` detecta el 401, limpia el token y llama `alExpirar()`, que `AdminPage.tsx` usa para volver a la pantalla de login) — pero `api/interesados.ts` y `api/solicitudes.ts` tienen su propio fetch duplicado (mismo patrón deliberado que `api/client.ts`/`api/turnos.ts` del lado de la app principal) y ninguno de los dos replicaba ese chequeo.
+
+- `api/admin.ts` expone `manejar401()` (la misma lógica de `req()`, factorizada) para que los otros dos archivos la llamen.
+- `api/solicitudes.ts`: su `adminReq()` ya centralizado ahora llama `manejar401()` en un 401.
+- `api/interesados.ts`: sus 5 llamadas admin (antes cada una con su propio `fetch`) se consolidaron en un `adminReq()` igual al de `solicitudes.ts`, con el mismo chequeo.
+
+Sin cambios de backend. `tsc`/`vite build` limpios (mismo error de baseline preexistente de `ImportMeta.env`, sin relación).
+
 ## [2026-09-14] — Mail de "cuenta lista" al aprobar + aprobación automática de solicitudes
 
 El usuario preguntó si al aprobar una cuenta le llegaba un mail avisando — no llegaba ninguno. Dos pedidos juntos: agregar ese mail, y darle al super-admin un modo para que las solicitudes nuevas se aprueben solas sin pasar por la bandeja manual.
