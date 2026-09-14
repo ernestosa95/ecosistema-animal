@@ -1,11 +1,13 @@
 /**
- * Flujo de trabajo: Caja (Fase D) — apertura/cierre con arqueo, cobros
- * (apertura rápida: si no hay caja abierta, el primer cobro/venta del día la
- * abre sola — 2026-09-03, antes rechazaba y obligaba a ir a la pestaña Caja
- * a mano), egresos aislados (esos SÍ siguen exigiendo una caja ya abierta:
- * no tiene sentido que un egreso abra una caja sola), auditoría de cierres
- * con diferencia, liquidación de honorarios y estadísticas del período
- * (nuevo) — contra Postgres real (PGlite/WASM). Llama a las clases reales
+ * Flujo de trabajo: Caja (Fase D) — apertura/cierre con arqueo, cobros y
+ * egresos con apertura rápida (si no hay caja abierta, el primer
+ * cobro/venta/egreso del día la abre sola — cobros desde 2026-09-03,
+ * egresos sumados el 2026-09-14 a pedido del usuario: un caso real, "+
+ * Ingresos" de Farmacia generando un egreso automático por la compra a
+ * proveedor, podía ser la primera plata del día, antes de cualquier venta,
+ * y quedaba rechazado con "abrí la caja primero"), auditoría de cierres con
+ * diferencia, liquidación de honorarios y estadísticas del período — contra
+ * Postgres real (PGlite/WASM). Llama a las clases reales
  * (CajasService/CobrosService/EgresosService), no una reimplementación de su
  * lógica — así un cambio de comportamiento real (como el de apertura
  * rápida) se refleja acá solo, sin que el test quede "probando una copia"
@@ -81,6 +83,10 @@ async function main() {
 
   const [orgA] = await db.insert(organizaciones).values({ nombre: 'Clínica A' }).returning();
   const [orgB] = await db.insert(organizaciones).values({ nombre: 'Clínica B' }).returning();
+  // Org aparte para probar la apertura rápida de egresos sin ensuciar a
+  // orgB, que las secciones 8/9 usan como "organización limpia" para los
+  // chequeos de aislamiento.
+  const [orgC] = await db.insert(organizaciones).values({ nombre: 'Clínica C' }).returning();
   const [vet] = await db.insert(usuarios).values({ email: 'vet@a.com', passwordHash: 'x', nombre: 'Ana' }).returning();
   const [staff] = await db.insert(usuarios).values({ email: 'recepcion@a.com', passwordHash: 'x' }).returning();
 
@@ -92,13 +98,17 @@ async function main() {
   check('la caja quedó abierta sola, con monto inicial 0', !!cajaAutoabierta && Number(cajaAutoabierta.montoInicial) === 0);
   check('el cobro quedó imputado a esa caja', primerCobro.cajaId === cajaAutoabierta!.id);
 
-  console.log('2) Egresos: a diferencia de los cobros, SIGUEN exigiendo una caja ya abierta');
-  const cajaSolo2 = await cajasService.actual(orgB.id);
-  check('orgB no tiene caja (ni por apertura rápida: sólo pasó por orgA)', cajaSolo2 === null);
-  let rechazoEgresoSinCaja = false;
-  try { await egresosService.crear(orgB.id, staff.id, { concepto: 'x', monto: 10 } as any); }
-  catch (e: any) { rechazoEgresoSinCaja = e?.status === 400 || e?.name === 'BadRequestException'; }
-  check('un egreso sin caja abierta se rechaza (no abre una sola)', rechazoEgresoSinCaja);
+  console.log('2) Apertura rápida también para egresos (2026-09-14): el primer egreso del día, sin caja abierta, abre una sola');
+  check('orgC no tiene ninguna caja abierta todavía', (await cajasService.actual(orgC.id)) === null);
+  const primerEgreso = await egresosService.crear(orgC.id, staff.id, { concepto: 'Compra a proveedor', monto: 10 } as any);
+  const cajaAutoabiertaPorEgreso = await cajasService.actual(orgC.id);
+  check('el egreso se guardó igual', !!primerEgreso.id);
+  check('la caja quedó abierta sola, con monto inicial 0', !!cajaAutoabiertaPorEgreso && Number(cajaAutoabiertaPorEgreso.montoInicial) === 0);
+  check('el egreso quedó imputado a esa caja', primerEgreso.cajaId === cajaAutoabiertaPorEgreso!.id);
+  check('la respuesta avisa que la caja se abrió recién ahora (cajaAbiertaAhora)', primerEgreso.cajaAbiertaAhora === true);
+  const segundoEgreso = await egresosService.crear(orgC.id, staff.id, { concepto: 'Otra compra', monto: 5 } as any);
+  check('un egreso con la caja ya abierta NO vuelve a avisar', segundoEgreso.cajaAbiertaAhora === false);
+  check('orgB sigue sin ninguna caja (esta prueba no la tocó, sólo a orgC)', (await cajasService.actual(orgB.id)) === null);
 
   console.log('3) Doble apertura manual se rechaza (la caja de orgA ya está abierta por el paso 1)');
   let rechazoDoble = false;
@@ -179,16 +189,15 @@ async function main() {
   const cajaDeHoy = await cajasService.actual(orgA.id);
   check('se abrió una caja nueva para hoy, sola', cajaDeHoy !== null && cajaDeHoy.id === cobroDeHoy.cajaId);
 
-  console.log('11) normalizarDelDia() vía egresos: mismo comportamiento, pero un egreso NO abre una caja nueva por sí solo');
+  console.log('11) normalizarDelDia() vía egresos: mismo comportamiento que con cobros, ahora que el egreso también abre una caja nueva sola');
   await cajasService.cerrar(orgA.id, staff.id, cajaDeHoy!.id, { montoDeclarado: 500 } as any); // cerrar la de hoy para dejar el escenario limpio
   const otraOlvidada = await cajasService.abrir(orgA.id, staff.id, { montoInicial: 0 } as any);
   await db.update(cajas).set({ abiertaEn: anteayer }).where(eq(cajas.id, otraOlvidada.id));
-  let rechazoEgresoTrasNormalizar = false;
-  try { await egresosService.crear(orgA.id, staff.id, { concepto: 'Insumos de hoy', monto: 20 } as any); }
-  catch (e: any) { rechazoEgresoTrasNormalizar = e?.status === 400 || e?.name === 'BadRequestException'; }
-  check('el egreso rechaza (no hay caja de hoy) en vez de imputarse a la caja vieja', rechazoEgresoTrasNormalizar);
+  const egresoTrasNormalizar = await egresosService.crear(orgA.id, staff.id, { concepto: 'Insumos de hoy', monto: 20 } as any);
+  check('el egreso NO quedó imputado a la caja vieja', egresoTrasNormalizar.cajaId !== otraOlvidada.id);
+  check('avisa que abrió una caja nueva sola', egresoTrasNormalizar.cajaAbiertaAhora === true);
   const [otraOlvidadaTrasNormalizar] = await db.select().from(cajas).where(eq(cajas.id, otraOlvidada.id));
-  check('igual, la caja vieja quedó cerrada sola en el intento', otraOlvidadaTrasNormalizar.estado === 'cerrada');
+  check('la caja vieja quedó cerrada sola por normalizarDelDia()', otraOlvidadaTrasNormalizar.estado === 'cerrada');
 
   console.log(`\nRESULTADO: ${ok} OK, ${fail} fallas`);
   await client.close();

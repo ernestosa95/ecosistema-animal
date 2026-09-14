@@ -454,6 +454,8 @@ export interface Cobro {
   cantidad?: number | null;
   consultaId?: string | null;
   liquidado: boolean;
+  /** Sólo en la respuesta de POST /caja/cobros: avisa si esta llamada abrió la caja del día sola. */
+  cajaAbiertaAhora?: boolean;
   liquidadoEn?: string | null;
   createdAt: string;
 }
@@ -464,6 +466,8 @@ export interface Egreso {
   concepto: string;
   monto: string;
   createdAt: string;
+  /** Sólo en la respuesta de POST /caja/egresos: avisa si esta llamada abrió la caja del día sola. */
+  cajaAbiertaAhora?: boolean;
 }
 
 export interface EstadisticasCaja {

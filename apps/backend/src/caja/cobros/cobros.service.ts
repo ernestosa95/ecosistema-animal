@@ -26,8 +26,8 @@ export class CobrosService {
    */
   async crear(organizacionId: string, usuarioId: string, dto: CreateCobroDto) {
     await this.cajasService.normalizarDelDia(organizacionId, usuarioId);
-    const caja = (await this.cajasService.actual(organizacionId))
-      ?? (await this.cajasService.abrir(organizacionId, usuarioId, {}));
+    const cajaExistente = await this.cajasService.actual(organizacionId);
+    const caja = cajaExistente ?? (await this.cajasService.abrir(organizacionId, usuarioId, {}));
 
     if (dto.productoId) {
       const [producto] = await this.db
@@ -62,7 +62,7 @@ export class CobrosService {
         consultaId: dto.consultaId,
       })
       .returning();
-    return cobro;
+    return { ...cobro, cajaAbiertaAhora: !cajaExistente };
   }
 
   /** Cobros de una caja puntual — para la vista en vivo del mostrador. */

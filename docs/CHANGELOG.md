@@ -2,6 +2,14 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-09-14] — Los egresos también abren la caja del día solos (apertura rápida)
+
+Decisión anterior revertida: `EgresosService.crear()` exigía una caja ya abierta y rechazaba con "abrí la caja primero" si no había ninguna — a diferencia de `CobrosService.crear()`, que desde 2026-09-03 abre una sola si hace falta. El usuario señaló el caso real que rompía esto: el flujo "+ Ingresos" de Farmacia genera un egreso automático por la compra a proveedor (`IngresoStockForm.tsx`), y eso puede ser la primera plata del día — antes de cualquier venta o cobro — con lo cual el egreso fallaba silenciosamente (el ingreso de stock ya se había guardado, sólo fallaba el gasto en Caja).
+
+- **Backend**: `EgresosService.crear()` ahora abre una caja sola igual que `CobrosService.crear()` (mismo `cajasService.actual() ?? cajasService.abrir()`). Ambos servicios devuelven `cajaAbiertaAhora: boolean` en la respuesta para que el front avise cuando esto pasó.
+- **Web**: `VentaRapidaModal.tsx`, `IngresoStockForm.tsx` (desde el acceso rápido del Home y desde `FarmaciaPage.tsx`) muestran "🔓 Se abrió la caja del día automáticamente." cuando corresponde. `CajaPage.tsx` no lo necesita — esa pantalla ya te muestra si hay una caja abierta antes de dejarte cobrar o cargar un egreso, así que el auto-open nunca se dispara silenciosamente ahí.
+- `test:caja-demo` reescrito: la sección que probaba "un egreso sin caja se rechaza" ahora prueba lo contrario (10 checks nuevos, org C separada para no ensuciar los tests de aislamiento entre organizaciones que ya usaban a la org B como "limpia"). Las 19 `test:*-demo` pasan.
+
 ## [2026-09-14] — DNI y celular de un dueño pasan a ser siempre obligatorios
 
 A pedido del usuario: hasta ahora `dni`/`celular` de `core.personas` eran opcionales en el alta — quedaba a criterio de quien cargaba. Regla de negocio explícita: **nunca opcionales**, y el DNI además es el marcador para no duplicar dueños dentro de una organización (chequeo que ya existía en `PersonasService.crear()`/`actualizar()`, sólo corría cuando el DNI venía informado — ahora corre siempre).

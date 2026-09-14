@@ -15,6 +15,7 @@ export function IngresoStockModal({
 }) {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [ok, setOk] = useState(false);
+  const [cajaAbiertaAhora, setCajaAbiertaAhora] = useState(false);
 
   useEffect(() => {
     api.productos(sesion).then(setProductos).catch(() => {});
@@ -31,7 +32,10 @@ export function IngresoStockModal({
         </div>
 
         {ok ? (
-          <p className="muted">Ingreso registrado ✓</p>
+          <>
+            <p className="muted">Ingreso registrado ✓</p>
+            {cajaAbiertaAhora && <p className="muted">🔓 Se abrió la caja del día automáticamente.</p>}
+          </>
         ) : productos.length === 0 ? (
           <p className="muted">Cargando productos…</p>
         ) : (
@@ -40,7 +44,8 @@ export function IngresoStockModal({
               sesion={sesion}
               productos={productos}
               onProductoCreado={(p) => setProductos((prev) => [...prev, p])}
-              onCreado={() => {
+              onCreado={(abierta) => {
+                setCajaAbiertaAhora(!!abierta);
                 setOk(true);
                 setTimeout(onCompletado, 900);
               }}

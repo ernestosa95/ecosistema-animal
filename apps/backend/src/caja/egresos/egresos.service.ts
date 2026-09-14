@@ -1,7 +1,7 @@
-import { BadRequestException, Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { and, desc, eq } from 'drizzle-orm';
 import { DRIZZLE, DrizzleDB } from '../../database/drizzle.provider';
-import { cajas, egresos } from '../../database/schema';
+import { egresos } from '../../database/schema';
 import { CreateEgresoDto } from './dto/create-egreso.dto';
 import { CajasService } from '../cajas/cajas.service';
 
@@ -13,24 +13,22 @@ export class EgresosService {
   ) {}
 
   /**
-   * Registra un egreso en la caja abierta — "aislado" de los ingresos
-   * (§2.6), nunca se listan juntos. Primero normaliza el día (si la caja
-   * abierta quedó de ayer sin cerrar, se cierra sola en revisión) para no
-   * imputarle por error un egreso de hoy a la caja de otro día — a
-   * diferencia de los cobros, un egreso sigue sin abrir una caja nueva por
-   * sí solo si no queda ninguna abierta.
+   * Registra un egreso — "aislado" de los ingresos (§2.6), nunca se listan
+   * juntos. Primero normaliza el día (si la caja abierta quedó de ayer sin
+   * cerrar, se cierra sola en revisión). Desde 2026-09-14, igual que
+   * `CobrosService.crear()`: si no queda ninguna caja abierta, abre una sola
+   * (apertura rápida) en vez de rechazar con "abrí la caja primero" —
+   * decisión anterior revertida a pedido del usuario tras un caso real
+   * (compra a proveedor con "+ Ingresos" de Farmacia, que genera un egreso
+   * automático — ver `IngresoStockForm.tsx` — siendo la primera acción de
+   * plata del día, antes de cualquier venta). `cajaAbiertaAhora` en la
+   * respuesta le avisa al front cuándo pasó esto, para poder recordárselo
+   * al usuario en vez de que quede silencioso.
    */
   async crear(organizacionId: string, usuarioId: string, dto: CreateEgresoDto) {
     await this.cajasService.normalizarDelDia(organizacionId, usuarioId);
-
-    const [caja] = await this.db
-      .select({ id: cajas.id })
-      .from(cajas)
-      .where(and(eq(cajas.organizacionId, organizacionId), eq(cajas.estado, 'abierta')))
-      .limit(1);
-    if (!caja) {
-      throw new BadRequestException('No hay una caja abierta. Abrí la caja del día antes de registrar un egreso.');
-    }
+    const cajaExistente = await this.cajasService.actual(organizacionId);
+    const caja = cajaExistente ?? (await this.cajasService.abrir(organizacionId, usuarioId, {}));
 
     const [egreso] = await this.db
       .insert(egresos)
@@ -42,7 +40,7 @@ export class EgresosService {
         monto: dto.monto.toString(),
       })
       .returning();
-    return egreso;
+    return { ...egreso, cajaAbiertaAhora: !cajaExistente };
   }
 
   listarDeCaja(organizacionId: string, cajaId: string) {

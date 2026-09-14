@@ -35,6 +35,7 @@ export function VentaRapidaModal({
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [ok, setOk] = useState(false);
+  const [cajaAbiertaAhora, setCajaAbiertaAhora] = useState(false);
 
   useEffect(() => {
     api.productos(sesion).then(setProductos).catch(() => {});
@@ -67,13 +68,14 @@ export function VentaRapidaModal({
     setError(null);
     setGuardando(true);
     try {
-      await api.crearCobro(sesion, {
+      const cobro = await api.crearCobro(sesion, {
         concepto: `Venta: ${productoSel.nombre}`,
         monto: Number(precioUnitario) * Number(cantidad),
         metodoPago,
         productoId: productoSel.id,
         cantidad: Number(cantidad),
       });
+      setCajaAbiertaAhora(!!cobro.cajaAbiertaAhora);
       try {
         await api.crearMovimientoStock(sesion, {
           productoId: productoSel.id,
@@ -120,7 +122,10 @@ export function VentaRapidaModal({
         </div>
 
         {ok ? (
-          <p className="muted">Venta registrada ✓</p>
+          <>
+            <p className="muted">Venta registrada ✓</p>
+            {cajaAbiertaAhora && <p className="muted">🔓 Se abrió la caja del día automáticamente.</p>}
+          </>
         ) : (
           <form className="form-grid" onSubmit={guardar} style={{ marginTop: '0.75rem' }}>
             <label className="span-2">

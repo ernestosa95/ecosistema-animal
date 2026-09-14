@@ -23,7 +23,8 @@ export function IngresoStockForm({
 }: {
   sesion: Sesion;
   productos: Producto[];
-  onCreado: () => void;
+  /** `cajaAbiertaAhora` viene en true si el egreso de la compra abrió la caja del día sola. */
+  onCreado: (cajaAbiertaAhora?: boolean) => void;
   /** El producto recién creado por el alta rápida — quien nos pasó `productos` tiene que sumarlo a su lista. */
   onProductoCreado: (p: Producto) => void;
 }) {
@@ -107,12 +108,14 @@ export function IngresoStockForm({
       if (precioCompra) dataProducto.precioCompra = Number(precioCompra);
       await api.actualizarProducto(sesion, producto.id, dataProducto);
 
+      let cajaAbiertaAhora = false;
       if (precioCompra && Number(precioCompra) > 0) {
         try {
-          await api.crearEgreso(sesion, {
+          const egreso = await api.crearEgreso(sesion, {
             concepto: `Compra a proveedor: ${producto.nombre} (${cantidad}${producto.unidad ? ` ${producto.unidad}` : ''})`,
             monto: Number(precioCompra) * Number(cantidad),
           });
+          cajaAbiertaAhora = !!egreso.cajaAbiertaAhora;
         } catch (errEgreso) {
           setError(
             'El ingreso se registró, pero no se pudo cargar el gasto en Caja: ' +
@@ -123,7 +126,7 @@ export function IngresoStockForm({
         }
       }
 
-      onCreado();
+      onCreado(cajaAbiertaAhora);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
     } finally {

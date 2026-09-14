@@ -58,6 +58,7 @@ export function FarmaciaPage({ sesion }: { sesion: Sesion }) {
   const [error, setError] = useState<string | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [mostrarIngreso, setMostrarIngreso] = useState(false);
+  const [avisoCajaAbierta, setAvisoCajaAbierta] = useState(false);
   const [filtroCategoria, setFiltroCategoria] = useState('');
 
   async function cargar() {
@@ -133,6 +134,7 @@ export function FarmaciaPage({ sesion }: { sesion: Sesion }) {
       <p className="muted">
         Vademécum y también el resto del stock de mostrador — alimento, accesorios, forraje, lo que sea que se venda o se use.
       </p>
+      {avisoCajaAbierta && <p className="muted">🔓 Se abrió la caja del día automáticamente.</p>}
 
       {mostrarForm && (
         <NuevoProductoForm
@@ -149,8 +151,10 @@ export function FarmaciaPage({ sesion }: { sesion: Sesion }) {
           sesion={sesion}
           productos={productos}
           onProductoCreado={(p) => setProductos((prev) => [...prev, p])}
-          onCreado={() => {
+          onCreado={(cajaAbiertaAhora) => {
             setMostrarIngreso(false);
+            setAvisoCajaAbierta(!!cajaAbiertaAhora);
+            if (cajaAbiertaAhora) setTimeout(() => setAvisoCajaAbierta(false), 6000);
             cargar();
           }}
         />
