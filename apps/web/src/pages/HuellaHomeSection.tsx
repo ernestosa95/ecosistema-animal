@@ -8,6 +8,7 @@ import { SeleccionarAnimalModal } from '../components/SeleccionarAnimalModal';
 import { VentaRapidaModal } from '../components/VentaRapidaModal';
 import { NuevoTurnoRapidoModal } from '../components/NuevoTurnoRapidoModal';
 import { IngresoStockModal } from '../components/IngresoStockModal';
+import { AccesoPortalModal } from '../components/AccesoPortalModal';
 import { tieneAlguno, ROLES_CLINICO, ROLES_CAJA, ROLES_TURNERO, ROLES_ATIENDEN, ROLES_FARMACIA } from '../nav/config';
 import type { ColumnaExport } from '../utils/columnasTabla';
 
@@ -43,7 +44,7 @@ interface Drill<T> {
   filas: T[];
 }
 
-type AccesoRapido = 'consulta' | 'vacuna' | 'venta' | 'turno' | 'ingreso-stock' | null;
+type AccesoRapido = 'consulta' | 'vacuna' | 'venta' | 'turno' | 'ingreso-stock' | 'portal' | null;
 
 /**
  * Home de Huella: ¾ izquierda = centro de operaciones (accesos rápidos a
@@ -326,15 +327,15 @@ export function HuellaHomeSection({
           </div>
 
           <div className="layout-side">
-            <button className="card dato kpi-clickable" onClick={abrirPacientesActivos}>
+            <button className="card dato kpi-clickable home-kpi" onClick={abrirPacientesActivos}>
               <span className="dato-label">Pacientes activos</span>
               <strong style={{ fontSize: '1.6rem' }}>{resumen.clinica.pacientesActivos}</strong>
             </button>
-            <button className="card dato kpi-clickable" onClick={abrirConsultasDelMes}>
+            <button className="card dato kpi-clickable home-kpi" onClick={abrirConsultasDelMes}>
               <span className="dato-label">Consultas este mes</span>
               <strong style={{ fontSize: '1.6rem' }}>{resumen.clinica.consultasEsteMes}</strong>
             </button>
-            <button className="card dato kpi-clickable" onClick={abrirVacunasPorVencer}>
+            <button className="card dato kpi-clickable home-kpi" onClick={abrirVacunasPorVencer}>
               <span className="dato-label">Vacunas por vencer (30 días)</span>
               <strong style={{ fontSize: '1.6rem' }}>{resumen.clinica.vacunasPorVencer}</strong>
             </button>
@@ -343,6 +344,13 @@ export function HuellaHomeSection({
                 <span className="operacion-btn-icono">📦</span>
                 <span className="operacion-btn-titulo">Ingreso de stock</span>
                 <span className="operacion-btn-sub">Registrá una compra a proveedor.</span>
+              </button>
+            )}
+            {puedeAgendar && (
+              <button className="operacion-btn" onClick={() => abrirAcceso('portal')}>
+                <span className="operacion-btn-icono">🔑</span>
+                <span className="operacion-btn-titulo">Acceso al portal</span>
+                <span className="operacion-btn-sub">Generá el link o el código para un dueño.</span>
               </button>
             )}
           </div>
@@ -386,6 +394,10 @@ export function HuellaHomeSection({
           onCancelar={() => setAccesoAbierto(null)}
           onCompletado={() => setAccesoAbierto(null)}
         />
+      )}
+
+      {accesoAbierto === 'portal' && (
+        <AccesoPortalModal sesion={sesion} onCerrar={() => setAccesoAbierto(null)} />
       )}
 
       {drill && (

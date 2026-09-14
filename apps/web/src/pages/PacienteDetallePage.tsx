@@ -41,6 +41,11 @@ export function PacienteDetallePage({
   const [dispensandoConsultaId, setDispensandoConsultaId] = useState<string | null>(null);
   const [indicandoConsultaId, setIndicandoConsultaId] = useState<string | null>(null);
   const [menuConsultaId, setMenuConsultaId] = useState<string | null>(null);
+  // Tras guardar una consulta nueva: en vez de abrir de una los paneles de
+  // dispensa/indicaciones (quedaban desplegados con el form vacío casi
+  // siempre, según feedback real de uso), se pregunta primero si hace falta
+  // cada uno — sólo se abre el panel si contestan que sí.
+  const [preguntaPostConsulta, setPreguntaPostConsulta] = useState<{ id: string; dispensa: boolean; indicacion: boolean } | null>(null);
   const [mostrarVacuna, setMostrarVacuna] = useState(() => !!abrirVacuna);
   const [editando, setEditando] = useState(false);
   const [generandoCarnet, setGenerandoCarnet] = useState(false);
@@ -272,11 +277,11 @@ export function PacienteDetallePage({
           onGuardada={(creada) => {
             setMostrarConsulta(false);
             cargar();
-            // Sigue directo a indicar medicamento/plan de tratamiento para la
-            // consulta recién creada, sin tener que reabrirla por el menú ⋮.
+            // Pregunta si hace falta dispensa/indicación para la consulta
+            // recién creada, en vez de abrir los paneles directo — ver
+            // preguntaPostConsulta más arriba.
             if (creada) {
-              setDispensandoConsultaId(creada.id);
-              setIndicandoConsultaId(creada.id);
+              setPreguntaPostConsulta({ id: creada.id, dispensa: false, indicacion: false });
             }
           }}
         />
@@ -391,6 +396,54 @@ export function PacienteDetallePage({
                         )}
                       </td>
                     </tr>
+                    {preguntaPostConsulta?.id === c.id && (!preguntaPostConsulta.dispensa || !preguntaPostConsulta.indicacion) && (
+                      <tr key={`${c.id}-pregunta`}>
+                        <td colSpan={7}>
+                          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            {!preguntaPostConsulta.dispensa && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                                <span>¿Se indicó algún medicamento en esta atención?</span>
+                                <button
+                                  className="btn-ghost"
+                                  onClick={() => {
+                                    setDispensandoConsultaId(c.id);
+                                    setPreguntaPostConsulta((p) => (p ? { ...p, dispensa: true } : p));
+                                  }}
+                                >
+                                  Sí, indicar
+                                </button>
+                                <button
+                                  className="link"
+                                  onClick={() => setPreguntaPostConsulta((p) => (p ? { ...p, dispensa: true } : p))}
+                                >
+                                  No
+                                </button>
+                              </div>
+                            )}
+                            {!preguntaPostConsulta.indicacion && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                                <span>¿Hay un plan de tratamiento para indicar?</span>
+                                <button
+                                  className="btn-ghost"
+                                  onClick={() => {
+                                    setIndicandoConsultaId(c.id);
+                                    setPreguntaPostConsulta((p) => (p ? { ...p, indicacion: true } : p));
+                                  }}
+                                >
+                                  Sí, cargar
+                                </button>
+                                <button
+                                  className="link"
+                                  onClick={() => setPreguntaPostConsulta((p) => (p ? { ...p, indicacion: true } : p))}
+                                >
+                                  No
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
                     {dispensandoConsultaId === c.id && (
                       <tr key={`${c.id}-dispensa`}>
                         <td colSpan={6}>
@@ -512,8 +565,8 @@ export function PacienteDetallePage({
       </div>
 
       {puedeClinico && mostrarVacuna && (
-        <div className="drawer-overlay" onClick={() => setMostrarVacuna(false)}>
-          <div className="drawer-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() => setMostrarVacuna(false)}>
+          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
             <div className="drawer-head">
               <span>💉 Nueva vacuna</span>
               <button className="link" onClick={() => setMostrarVacuna(false)}>
@@ -767,16 +820,6 @@ function ConsultaForm({
         <input value={observaciones} onChange={(e) => campo('observaciones')(e.target.value)} />
       </label>
       <label>
-        Anamnesis
-        <MacroPicker categoria="anamnesis" macros={macros} onInsertar={(t) => campo('anamnesis')(anamnesis ? `${anamnesis}\n${t}` : t)} />
-        <textarea rows={2} value={anamnesis} onChange={(e) => campo('anamnesis')(e.target.value)} />
-      </label>
-      <label>
-        Examen físico
-        <MacroPicker categoria="examenFisico" macros={macros} onInsertar={(t) => campo('examenFisico')(examenFisico ? `${examenFisico}\n${t}` : t)} />
-        <textarea rows={2} value={examenFisico} onChange={(e) => campo('examenFisico')(e.target.value)} />
-      </label>
-      <label>
         Diagnóstico
         <MacroPicker categoria="diagnostico" macros={macros} onInsertar={(t) => campo('diagnostico')(t)} />
         <BuscadorCatalogoDiagnosticos
@@ -792,42 +835,45 @@ function ConsultaForm({
         <MacroPicker categoria="tratamiento" macros={macros} onInsertar={(t) => campo('tratamiento')(t)} />
         <input value={tratamiento} onChange={(e) => campo('tratamiento')(e.target.value)} />
       </label>
-      <label>
-        Peso (kg)
-        <input
-          type="number"
-          step="0.1"
-          min="0"
-          value={pesoKg}
-          onChange={(e) => campo('pesoKg')(e.target.value)}
-        />
-        {!consulta && previa?.pesoKg && (
-          <span className="muted hint-previo">Anterior: {previa.pesoKg} kg</span>
-        )}
-      </label>
-      <label>
-        Temperatura (°C)
-        <input
-          type="number"
-          step="0.1"
-          min="0"
-          value={temperaturaC}
-          onChange={(e) => campo('temperaturaC')(e.target.value)}
-        />
-        {!consulta && previa?.temperaturaC && (
-          <span className="muted hint-previo">Anterior: {previa.temperaturaC} °C</span>
-        )}
-      </label>
-      <label>
-        Costo
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          value={costo}
-          onChange={(e) => campo('costo')(e.target.value)}
-        />
-      </label>
+      <div className="span-2" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+        <label style={{ flex: '0 0 110px' }}>
+          Peso (kg)
+          <input
+            type="number"
+            step="0.1"
+            min="0"
+            value={pesoKg}
+            onChange={(e) => campo('pesoKg')(e.target.value)}
+          />
+          {!consulta && previa?.pesoKg && (
+            <span className="muted hint-previo">Ant.: {previa.pesoKg} kg</span>
+          )}
+        </label>
+        <label style={{ flex: '0 0 130px' }}>
+          Temperatura (°C)
+          <input
+            type="number"
+            step="0.1"
+            min="0"
+            value={temperaturaC}
+            onChange={(e) => campo('temperaturaC')(e.target.value)}
+          />
+          {!consulta && previa?.temperaturaC && (
+            <span className="muted hint-previo">Ant.: {previa.temperaturaC} °C</span>
+          )}
+        </label>
+        <label style={{ flex: '0 0 110px' }}>
+          Costo
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={costo}
+            onChange={(e) => campo('costo')(e.target.value)}
+          />
+          <span className="muted hint-previo">Valor de referencia — el cobro se carga aparte en Caja</span>
+        </label>
+      </div>
       {error && <div className="alerta span-2">{error}</div>}
       <div className="span-2 acciones">
         <button className="btn" type="submit" disabled={guardando}>

@@ -309,6 +309,17 @@ h2 {
     width: auto;
     gap: 0.3rem;
   }
+  /* La barra horizontal de mobile prioriza lo básico (Home, Turnos,
+     Recordatorios, Farmacia, Caja) — mismo criterio que la app: "Animales"
+     y "Dueños" se alcanzan desde el Omnibox (buscador) o desde los accesos
+     rápidos del Home ("Nueva consulta"/"Registro de vacuna" ya incluyen
+     elegir o crear el paciente y su dueño), no hace falta un tab aparte acá.
+     Sólo se ocultan en Huella — Tropera usa sus propios ids
+     (tropera-animales), no coinciden con este selector. */
+  [data-tour="nav-animales"],
+  [data-tour="nav-duenos"] {
+    display: none;
+  }
   .option-btn {
     width: auto;
     height: auto;
@@ -516,6 +527,16 @@ h2 {
 @media (max-width: 900px) {
   .layout-2col {
     grid-template-columns: 1fr;
+  }
+  /* Los 3 KPI del Home de Huella (pacientes activos/consultas del mes/
+     vacunas por vencer) sólo ocupan espacio arriba de "Centro de
+     operaciones" en una columna angosta — en desktop van al costado, acá
+     se sacan del todo en vez de apilarse (el detalle sigue disponible en
+     Turnos/Recordatorios). Los accesos rápidos de .layout-side que sí
+     importan en mobile (Ingreso de stock, Acceso al portal) no llevan esta
+     clase, así que siguen mostrándose. */
+  .home-kpi {
+    display: none;
   }
   /* Apiladas en una sola columna, .layout-side ya no comparte fila con
      .layout-main (align-items: stretch no tiene nada contra qué estirarla),

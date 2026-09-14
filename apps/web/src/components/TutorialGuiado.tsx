@@ -39,6 +39,31 @@ export function TutorialGuiado({
   // Índice al que hay que llegar una vez que `seccionActual` refleje el
   // cambio de sección que ese paso necesita (ver efecto de abajo).
   const pendiente = useRef<number | null>(null);
+  const pendienteDireccion = useRef<1 | -1>(1);
+
+  // Un target puede existir en el DOM pero estar oculto por CSS (ej.
+  // nav-animales/nav-duenos en el layout mobile, ver styles.css) — Joyride
+  // sólo dispara TARGET_NOT_FOUND cuando el selector no matchea nada, no
+  // cuando matchea un elemento con display:none, así que ese caso hay que
+  // detectarlo acá y tratarlo igual: saltear el paso en vez de anclar el
+  // tooltip a un elemento invisible de 0x0.
+  function elementoVisible(target: TourStep['target']): boolean {
+    if (typeof target !== 'string' || target === 'body') return true;
+    const el = document.querySelector(target);
+    return !!el && (el as HTMLElement).offsetParent !== null;
+  }
+
+  function mostrarPaso(idx: number, direccion: 1 | -1) {
+    if (idx < 0 || idx >= steps.length) {
+      onTerminar();
+      return;
+    }
+    if (!elementoVisible(steps[idx].target)) {
+      irAPaso(idx + direccion, direccion);
+      return;
+    }
+    setStepIndex(idx);
+  }
 
   useEffect(() => {
     if (activo) {
@@ -57,11 +82,12 @@ export function TutorialGuiado({
     const requerida = steps[idx]?.seccion;
     if (requerida === null || requerida === undefined || requerida === seccionActual) {
       pendiente.current = null;
-      setStepIndex(idx);
+      mostrarPaso(idx, pendienteDireccion.current);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seccionActual, steps]);
 
-  function irAPaso(idx: number) {
+  function irAPaso(idx: number, direccion: 1 | -1 = 1) {
     if (idx < 0 || idx >= steps.length) {
       onTerminar();
       return;
@@ -69,9 +95,10 @@ export function TutorialGuiado({
     const requerida = steps[idx].seccion;
     if (requerida !== null && requerida !== seccionActual) {
       pendiente.current = idx;
+      pendienteDireccion.current = direccion;
       onNavegar(requerida);
     } else {
-      setStepIndex(idx);
+      mostrarPaso(idx, direccion);
     }
   }
 
@@ -85,12 +112,13 @@ export function TutorialGuiado({
       // El elemento no está en pantalla en este momento (ej. una sub-vista
       // distinta a la esperada dentro de la sección) — no bloquea el tour,
       // sigue en la misma dirección en la que se venía moviendo.
-      irAPaso(action === ACTIONS.PREV ? index - 1 : index + 1);
+      const direccion: 1 | -1 = action === ACTIONS.PREV ? -1 : 1;
+      irAPaso(index + direccion, direccion);
       return;
     }
     if (type === EVENTS.STEP_AFTER) {
-      if (action === ACTIONS.NEXT) irAPaso(index + 1);
-      else if (action === ACTIONS.PREV) irAPaso(index - 1);
+      if (action === ACTIONS.NEXT) irAPaso(index + 1, 1);
+      else if (action === ACTIONS.PREV) irAPaso(index - 1, -1);
       else if (action === ACTIONS.CLOSE || action === ACTIONS.SKIP) onTerminar();
     }
   }

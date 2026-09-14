@@ -2,6 +2,18 @@
 
 > Registro de cambios por iteración. El estado global y las fases viven en `Roadmap_Ecosistema.md`; la estructura de carpetas en `Estructura_Proyecto.md`.
 
+## [2026-09-13] — Revisión de UX post-deploy: onboarding, formularios y accesos al portal
+
+El usuario probó la app recién desplegada de punta a punta y fue señalando ajustes puntuales de UX — todos en `apps/web`, sin tocar backend ni schema:
+
+- **`LoginPage.tsx`**: sacado el link "¿No tenés cuenta? Solicitar acceso" — el alta de cuenta nueva sólo se pide desde la landing pública, no desde el login. Se fue con él el `ModalInteres`/cupo que sólo se usaban ahí (el `modo 'registro'` de solicitudes queda sin ningún botón que lo dispare, sin borrar el código).
+- **`WizardConfiguracionRapida.tsx`** ("Tu equipo"): la fila del propietario ahora aclara "Vos — {nombre}" y pregunta "¿ocupás algún rol más?" en vez de repetir Propietario como checkbox; se sacaron Administrador y Capataz de las opciones (Capataz sólo si la organización no tiene Tropera activo). El paso de agenda de veterinarios pasó de un dropdown genérico a preguntar uno por uno "¿configuramos la agenda de X?"; "Agenda no médica" hace lo mismo ("¿contás con un servicio no médico...?", vuelve a preguntar "¿otro más?" después de cada alta).
+- **`PacienteDetallePage.tsx`**: el form de consulta se simplificó a Motivo/Observaciones/Diagnóstico/Tratamiento (Anamnesis y Examen físico se sacaron de la vista, sin tocar el dato de consultas viejas); Peso/Temperatura/Costo pasaron a una fila compacta de ancho fijo, con una aclaración en Costo ("valor de referencia, el cobro se carga aparte en Caja" — no se conecta con Caja automáticamente). Tras guardar una consulta, ahora se pregunta "¿se indicó un medicamento?"/"¿hay un plan de tratamiento?" en vez de abrir los dos paneles de una. El modal de "Nueva vacuna" pasó del drawer lateral al modal centrado genérico, igual que el resto de la app.
+- **`PersonasPage.tsx`**: el enlace del portal ya no se muestra como URL cruda para copiar a mano — reusa el mismo patrón de `RecordatoriosPage.tsx` (WhatsApp si el dueño tiene celular, portapapeles si no).
+- **Nuevo: `AccesoPortalModal.tsx`**, accesible desde un botón nuevo en el Home ("🔑 Acceso al portal"): buscar/crear un dueño y generarle el link y/o el código de acceso, con un botón para mandar los dos juntos por WhatsApp con un tutorial breve.
+- **`AdminPage.tsx`** (Registrar pago): "Medio de pago" pasó de texto libre a una lista fija (Transferencia/Efectivo/Mercado Pago/Tarjeta/Demo/Otro); elegir "Demo" fija el monto en 0 (no genera ingreso real).
+- **Mobile (≤720/900px)**: los 3 KPI del Home (pacientes activos/consultas del mes/vacunas por vencer) se ocultan del todo en vez de apilarse — sólo ocupaban espacio arriba de "Centro de operaciones". "Animales" y "Dueños" se sacaron de la barra de navegación superior (se llega por el buscador o por los accesos rápidos del Home, mismo criterio "reducido" que la app mobile nativa) — `TutorialGuiado.tsx` ahora detecta un target oculto por CSS y lo saltea igual que uno inexistente, para que sus pasos no queden apuntando a un elemento invisible.
+
 ## [2026-09-13] — Fix: sesión con refresh token vencido no redirigía al home
 
 El usuario lo notó probando los flujos en producción. `api/admin.ts` ya resolvía esto (`alExpirar`, agregado antes) pero `api/client.ts`/`api/turnos.ts` (el cliente principal de la app) no: cuando el refresh token también vence (sesión inactiva más de `JWT_REFRESH_EXPIRES_IN`), el `pedir()`/`request()` de ambos dejaba que la llamada fallara con el 401 original, mostrando el error crudo en la pantalla en la que estuviera el usuario en vez de sacarlo.

@@ -156,7 +156,7 @@ function PersonaFila({
   onEditar: () => void;
 }) {
   const [animales, setAnimales] = useState<Animal[] | null>(null);
-  const [portalUrl, setPortalUrl] = useState<string | null>(null);
+  const [copiadoPortal, setCopiadoPortal] = useState(false);
   const [codigoPortal, setCodigoPortal] = useState<{ codigo: string; expiraEnMinutos: number } | null>(null);
   const [generandoCodigo, setGenerandoCodigo] = useState(false);
   const [errorCodigo, setErrorCodigo] = useState<string | null>(null);
@@ -172,14 +172,29 @@ function PersonaFila({
 
   const contacto = persona.celular || persona.telefono || persona.email || '—';
 
+  // Con teléfono, manda el link directo por WhatsApp en vez de mostrar el
+  // JWT larguísimo en pantalla para copiar a mano; sin teléfono, lo copia al
+  // portapapeles. Mismo patrón que RecordatoriosPage.tsx. La ventana se abre
+  // ANTES del await porque abrirla después suele quedar bloqueada por el
+  // popup blocker al dejar de ser un gesto directo del click.
   async function generarAcceso() {
     setErrorPortal(null);
     setGenerando(true);
+    setCopiadoPortal(false);
+    const tel = persona.celular || persona.telefono || '';
+    const ventana = tel ? window.open('', '_blank') : null;
     try {
       const r = await api.generarAccesoPortal(sesion, persona.id);
-      setPortalUrl(r.portalUrl);
       api.registrarEvento(sesion, 'accion', 'portal-generar-acceso');
+      const msg = `Hola${persona.nombre ? ' ' + persona.nombre : ''}, te compartimos el acceso al portal de tus mascotas: podés ver su historia clínica, vacunas y turnos acá → ${r.portalUrl}`;
+      if (tel && ventana) {
+        ventana.location.href = `https://wa.me/${tel}?text=${encodeURIComponent(msg)}`;
+      } else {
+        await navigator.clipboard.writeText(r.portalUrl);
+        setCopiadoPortal(true);
+      }
     } catch (err) {
+      ventana?.close();
       setErrorPortal(err instanceof Error ? err.message : 'No se pudo generar el acceso');
     } finally {
       setGenerando(false);
@@ -236,16 +251,15 @@ function PersonaFila({
             )}
 
             <div style={{ marginTop: '0.75rem', paddingTop: '0.6rem', borderTop: '1px solid #f0f1ee' }}>
-              {portalUrl ? (
-                <div className="dato">
-                  <span className="dato-label">Enlace del portal (vale 30 días) — copiá y mandale este link al dueño</span>
-                  <span className="mono" style={{ wordBreak: 'break-all' }}>{portalUrl}</span>
-                </div>
-              ) : (
-                <button className="btn-ghost" onClick={generarAcceso} disabled={generando}>
-                  {generando ? 'Generando…' : 'Generar acceso al portal'}
-                </button>
-              )}
+              <button className="btn-ghost" onClick={generarAcceso} disabled={generando}>
+                {generando
+                  ? 'Generando…'
+                  : copiadoPortal
+                    ? 'Link copiado ✓'
+                    : (persona.celular || persona.telefono)
+                      ? 'Enviar portal'
+                      : 'Copiar link portal'}
+              </button>
               {errorPortal && <div className="alerta">{errorPortal}</div>}
             </div>
 

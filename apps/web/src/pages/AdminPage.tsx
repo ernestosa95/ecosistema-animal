@@ -466,6 +466,8 @@ function Home({ resumen, ganancias, pendientes, onPagoRegistrado }: {
   );
 }
 
+const MEDIOS_PAGO = ['Transferencia', 'Efectivo', 'Mercado Pago', 'Tarjeta', 'Demo', 'Otro'];
+
 function RegistrarPagoModal({ org, onClose, onGuardado }: {
   org: ResumenPagoOrg; onClose: () => void; onGuardado: () => void;
 }) {
@@ -475,15 +477,24 @@ function RegistrarPagoModal({ org, onClose, onGuardado }: {
   const [historial, setHistorial] = useState<Pago[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const esDemo = medioPago === 'Demo';
 
   useEffect(() => { listarPagosOrg(org.id).then(setHistorial).catch(() => {}); }, [org.id]);
 
+  function cambiarMedioPago(v: string) {
+    setMedioPago(v);
+    if (v === 'Demo') setMonto('0'); // demo = sin costo, no genera ingreso real
+  }
+
   async function guardar() {
     const n = Number(monto);
-    if (!monto.trim() || !Number.isFinite(n) || n <= 0) { setError('Ingresá un monto válido'); return; }
+    if (!monto.trim() || !Number.isFinite(n) || n < 0 || (!esDemo && n === 0)) {
+      setError('Ingresá un monto válido');
+      return;
+    }
     setGuardando(true); setError(null);
     try {
-      await registrarPago(org.id, { monto: n, medioPago: medioPago.trim() || undefined, observaciones: observaciones.trim() || undefined });
+      await registrarPago(org.id, { monto: n, medioPago: medioPago || undefined, observaciones: observaciones.trim() || undefined });
       onGuardado();
     } catch (e: any) { setError(e.message ?? 'No se pudo registrar el pago'); }
     finally { setGuardando(false); }
@@ -494,12 +505,24 @@ function RegistrarPagoModal({ org, onClose, onGuardado }: {
       <div className="modal-panel" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
         <h4 className="form-titulo">Registrar pago — {org.nombre}</h4>
         <label>
-          Monto
-          <input type="number" min={0} value={monto} onChange={(e) => setMonto(e.target.value)} placeholder="Ej: 15000" autoFocus />
+          Medio de pago (opcional)
+          <select value={medioPago} onChange={(e) => cambiarMedioPago(e.target.value)}>
+            <option value="">Sin especificar</option>
+            {MEDIOS_PAGO.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
         </label>
         <label>
-          Medio de pago (opcional)
-          <input value={medioPago} onChange={(e) => setMedioPago(e.target.value)} placeholder="Ej: transferencia" />
+          Monto
+          <input
+            type="number"
+            min={0}
+            value={monto}
+            onChange={(e) => setMonto(e.target.value)}
+            placeholder="Ej: 15000"
+            disabled={esDemo}
+            autoFocus
+          />
+          {esDemo && <span className="muted hint-previo">Demo: no genera ingreso real, el monto queda en 0.</span>}
         </label>
         <label>
           Observaciones (opcional)

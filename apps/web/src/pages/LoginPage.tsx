@@ -4,9 +4,7 @@ import {
   crearSolicitud, listarPlanesPublicos, enviarCodigoVerificacion, confirmarCodigoVerificacion,
   type PlanPublico,
 } from '../api/solicitudes';
-import { consultarCupoInteresados, type CupoInteresados } from '../api/interesados';
 import { TerminosModal } from '../components/TerminosModal';
-import { ModalInteres } from '../components/ModalInteres';
 import { InfoRoles } from '../components/InfoRoles';
 import { SelectorBusqueda } from '../components/SelectorBusqueda';
 import { rolInfoDe } from '../config/rolesInfo';
@@ -23,20 +21,17 @@ import type { Sesion } from '../api/types';
 const PASOS_REGISTRO = ['Tus datos', 'Tu organización', 'Tu plan', 'Tu acceso'] as const;
 
 export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
-  // Estrategia de lanzamiento (temporal, ver LandingPage.tsx): el alta
-  // self-service directa ("modo registro" acá abajo) queda pausada, sin
-  // reemplazar el código — sólo sin ningún botón que la dispare, para poder
-  // restaurarla fácil cuando se levante el cupo de 10. "Solicitar acceso"
-  // abre el mismo ModalInteres que la landing en vez de pasar a modo
-  // registro; si no, este link quedaba como una vía paralela para saltearse
-  // el cupo sin pasar por la landing.
+  // Estrategia de lanzamiento (ver LandingPage.tsx): el alta de cuenta nueva
+  // sólo se pide desde la landing pública ("Estoy interesado" → ModalInteres),
+  // nunca desde acá — este login queda exclusivamente para ingresar o
+  // recuperar contraseña. El "modo registro" de acá abajo (alta self-service
+  // directa vía solicitudes/) queda sin ningún botón que lo dispare, mismo
+  // motivo: no duplicar una vía de alta paralela a la landing.
   const [planIdInicial] = useState(() => new URLSearchParams(window.location.search).get('plan'));
   const [modo, setModo] = useState<'login' | 'registro' | 'olvide'>('login');
   const [paso, setPaso] = useState(0);
   const [enviada, setEnviada] = useState(false);
   const [olvideEnviado, setOlvideEnviado] = useState(false);
-  const [cupo, setCupo] = useState<CupoInteresados | null>(null);
-  const [modalInteresAbierta, setModalInteresAbierta] = useState(!!planIdInicial);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -118,12 +113,6 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
       }).catch(() => {});
     }
   }, [modo]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    consultarCupoInteresados()
-      .then(setCupo)
-      .catch(() => setCupo({ disponible: true, restantes: 10 })); // si falla la consulta, no bloquear el link
-  }, []);
 
   const planElegido = planes.find((p) => p.id === planId);
 
@@ -524,29 +513,8 @@ export function LoginPage({ onSesion }: { onSesion: (s: Sesion) => void }) {
               Ingresar
             </button>
           </p>
-        ) : (
-          <p className="switch">
-            {cupo && !cupo.disponible ? (
-              'Ya completamos las primeras 10 solicitudes de esta etapa.'
-            ) : (
-              <>
-                ¿No tenés cuenta?{' '}
-                <button type="button" className="link" onClick={() => setModalInteresAbierta(true)}>
-                  Solicitar acceso
-                </button>
-              </>
-            )}
-          </p>
-        )}
+        ) : null}
       </form>
-
-      {modalInteresAbierta && (
-        <ModalInteres
-          restantes={cupo?.restantes ?? 10}
-          onCerrar={() => setModalInteresAbierta(false)}
-          onEnviado={() => setCupo((c) => (c ? { disponible: c.restantes > 1, restantes: c.restantes - 1 } : c))}
-        />
-      )}
     </div>
   );
 }

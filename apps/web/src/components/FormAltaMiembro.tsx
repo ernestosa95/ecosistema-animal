@@ -15,9 +15,11 @@ export interface LimitesPlan {
  * `limites` (de `api.limitesPlan`), deshabilita los roles que ya agotaron el
  * cupo del plan en vez de dejar que el submit falle con un 400.
  */
-export function FormAltaMiembro({ sesion, limites, onCreado }: {
+export function FormAltaMiembro({ sesion, limites, rolesExcluidos, onCreado }: {
   sesion: Sesion;
   limites?: LimitesPlan | null;
+  /** Roles que no tiene sentido ofrecer acá (ej. wizard de configuración rápida, ver WizardConfiguracionRapida.tsx). */
+  rolesExcluidos?: string[];
   onCreado: (usuario: { id: string; email: string; nombre: string | null; apellido: string | null }, roles: string[]) => void;
 }) {
   const [email, setEmail] = useState('');
@@ -75,7 +77,7 @@ export function FormAltaMiembro({ sesion, limites, onCreado }: {
       </div>
       <label>Rol (podés elegir más de uno)</label>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
-        {ROLES_INFO.map((r) => {
+        {ROLES_INFO.filter((r) => !rolesExcluidos?.includes(r.id)).map((r) => {
           const lim = limites?.[r.id];
           const sinCupo = !!lim && lim.limite != null && lim.usados >= lim.limite && !roles.includes(r.id);
           return (
